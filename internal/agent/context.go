@@ -1,28 +1,85 @@
 package agent
 
 import (
+	"log/slog"
+
+	"github.com/pkoukk/tiktoken-go"
+	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 )
 
-// ContextManager manages conversation history with token-based truncation.
+// ContextManager manages conversation history with token-based truncation and sqlite persistence.
 type ContextManager struct {
 	messages  []provider.Message
 	maxTokens int
+	store     *memory.Store
+	sessionID string
+	tke       *tiktoken.Tiktoken
 }
 
 // NewContextManager creates a new context manager.
-func NewContextManager(maxTokens int) *ContextManager {
-	return &ContextManager{
-		maxTokens: maxTokens,
+func NewContextManager(maxTokens int, store *memory.Store, sessionID string) *ContextManager {
+	// Initialize tiktoken (using cl100k_base which is used by gpt-4/o)
+	tke, err := tiktoken.GetEncoding("cl100k_base")
+	if err != nil {
+		slog.Error("failed to get tiktoken encoding, falling back to basic length counter", "error", err)
 	}
+
+	cm := &ContextManager{
+		maxTokens: maxTokens,
+		store:     store,
+		sessionID: sessionID,
+		tke:       tke,
+	}
+	
+	if store != nil && sessionID != "" {
+		msgs, err := store.LoadSession(sessionID)
+		if err == nil && len(msgs) > 0 {
+			cm.messages = msgs
+		}
+	}
+	
+	return cm
 }
 
 // AddMessage appends a message to the conversation history.
 func (c *ContextManager) AddMessage(role, content string) {
-	c.messages = append(c.messages, provider.Message{
+	msg := provider.Message{
 		Role:    role,
 		Content: content,
-	})
+	}
+	c.messages = append(c.messages, msg)
+	if c.store != nil && c.sessionID != "" {
+		_ = c.store.SaveMessage(c.sessionID, msg)
+	}
+	c.truncate()
+}
+
+// AddToolCallMessage appends an assistant message containing tool calls.
+func (c *ContextManager) AddToolCallMessage(content string, toolCalls []provider.ToolCallInfo) {
+	msg := provider.Message{
+		Role:      provider.RoleAssistant,
+		Content:   content,
+		ToolCalls: toolCalls,
+	}
+	c.messages = append(c.messages, msg)
+	if c.store != nil && c.sessionID != "" {
+		_ = c.store.SaveMessage(c.sessionID, msg)
+	}
+	c.truncate()
+}
+
+// AddToolResultMessage appends a message containing the result of a tool execution.
+func (c *ContextManager) AddToolResultMessage(toolCallID string, content string) {
+	msg := provider.Message{
+		Role:       provider.RoleTool,
+		Content:    content,
+		ToolCallID: toolCallID,
+	}
+	c.messages = append(c.messages, msg)
+	if c.store != nil && c.sessionID != "" {
+		_ = c.store.SaveMessage(c.sessionID, msg)
+	}
 	c.truncate()
 }
 
@@ -31,7 +88,7 @@ func (c *ContextManager) GetMessages() []provider.Message {
 	return c.messages
 }
 
-// Clear removes all messages.
+// Clear removes all in-memory messages but doesn't delete from SQLite.
 func (c *ContextManager) Clear() {
 	c.messages = nil
 }
@@ -46,16 +103,22 @@ func (c *ContextManager) truncate() {
 	for c.totalTokens() > c.maxTokens && len(c.messages) > 2 {
 		// Remove the oldest message (keep at least the last 2)
 		c.messages = c.messages[1:]
+		// We don't delete from the DB here; the DB is the full un-truncated history
 	}
 }
 
-// totalTokens estimates token count across all messages.
-// Uses a simple heuristic: ~4 chars per token.
+// totalTokens uses tiktoken to count tokens accurately if available.
 func (c *ContextManager) totalTokens() int {
 	total := 0
 	for _, m := range c.messages {
-		// ~4 chars per token + overhead per message
-		total += len(m.Content)/4 + 4
+		if c.tke != nil {
+			total += len(c.tke.Encode(m.Content, nil, nil))
+			// roughly 4 tokens for scaffolding 
+			total += 4
+		} else {
+			// Fallback heuristic if tiktoken failed to load
+			total += len(m.Content)/4 + 4
+		}
 	}
 	return total
 }

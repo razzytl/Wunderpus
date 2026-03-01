@@ -42,7 +42,7 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		model, g.apiKey,
 	)
 
-	body := buildGeminiBody(req.Messages, g.maxTok)
+	body := buildGeminiBody(req.Messages, req.Tools, g.maxTok)
 
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -70,7 +70,11 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		Candidates []struct {
 			Content struct {
 				Parts []struct {
-					Text string `json:"text"`
+					Text         string         `json:"text"`
+					FunctionCall *struct {
+						Name string         `json:"name"`
+						Args map[string]any `json:"args"`
+					} `json:"functionCall"`
 				} `json:"parts"`
 			} `json:"content"`
 			FinishReason string `json:"finishReason"`
@@ -90,8 +94,22 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 	}
 
 	var content string
+	var toolCalls []ToolCallInfo
 	for _, p := range result.Candidates[0].Content.Parts {
-		content += p.Text
+		if p.Text != "" {
+			content += p.Text
+		}
+		if p.FunctionCall != nil {
+			argsJson, _ := json.Marshal(p.FunctionCall.Args)
+			toolCalls = append(toolCalls, ToolCallInfo{
+				ID:   "call_" + p.FunctionCall.Name, // Gemini doesn't always provide IDs, generate one
+				Type: "function",
+				Function: ToolCallFunc{
+					Name:      p.FunctionCall.Name,
+					Arguments: string(argsJson),
+				},
+			})
+		}
 	}
 
 	return &CompletionResponse{
@@ -100,6 +118,7 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		FinishReason: result.Candidates[0].FinishReason,
 		PromptTokens: result.UsageMetadata.PromptTokenCount,
 		CompTokens:   result.UsageMetadata.CandidatesTokenCount,
+		ToolCalls:    toolCalls,
 	}, nil
 }
 
@@ -114,7 +133,7 @@ func (g *Gemini) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		model, g.apiKey,
 	)
 
-	body := buildGeminiBody(req.Messages, g.maxTok)
+	body := buildGeminiBody(req.Messages, req.Tools, g.maxTok)
 
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -181,7 +200,7 @@ func (g *Gemini) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	return ch, nil
 }
 
-func buildGeminiBody(msgs []Message, maxTokens int) map[string]any {
+func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[string]any {
 	var contents []map[string]any
 	var systemInstruction string
 
@@ -190,13 +209,59 @@ func buildGeminiBody(msgs []Message, maxTokens int) map[string]any {
 			systemInstruction = m.Content
 			continue
 		}
+		
+		if m.Role == RoleTool || m.ToolCallID != "" {
+			// Encode tool result
+			var resultObj any
+			// Try to parse the content as JSON so Gemini receives it as an object
+			if err := json.Unmarshal([]byte(m.Content), &resultObj); err != nil {
+				resultObj = m.Content
+			}
+			contents = append(contents, map[string]any{
+				"role": "user",
+				"parts": []map[string]any{
+					{
+						"functionResponse": map[string]any{
+							"name": strings.TrimPrefix(m.ToolCallID, "call_"), // Best effort matching
+							"response": map[string]any{
+								"result": resultObj,
+							},
+						},
+					},
+				},
+			})
+			continue
+		}
+
+		if len(m.ToolCalls) > 0 {
+			var parts []map[string]any
+			if m.Content != "" {
+				parts = append(parts, map[string]any{"text": m.Content})
+			}
+			for _, tc := range m.ToolCalls {
+				var args map[string]any
+				_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+				parts = append(parts, map[string]any{
+					"functionCall": map[string]any{
+						"name": tc.Function.Name,
+						"args": args,
+					},
+				})
+			}
+			contents = append(contents, map[string]any{
+				"role": "model",
+				"parts": parts,
+			})
+			continue
+		}
+
 		role := "user"
 		if m.Role == RoleAssistant {
 			role = "model"
 		}
 		contents = append(contents, map[string]any{
 			"role": role,
-			"parts": []map[string]string{
+			"parts": []map[string]any{
 				{"text": m.Content},
 			},
 		})
@@ -211,8 +276,26 @@ func buildGeminiBody(msgs []Message, maxTokens int) map[string]any {
 
 	if systemInstruction != "" {
 		body["systemInstruction"] = map[string]any{
-			"parts": []map[string]string{
+			"parts": []map[string]any{
 				{"text": systemInstruction},
+			},
+		}
+	}
+
+	if len(tools) > 0 {
+		var functionDeclarations []map[string]any
+		for _, t := range tools {
+			var params map[string]any
+			_ = json.Unmarshal(t.Function.Parameters, &params)
+			functionDeclarations = append(functionDeclarations, map[string]any{
+				"name":        t.Function.Name,
+				"description": t.Function.Description,
+				"parameters":  params,
+			})
+		}
+		body["tools"] = []map[string]any{
+			{
+				"functionDeclarations": functionDeclarations,
 			},
 		}
 	}

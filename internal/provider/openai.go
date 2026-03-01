@@ -47,6 +47,9 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		"max_tokens":  maxTok,
 		"temperature": req.Temperature,
 	}
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools
+	}
 
 	resp, err := o.doRequest(ctx, body, false)
 	if err != nil {
@@ -56,8 +59,11 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 
 	var result struct {
 		Choices []struct {
-			Message      struct{ Content string } `json:"message"`
-			FinishReason string                   `json:"finish_reason"`
+			Message struct {
+				Content   string         `json:"content"`
+				ToolCalls []ToolCallInfo `json:"tool_calls"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
 		Usage struct {
 			PromptTokens     int `json:"prompt_tokens"`
@@ -79,6 +85,7 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		FinishReason: result.Choices[0].FinishReason,
 		PromptTokens: result.Usage.PromptTokens,
 		CompTokens:   result.Usage.CompletionTokens,
+		ToolCalls:    result.Choices[0].Message.ToolCalls,
 	}, nil
 }
 
@@ -98,6 +105,9 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		"max_tokens":  maxTok,
 		"temperature": req.Temperature,
 		"stream":      true,
+	}
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools
 	}
 
 	resp, err := o.doRequest(ctx, body, true)
@@ -172,10 +182,17 @@ func (o *OpenAI) doRequest(ctx context.Context, body map[string]any, stream bool
 	return resp, nil
 }
 
-func toOpenAIMessages(msgs []Message) []map[string]string {
-	out := make([]map[string]string, len(msgs))
+func toOpenAIMessages(msgs []Message) []map[string]any {
+	out := make([]map[string]any, len(msgs))
 	for i, m := range msgs {
-		out[i] = map[string]string{"role": m.Role, "content": m.Content}
+		msg := map[string]any{"role": m.Role, "content": m.Content}
+		if m.ToolCallID != "" {
+			msg["tool_call_id"] = m.ToolCallID
+		}
+		if len(m.ToolCalls) > 0 {
+			msg["tool_calls"] = m.ToolCalls
+		}
+		out[i] = msg
 	}
 	return out
 }

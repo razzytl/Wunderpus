@@ -1,0 +1,20 @@
+# Wunderpus Ignores
+
+# User specific request
+CHECKLIST.md
+.planning/
+*.exe
+
+# Application State
+*.db
+wonderpus_audit.db
+wonderpus_memory.db
+
+# Config
+config.yaml
+
+# Build artifacts
+bin/
+
+# Dependencies
+vendor/

@@ -28,6 +28,13 @@ type streamChunkMsg struct{ text string }
 // streamErrMsg carries a stream error.
 type streamErrMsg struct{ err error }
 
+// toolMsg carries info about a tool execution.
+type toolMsg struct {
+	name   string
+	args   map[string]any
+	result string
+}
+
 // Model is the Bubbletea model for the TUI.
 type Model struct {
 	agent    *agent.Agent
@@ -143,8 +150,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamDoneMsg:
 		m.streaming = false
 		// Replace the streaming line with final version
-		if len(m.chatLog) > 0 {
+		if len(m.chatLog) > 0 && strings.HasPrefix(m.chatLog[len(m.chatLog)-1], AgentPrefixStyle.Render("🐙")) {
 			m.chatLog[len(m.chatLog)-1] = AgentPrefixStyle.Render("🐙") + " " + MessageStyle.Render(msg.full)
+		} else {
+			m.appendChat(AgentPrefixStyle.Render("🐙") + " " + MessageStyle.Render(msg.full))
 		}
 		m.appendChat("") // blank line separator
 		m.refreshViewport()
@@ -154,6 +163,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streaming = false
 		m.appendChat(ErrorStyle.Render("Error: " + msg.err.Error()))
 		m.appendChat("")
+		return m, nil
+
+	case toolMsg:
+		argStr := fmt.Sprintf("%v", msg.args)
+		if len(argStr) > 50 {
+			argStr = argStr[:47] + "..."
+		}
+		m.appendChat(DimStyle.Render(fmt.Sprintf("  🔧 Tool Executed: %s( %s )", msg.name, argStr)))
+		resultLine := msg.result
+		if len(resultLine) > 100 {
+			resultLine = resultLine[:97] + "..."
+		}
+		m.appendChat(DimStyle.Render(fmt.Sprintf("     ↳ %s", strings.ReplaceAll(resultLine, "\n", " "))))
 		return m, nil
 
 	case spinner.TickMsg:
@@ -260,6 +282,7 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 			DimStyle.Render("  /status            Show agent status"),
 			DimStyle.Render("  /provider <name>   Switch provider (openai, anthropic, ollama, gemini)"),
 			DimStyle.Render("  /providers         List available providers"),
+			DimStyle.Render("  /tools             List available tools"),
 			DimStyle.Render("  /exit              Quit"),
 			"",
 		}
@@ -314,6 +337,18 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 		}
 		m.appendChat("")
 
+	case "/tools":
+		m.appendChat("")
+		m.appendChat(SystemPrefixStyle.Render("Available tools:"))
+		// Not directly exposed on agent cleanly, so we just list the typical built-ins for Phase 2
+		m.appendChat(DimStyle.Render("  ▸ file_read      (Read file contents)"))
+		m.appendChat(DimStyle.Render("  ▸ file_write     (Write to file - sandbox)"))
+		m.appendChat(DimStyle.Render("  ▸ file_list      (List directory contents)"))
+		m.appendChat(DimStyle.Render("  ▸ shell_exec     (Execute whitelisted commands)"))
+		m.appendChat(DimStyle.Render("  ▸ http_request   (Make HTTP requests - SSRF protected)"))
+		m.appendChat(DimStyle.Render("  ▸ calculator     (Evaluate math expressions)"))
+		m.appendChat("")
+
 	case "/exit":
 		m.quitting = true
 		return m, tea.Quit
@@ -331,6 +366,12 @@ func Run(ag *agent.Agent) error {
 	_ = provider.RoleSystem // ensure import
 	m := New(ag)
 	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	// Wire up tool callback to send messages to the TUI
+	ag.SetToolCallback(func(name string, args map[string]any, result string) {
+		p.Send(toolMsg{name: name, args: args, result: result})
+	})
+
 	_, err := p.Run()
 	return err
 }

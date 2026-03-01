@@ -51,6 +51,9 @@ func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*Comp
 	if systemMsg != "" {
 		body["system"] = systemMsg
 	}
+	if len(req.Tools) > 0 {
+		body["tools"] = toAnthropicTools(req.Tools)
+	}
 
 	resp, err := a.doRequest(ctx, body, false)
 	if err != nil {
@@ -60,7 +63,11 @@ func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*Comp
 
 	var result struct {
 		Content []struct {
-			Text string `json:"text"`
+			Type  string `json:"type"`
+			Text  string `json:"text"`
+			ID    string `json:"id"`
+			Name  string `json:"name"`
+			Input any    `json:"input"`
 		} `json:"content"`
 		StopReason string `json:"stop_reason"`
 		Usage      struct {
@@ -74,8 +81,21 @@ func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*Comp
 	}
 
 	var content string
+	var toolCalls []ToolCallInfo
 	for _, c := range result.Content {
-		content += c.Text
+		if c.Type == "text" {
+			content += c.Text
+		} else if c.Type == "tool_use" {
+			inputParams, _ := json.Marshal(c.Input)
+			toolCalls = append(toolCalls, ToolCallInfo{
+				ID:   c.ID,
+				Type: "function",
+				Function: ToolCallFunc{
+					Name:      c.Name,
+					Arguments: string(inputParams),
+				},
+			})
+		}
 	}
 
 	return &CompletionResponse{
@@ -84,6 +104,7 @@ func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*Comp
 		FinishReason: result.StopReason,
 		PromptTokens: result.Usage.InputTokens,
 		CompTokens:   result.Usage.OutputTokens,
+		ToolCalls:    toolCalls,
 	}, nil
 }
 
@@ -107,6 +128,9 @@ func (a *Anthropic) Stream(ctx context.Context, req *CompletionRequest) (<-chan 
 	}
 	if systemMsg != "" {
 		body["system"] = systemMsg
+	}
+	if len(req.Tools) > 0 {
+		body["tools"] = toAnthropicTools(req.Tools)
 	}
 
 	resp, err := a.doRequest(ctx, body, true)
@@ -198,10 +222,65 @@ func extractSystem(msgs []Message) (string, []Message) {
 	return system, rest
 }
 
-func toAnthropicMessages(msgs []Message) []map[string]string {
-	out := make([]map[string]string, len(msgs))
-	for i, m := range msgs {
-		out[i] = map[string]string{"role": m.Role, "content": m.Content}
+func toAnthropicMessages(msgs []Message) []map[string]any {
+	out := make([]map[string]any, 0, len(msgs))
+	for _, m := range msgs {
+		if m.Role == RoleTool || m.ToolCallID != "" {
+			// Anthropic uses role "user" with content type "tool_result" for tool responses
+			out = append(out, map[string]any{
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type":         "tool_result",
+						"tool_use_id":  m.ToolCallID,
+						"content":      m.Content,
+					},
+				},
+			})
+			continue
+		}
+
+		if len(m.ToolCalls) > 0 {
+			// Anthropic assistant message with tool calls
+			contentBlocks := make([]map[string]any, 0)
+			if m.Content != "" {
+				contentBlocks = append(contentBlocks, map[string]any{
+					"type": "text",
+					"text": m.Content,
+				})
+			}
+			for _, tc := range m.ToolCalls {
+				var input map[string]any
+				_ = json.Unmarshal([]byte(tc.Function.Arguments), &input)
+				contentBlocks = append(contentBlocks, map[string]any{
+					"type":  "tool_use",
+					"id":    tc.ID,
+					"name":  tc.Function.Name,
+					"input": input,
+				})
+			}
+			out = append(out, map[string]any{
+				"role":    "assistant",
+				"content": contentBlocks,
+			})
+			continue
+		}
+
+		out = append(out, map[string]any{"role": m.Role, "content": m.Content})
+	}
+	return out
+}
+
+func toAnthropicTools(tools []ToolSchema) []map[string]any {
+	out := make([]map[string]any, len(tools))
+	for i, t := range tools {
+		var inputSchema map[string]any
+		_ = json.Unmarshal(t.Function.Parameters, &inputSchema)
+		out[i] = map[string]any{
+			"name":        t.Function.Name,
+			"description": t.Function.Description,
+			"input_schema": inputSchema,
+		}
 	}
 	return out
 }

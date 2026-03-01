@@ -44,6 +44,9 @@ func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 			"num_predict": o.maxTok,
 		},
 	}
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools // Ollama supports OpenAI-compatible tool schemas directly
+	}
 
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -69,7 +72,13 @@ func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 
 	var result struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Function struct {
+					Name      string         `json:"name"`
+					Arguments map[string]any `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"message"`
 		DoneReason string `json:"done_reason"`
 	}
@@ -77,10 +86,24 @@ func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		return nil, fmt.Errorf("ollama: decode response: %w", err)
 	}
 
+	var toolCalls []ToolCallInfo
+	for i, tc := range result.Message.ToolCalls {
+		argsJson, _ := json.Marshal(tc.Function.Arguments)
+		toolCalls = append(toolCalls, ToolCallInfo{
+			ID:   fmt.Sprintf("call_%d", i), // Ollama doesn't always provide IDs
+			Type: "function",
+			Function: ToolCallFunc{
+				Name:      tc.Function.Name,
+				Arguments: string(argsJson),
+			},
+		})
+	}
+
 	return &CompletionResponse{
 		Content:      result.Message.Content,
 		Model:        model,
 		FinishReason: result.DoneReason,
+		ToolCalls:    toolCalls,
 	}, nil
 }
 
@@ -97,6 +120,9 @@ func (o *Ollama) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		"options": map[string]any{
 			"num_predict": o.maxTok,
 		},
+	}
+	if len(req.Tools) > 0 {
+		body["tools"] = req.Tools
 	}
 
 	data, err := json.Marshal(body)
@@ -153,10 +179,28 @@ func (o *Ollama) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	return ch, nil
 }
 
-func toOllamaMessages(msgs []Message) []map[string]string {
-	out := make([]map[string]string, len(msgs))
+func toOllamaMessages(msgs []Message) []map[string]any {
+	out := make([]map[string]any, len(msgs))
 	for i, m := range msgs {
-		out[i] = map[string]string{"role": m.Role, "content": m.Content}
+		msg := map[string]any{"role": m.Role, "content": m.Content}
+		
+		if len(m.ToolCalls) > 0 {
+			var ollamaToolCalls []map[string]any
+			for _, tc := range m.ToolCalls {
+				var arguments map[string]any
+				_ = json.Unmarshal([]byte(tc.Function.Arguments), &arguments)
+				
+				ollamaToolCalls = append(ollamaToolCalls, map[string]any{
+					"function": map[string]any{
+						"name":      tc.Function.Name,
+						"arguments": arguments,
+					},
+				})
+			}
+			msg["tool_calls"] = ollamaToolCalls
+		}
+		
+		out[i] = msg
 	}
 	return out
 }

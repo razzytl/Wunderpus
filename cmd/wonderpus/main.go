@@ -14,8 +14,11 @@ import (
 	"github.com/wonderpus/wonderpus/internal/config"
 	"github.com/wonderpus/wonderpus/internal/health"
 	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
+	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wonderpus/wonderpus/internal/tool/builtin"
 	"github.com/wonderpus/wonderpus/internal/tui"
 )
 
@@ -57,17 +60,58 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 5. Init agent
+	// 5. Init tools
+	registry := tool.NewRegistry()
+	var executor *tool.Executor
+
+	if cfg.Tools.Enabled {
+		registry.Register(builtin.NewFileRead(cfg.Tools.AllowedPaths))
+		registry.Register(builtin.NewFileWrite(cfg.Tools.AllowedPaths))
+		registry.Register(builtin.NewFileList(cfg.Tools.AllowedPaths))
+		registry.Register(builtin.NewShellExec(cfg.Tools.ShellWhitelist))
+		registry.Register(builtin.NewHTTPRequest())
+		registry.Register(builtin.NewCalculator())
+
+		timeout := time.Duration(cfg.Tools.TimeoutSeconds) * time.Second
+		
+		approvalFn := func(toolName string, args map[string]any) (bool, error) {
+			// In a full TUI this would pause and ask the user.
+			// For Phase 2 MVP, we log a warning but allow it to proceed,
+			// relying on the sandboxing (paths/whitelist) for safety.
+			slog.Warn("SENSITIVE TOOL AUTO-APPROVED", "tool", toolName, "args", args)
+			return true, nil
+		}
+		
+		executor = tool.NewExecutor(registry, audit, approvalFn, timeout)
+	}
+
+	// 6. Init memory store
+	memStore, err := memory.NewStore(cfg.Agent.MemoryDBPath)
+	if err != nil {
+		slog.Error("failed to init memory store", "error", err)
+		os.Exit(1)
+	}
+	defer memStore.Close()
+
+	// Hardcode a single session ID for the CLI right now
+	// In the future this can be generated per connection/run
+	sessionID := "default_cli_session"
+
+	// 7. Init agent
 	ag := agent.NewAgent(
 		router,
 		sanitizer,
 		audit,
+		memStore,
+		registry,
+		executor,
 		cfg.Agent.SystemPrompt,
 		cfg.Agent.MaxContextTokens,
 		cfg.Agent.Temperature,
+		sessionID,
 	)
 
-	// 6. Start health server
+	// 8. Start health server
 	healthSrv := health.NewServer(cfg.Server.HealthPort)
 	healthSrv.Start()
 

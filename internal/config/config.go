@@ -13,6 +13,7 @@ type Config struct {
 	Providers       ProvidersConfig `yaml:"providers"`
 	DefaultProvider string          `yaml:"default_provider"`
 	Agent           AgentConfig     `yaml:"agent"`
+	Tools           ToolsConfig     `yaml:"tools"`
 	Security        SecurityConfig  `yaml:"security"`
 	Logging         LoggingConfig   `yaml:"logging"`
 	Server          ServerConfig    `yaml:"server"`
@@ -45,6 +46,15 @@ type AgentConfig struct {
 	SystemPrompt    string  `yaml:"system_prompt"`
 	MaxContextTokens int    `yaml:"max_context_tokens"`
 	Temperature     float64 `yaml:"temperature"`
+	MemoryDBPath    string  `yaml:"memory_db_path"`
+}
+
+// ToolsConfig holds tool execution, sandbox, and allowlist settings.
+type ToolsConfig struct {
+	Enabled        bool     `yaml:"enabled"`
+	TimeoutSeconds int      `yaml:"timeout_seconds"`
+	AllowedPaths   []string `yaml:"allowed_paths"`
+	ShellWhitelist []string `yaml:"shell_whitelist"`
 }
 
 // SecurityConfig holds security settings.
@@ -98,9 +108,17 @@ func Load(path string) (*Config, error) {
 
 func applyDefaults(cfg *Config) {
 	cfg.DefaultProvider = "openai"
-	cfg.Agent.SystemPrompt = "You are Wonderpus, a helpful AI assistant. Be concise and accurate."
+	cfg.Agent.SystemPrompt = "You are Wonderpus, a helpful AI assistant. Be concise and accurate. You have access to tools; use them when necessary to fulfill the user's request."
 	cfg.Agent.MaxContextTokens = 8000
 	cfg.Agent.Temperature = 0.7
+	cfg.Agent.MemoryDBPath = "wonderpus_memory.db"
+	cfg.Tools.Enabled = true
+	cfg.Tools.TimeoutSeconds = 30
+	cfg.Tools.AllowedPaths = []string{"."}
+	cfg.Tools.ShellWhitelist = []string{
+		"ls", "dir", "cat", "type", "echo", "head", "tail",
+		"wc", "grep", "find", "pwd", "date", "whoami",
+	}
 	cfg.Security.SanitizationEnabled = true
 	cfg.Security.AuditDBPath = "wonderpus_audit.db"
 	cfg.Logging.Level = "info"

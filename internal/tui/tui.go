@@ -283,6 +283,7 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 			DimStyle.Render("  /provider <name>   Switch provider (openai, anthropic, ollama, gemini)"),
 			DimStyle.Render("  /providers         List available providers"),
 			DimStyle.Render("  /tools             List available tools"),
+			DimStyle.Render("  /orchestrate <msg> Run multi-agent orchestrator on a complex task"),
 			DimStyle.Render("  /exit              Quit"),
 			"",
 		}
@@ -348,6 +349,28 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 		m.appendChat(DimStyle.Render("  ▸ http_request   (Make HTTP requests - SSRF protected)"))
 		m.appendChat(DimStyle.Render("  ▸ calculator     (Evaluate math expressions)"))
 		m.appendChat("")
+
+	case "/orchestrate":
+		if len(parts) < 2 {
+			m.appendChat(ErrorStyle.Render("Usage: /orchestrate <complex goal description>"))
+			m.appendChat("")
+		} else {
+			goal := strings.TrimPrefix(cmd, parts[0])
+			goal = strings.TrimSpace(goal)
+			m.appendChat(UserPrefixStyle.Render("You") + " " + MessageStyle.Render("(/orchestrate) " + goal))
+			
+			// We handle orchestrate outside the streaming logic for ease right now
+			m.streaming = true
+			m.streamBuf = ""
+			
+			return m, func() tea.Msg {
+				res, err := m.agent.HandleComplexTask(context.Background(), goal)
+				if err != nil {
+					return streamErrMsg{err: err}
+				}
+				return streamDoneMsg{full: res}
+			}
+		}
 
 	case "/exit":
 		m.quitting = true

@@ -171,6 +171,55 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 	return "", fmt.Errorf("agent reached maximum tool call iterations (%d)", maxIterations)
 }
 
+// HandleComplexTask engages Phase 4 Multi-Agent architecture.
+// It bypasses the simple agent loop, creates a TaskGraph, and runs it through the Orchestrator.
+func (a *Agent) HandleComplexTask(ctx context.Context, input string) (string, error) {
+	a.audit.Log(security.AuditEvent{
+		Timestamp:   time.Now(),
+		Action:      "complex_task_start",
+		Input:       input,
+		ThreatLevel: "none",
+	})
+
+	// 1. Planner decomposes the task
+	planner := NewTaskPlanner(a.router.Active(), a.router.ActiveName()) // Use current model
+	
+	// Print a little callback letting TUI know we are planning
+	if a.toolFunc != nil {
+		a.toolFunc("system:planner", map[string]any{"goal": input}, "Decomposing task into dependency graph...")
+	}
+	
+	graph, err := planner.Decompose(ctx, input)
+	if err != nil {
+		return "", fmt.Errorf("planner failed: %w", err)
+	}
+
+	if a.toolFunc != nil {
+		a.toolFunc("system:orchestrator", map[string]any{"subtasks": len(graph.Subtasks)}, "Graph resolved. Launching worker arms...")
+	}
+
+	// 2. Orchestrator executes graph
+	orchestator := NewOrchestrator(a.router, a.registry, a.executor, a.router.ActiveName())
+	
+	finalRes, err := orchestator.Execute(ctx, graph)
+	if err != nil {
+		return "", fmt.Errorf("orchestrator failed: %w", err)
+	}
+
+	// Add final result to main agent context so it remembers the synthesis
+	a.ctx.AddMessage(provider.RoleUser, "Deep Task: " + input)
+	a.ctx.AddMessage(provider.RoleAssistant, finalRes)
+
+	a.audit.Log(security.AuditEvent{
+		Timestamp:   time.Now(),
+		Action:      "complex_task_end",
+		Result:      finalRes,
+		ThreatLevel: "none",
+	})
+
+	return finalRes, nil
+}
+
 // StreamMessage processes a user message and streams the response.
 func (a *Agent) StreamMessage(ctx context.Context, input string) (<-chan provider.StreamChunk, error) {
 	// 1. Sanitize

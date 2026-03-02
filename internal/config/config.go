@@ -17,6 +17,7 @@ type Config struct {
 	Security        SecurityConfig  `yaml:"security"`
 	Logging         LoggingConfig   `yaml:"logging"`
 	Server          ServerConfig    `yaml:"server"`
+	Channels        ChannelsConfig  `yaml:"channels"`
 }
 
 // ProvidersConfig holds all LLM provider configurations.
@@ -47,6 +48,8 @@ type AgentConfig struct {
 	MaxContextTokens int    `yaml:"max_context_tokens"`
 	Temperature     float64 `yaml:"temperature"`
 	MemoryDBPath    string  `yaml:"memory_db_path"`
+	Budget          float64 `yaml:"budget"`           // max cost in dollars
+	CostDBPath      string  `yaml:"cost_db_path"`
 }
 
 // ToolsConfig holds tool execution, sandbox, and allowlist settings.
@@ -59,8 +62,23 @@ type ToolsConfig struct {
 
 // SecurityConfig holds security settings.
 type SecurityConfig struct {
-	SanitizationEnabled bool   `yaml:"sanitization_enabled"`
-	AuditDBPath         string `yaml:"audit_db_path"`
+	SanitizationEnabled bool           `yaml:"sanitization_enabled"`
+	AuditDBPath         string         `yaml:"audit_db_path"`
+	RateLimit           RateLimitConfig `yaml:"rate_limit"`
+	Encryption          EncryptionConfig `yaml:"encryption"`
+}
+
+// RateLimitConfig holds rate limiting settings.
+type RateLimitConfig struct {
+	Enabled     bool `yaml:"enabled"`
+	MaxRequests int  `yaml:"max_requests"`
+	WindowSec   int  `yaml:"window_sec"`
+}
+
+// EncryptionConfig holds encryption settings.
+type EncryptionConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Key     string `yaml:"key"` // Base64 encoded 32-byte key
 }
 
 // LoggingConfig holds logging settings.
@@ -73,6 +91,32 @@ type LoggingConfig struct {
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
 	HealthPort int `yaml:"health_port"`
+}
+
+// ChannelsConfig holds configuration for various communication channels.
+type ChannelsConfig struct {
+	Telegram  TelegramConfig  `yaml:"telegram"`
+	Discord   DiscordConfig   `yaml:"discord"`
+	WebSocket WebSocketConfig `yaml:"websocket"`
+}
+
+// TelegramConfig holds Telegram bot settings.
+type TelegramConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Token   string `yaml:"token"`
+}
+
+// DiscordConfig holds Discord bot settings.
+type DiscordConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Token   string `yaml:"token"`
+	GuildID string `yaml:"guild_id"`
+}
+
+// WebSocketConfig holds WebSocket server settings.
+type WebSocketConfig struct {
+	Enabled bool `yaml:"enabled"`
+	Port    int  `yaml:"port"`
 }
 
 // Load reads config from a YAML file, then overlays environment variables.
@@ -112,6 +156,8 @@ func applyDefaults(cfg *Config) {
 	cfg.Agent.MaxContextTokens = 8000
 	cfg.Agent.Temperature = 0.7
 	cfg.Agent.MemoryDBPath = "wonderpus_memory.db"
+	cfg.Agent.Budget = 10.00 // Default $10 budget
+	cfg.Agent.CostDBPath = "wonderpus_cost.db"
 	cfg.Tools.Enabled = true
 	cfg.Tools.TimeoutSeconds = 30
 	cfg.Tools.AllowedPaths = []string{"."}
@@ -121,10 +167,20 @@ func applyDefaults(cfg *Config) {
 	}
 	cfg.Security.SanitizationEnabled = true
 	cfg.Security.AuditDBPath = "wonderpus_audit.db"
+	cfg.Security.RateLimit.Enabled = true
+	cfg.Security.RateLimit.MaxRequests = 10
+	cfg.Security.RateLimit.WindowSec = 60
+	cfg.Security.Encryption.Enabled = false
 	cfg.Logging.Level = "info"
 	cfg.Logging.Format = "json"
 	cfg.Logging.Output = "stderr"
 	cfg.Server.HealthPort = 8080
+
+	cfg.Channels.Telegram.Enabled = false
+	cfg.Channels.Discord.Enabled = false
+	cfg.Channels.WebSocket.Enabled = false
+	cfg.Channels.WebSocket.Port = 9090
+
 	cfg.Providers.OpenAI.Model = "gpt-4o"
 	cfg.Providers.OpenAI.MaxTokens = 4096
 	cfg.Providers.Anthropic.Model = "claude-sonnet-4-20250514"
@@ -155,6 +211,10 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WONDERPUS_LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = v
+	}
+	if v := os.Getenv("WONDERPUS_ENCRYPTION_KEY"); v != "" {
+		cfg.Security.Encryption.Key = v
+		cfg.Security.Encryption.Enabled = true
 	}
 }
 

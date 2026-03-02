@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +21,11 @@ import (
 	"github.com/wonderpus/wonderpus/internal/tool"
 	"github.com/wonderpus/wonderpus/internal/tool/builtin"
 	"github.com/wonderpus/wonderpus/internal/tui"
+	"github.com/wonderpus/wonderpus/internal/channel"
+	"github.com/wonderpus/wonderpus/internal/channel/websocket"
+	"github.com/wonderpus/wonderpus/internal/channel/telegram"
+	"github.com/wonderpus/wonderpus/internal/channel/discord"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -93,31 +99,49 @@ func main() {
 	}
 	defer memStore.Close()
 
-	// Hardcode a single session ID for the CLI right now
-	// In the future this can be generated per connection/run
-	sessionID := "default_cli_session"
-
-	// 7. Init agent
-	ag := agent.NewAgent(
+	// 7. Init agent manager
+	manager := agent.NewManager(
+		cfg,
 		router,
 		sanitizer,
 		audit,
 		memStore,
 		registry,
 		executor,
-		cfg.Agent.SystemPrompt,
-		cfg.Agent.MaxContextTokens,
-		cfg.Agent.Temperature,
-		sessionID,
 	)
 
-	// 8. Start health server
-	healthSrv := health.NewServer(cfg.Server.HealthPort)
-	healthSrv.Start()
+	// Hardcode a single session ID for the CLI right now
+	sessionID := "default_cli_session"
+	ag := manager.GetAgent(sessionID)
 
 	// 7. Graceful shutdown handler
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// 8. Init channels
+	var channels []channel.Channel
+	if cfg.Channels.WebSocket.Enabled {
+		channels = append(channels, websocket.NewServer(cfg.Channels.WebSocket.Port, manager))
+	}
+	if cfg.Channels.Telegram.Enabled {
+		channels = append(channels, telegram.NewChannel(cfg.Channels.Telegram.Token, manager))
+	}
+	if cfg.Channels.Discord.Enabled {
+		channels = append(channels, discord.NewChannel(cfg.Channels.Discord.Token, manager))
+	}
+
+	// 9. Start health & metrics server
+	healthSrv := health.NewServer(cfg.Server.HealthPort)
+	// Add Prometheus metrics endpoint
+	http.Handle("/metrics", promhttp.Handler())
+	healthSrv.Start()
+
+	// 10. Start channels
+	for _, ch := range channels {
+		if err := ch.Start(ctx); err != nil {
+			slog.Error("failed to start channel", "channel", ch.Name(), "error", err)
+		}
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -131,13 +155,16 @@ func main() {
 		defer shutCancel()
 
 		_ = healthSrv.Shutdown(shutCtx)
+		for _, ch := range channels {
+			_ = ch.Stop()
+		}
 		audit.Close()
 		slog.Info("wonderpus stopped")
 	}()
 
 	_ = ctx // used for future background tasks
 
-	// 8. Launch TUI
+	// 11. Launch TUI (runs in main thread)
 	if err := tui.Run(ag); err != nil {
 		slog.Error("tui error", "error", err)
 		os.Exit(1)

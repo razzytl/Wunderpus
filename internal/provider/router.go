@@ -1,10 +1,12 @@
 package provider
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 
 	"github.com/wonderpus/wonderpus/internal/config"
+	"github.com/wonderpus/wonderpus/internal/security"
 )
 
 // Router manages available providers and routes to the right one.
@@ -22,24 +24,63 @@ func NewRouter(cfg *config.Config) (*Router, error) {
 		defaultName: cfg.DefaultProvider,
 	}
 
-	// Register configured providers
-	if cfg.Providers.OpenAI.APIKey != "" {
-		p := NewOpenAI(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.Model, cfg.Providers.OpenAI.MaxTokens)
+	// encryption key
+	var decodedKey []byte
+	if cfg.Security.Encryption.Enabled && cfg.Security.Encryption.Key != "" {
+		var err error
+		decodedKey, err = base64.StdEncoding.DecodeString(cfg.Security.Encryption.Key)
+		if err != nil {
+			return nil, fmt.Errorf("invalid encryption key: %w", err)
+		}
+	}
+
+	// Helper to get key (decrypt if needed)
+	getKey := func(k string) (string, error) {
+		if k == "" {
+			return "", nil
+		}
+		if len(decodedKey) > 0 {
+			return security.Decrypt(k, decodedKey)
+		}
+		return k, nil
+	}
+
+	// OpenAI
+	openAIKey, err := getKey(cfg.Providers.OpenAI.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("openai key decryption: %w", err)
+	}
+	if openAIKey != "" {
+		p := NewOpenAI(openAIKey, cfg.Providers.OpenAI.Model, cfg.Providers.OpenAI.MaxTokens)
 		r.providers["openai"] = p
 		slog.Info("provider registered", "name", "openai", "model", cfg.Providers.OpenAI.Model)
 	}
-	if cfg.Providers.Anthropic.APIKey != "" {
-		p := NewAnthropic(cfg.Providers.Anthropic.APIKey, cfg.Providers.Anthropic.Model, cfg.Providers.Anthropic.MaxTokens)
+
+	// Anthropic
+	anthropicKey, err := getKey(cfg.Providers.Anthropic.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("anthropic key decryption: %w", err)
+	}
+	if anthropicKey != "" {
+		p := NewAnthropic(anthropicKey, cfg.Providers.Anthropic.Model, cfg.Providers.Anthropic.MaxTokens)
 		r.providers["anthropic"] = p
 		slog.Info("provider registered", "name", "anthropic", "model", cfg.Providers.Anthropic.Model)
 	}
+
+	// Ollama (no key needed)
 	if cfg.Providers.Ollama.Host != "" {
 		p := NewOllama(cfg.Providers.Ollama.Host, cfg.Providers.Ollama.Model, cfg.Providers.Ollama.MaxTokens)
 		r.providers["ollama"] = p
 		slog.Info("provider registered", "name", "ollama", "model", cfg.Providers.Ollama.Model)
 	}
-	if cfg.Providers.Gemini.APIKey != "" {
-		p := NewGemini(cfg.Providers.Gemini.APIKey, cfg.Providers.Gemini.Model, cfg.Providers.Gemini.MaxTokens)
+
+	// Gemini
+	geminiKey, err := getKey(cfg.Providers.Gemini.APIKey)
+	if err != nil {
+		return nil, fmt.Errorf("gemini key decryption: %w", err)
+	}
+	if geminiKey != "" {
+		p := NewGemini(geminiKey, cfg.Providers.Gemini.Model, cfg.Providers.Gemini.MaxTokens)
 		r.providers["gemini"] = p
 		slog.Info("provider registered", "name", "gemini", "model", cfg.Providers.Gemini.Model)
 	}

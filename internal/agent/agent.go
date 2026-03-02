@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wonderpus/wonderpus/internal/memory"
+	"github.com/wonderpus/wonderpus/internal/logging"
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
@@ -24,6 +25,8 @@ type Agent struct {
 	sysPrompt string
 	temp      float64
 	toolFunc  func(name string, args map[string]any, result string) // optional callback for TUI
+	limiter   *security.RateLimiter
+	sessionID string
 }
 
 // NewAgent creates a new agent instance.
@@ -48,7 +51,13 @@ func NewAgent(
 		ctx:       NewContextManager(maxContextTokens, store, sessionID),
 		sysPrompt: systemPrompt,
 		temp:      temperature,
+		sessionID: sessionID,
 	}
+}
+
+// SetRateLimiter sets the rate limiter for the agent.
+func (a *Agent) SetRateLimiter(rl *security.RateLimiter) {
+	a.limiter = rl
 }
 
 // SetToolCallback sets a function to be called when a tool executes (useful for TUI).
@@ -58,6 +67,11 @@ func (a *Agent) SetToolCallback(fn func(name string, args map[string]any, result
 
 // HandleMessage processes a user message and returns the agent response.
 func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error) {
+	// 0. Rate Limit
+	if a.limiter != nil && !a.limiter.Allow(a.sessionID) {
+		return "⚠️  Rate limit exceeded. Please wait a moment before sending more messages.", nil
+	}
+
 	// 1. Sanitize
 	cleaned, threats := a.sanitizer.Sanitize(input)
 
@@ -132,6 +146,7 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 				Result:      resp.Content,
 				ThreatLevel: "none",
 			})
+			logging.MessagesProcessed.WithLabelValues("unknown", prov.Name()).Inc()
 			return resp.Content, nil
 		}
 
@@ -150,8 +165,9 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 				Args: args,
 			}
 
-			// execute tool
+			start := time.Now()
 			res := a.executor.Execute(ctx, toolCall)
+			logging.ToolExecutionTime.WithLabelValues(tc.Function.Name).Observe(time.Since(start).Seconds())
 
 			outputStr := res.Output
 			if res.Error != "" {

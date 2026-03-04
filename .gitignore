@@ -16,5 +16,8 @@ config.yaml
 # Build artifacts
 bin/
 
+# Worktrees
+.worktrees/
+
 # Dependencies
 vendor/

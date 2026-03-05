@@ -6,9 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
+
+	"github.com/wonderpus/wonderpus/internal/errors"
 )
 
 // OpenAI implements the Provider interface for OpenAI's API.
@@ -25,7 +26,7 @@ func NewOpenAI(apiKey, model string, maxTokens int) *OpenAI {
 		apiKey: apiKey,
 		model:  model,
 		maxTok: maxTokens,
-		client: &http.Client{},
+		client: DefaultClient,
 	}
 }
 
@@ -49,9 +50,17 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 	}
 	if len(req.Tools) > 0 {
 		body["tools"] = req.Tools
+		if req.ToolChoice != nil {
+			body["tool_choice"] = req.ToolChoice
+		}
 	}
 
-	resp, err := o.doRequest(ctx, body, false)
+	httpReq, err := o.createRequest(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := RetryDo(ctx, o.client, httpReq, DefaultRetryOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +117,17 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	}
 	if len(req.Tools) > 0 {
 		body["tools"] = req.Tools
+		if req.ToolChoice != nil {
+			body["tool_choice"] = req.ToolChoice
+		}
 	}
 
-	resp, err := o.doRequest(ctx, body, true)
+	httpReq, err := o.createRequest(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := RetryDo(ctx, o.client, httpReq, DefaultRetryOptions) // Stream still uses standard request, but RetryDo might need adjustment for live streams. For now, we only retry the connection.
 	if err != nil {
 		return nil, err
 	}
@@ -154,38 +171,47 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	return ch, nil
 }
 
-func (o *OpenAI) doRequest(ctx context.Context, body map[string]any, stream bool) (*http.Response, error) {
+func (o *OpenAI) createRequest(ctx context.Context, body map[string]any) (*http.Request, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("openai: marshal: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "marshal openai request", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("openai: create request: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "create openai request", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
 
-	resp, err := o.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("openai: request failed: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("openai: API error %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	return resp, nil
+	return httpReq, nil
 }
 
 func toOpenAIMessages(msgs []Message) []map[string]any {
 	out := make([]map[string]any, len(msgs))
 	for i, m := range msgs {
-		msg := map[string]any{"role": m.Role, "content": m.Content}
+		var content any
+		if len(m.MultiContent) > 0 {
+			parts := make([]map[string]any, len(m.MultiContent))
+			for j, p := range m.MultiContent {
+				part := map[string]any{"type": p.Type}
+				if p.Type == "text" {
+					part["text"] = p.Text
+				} else if p.Type == "image_url" && p.ImageURL != nil {
+					part["image_url"] = map[string]any{
+						"url":    p.ImageURL.URL,
+						"detail": p.ImageURL.Detail,
+					}
+				}
+				parts[j] = part
+			}
+			content = parts
+		} else {
+			content = m.Content
+		}
+
+		msg := map[string]any{"role": m.Role, "content": content}
 		if m.ToolCallID != "" {
 			msg["tool_call_id"] = m.ToolCallID
 		}

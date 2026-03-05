@@ -17,20 +17,36 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o wonderpus -ldflags="-s -w" ./cmd/wonderpus
 
 # Production stage
-FROM alpine:3.19
+FROM alpine:3.19.1
+
+LABEL org.opencontainers.image.source="https://github.com/wonderpus/wonderpus"
+LABEL org.opencontainers.image.description="Universal Autonomous AI Agent in Go"
+
+# Create non-root user
+RUN addgroup -S wonderpus && adduser -S wonderpus -G wonderpus
 
 WORKDIR /app
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
+# Create data directory and set permissions
+RUN mkdir -p /app/data && chown -R wonderpus:wonderpus /app
+
 # Copy binary from builder
 COPY --from=builder /app/wonderpus .
-COPY --from=builder /app/config.example.yaml ./config.yaml
+COPY --from=builder --chown=wonderpus:wonderpus /app/config.example.yaml ./config.yaml
+
+# Switch to non-root user
+USER wonderpus
 
 # Expose ports
 # Health & Metrics: 8080
 # WebSocket: 9090 (default)
 EXPOSE 8080 9090
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/live || exit 1
 
 ENTRYPOINT ["./wonderpus"]

@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/wonderpus/wonderpus/internal/config"
 	"github.com/wonderpus/wonderpus/internal/cost"
@@ -10,6 +11,7 @@ import (
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wonderpus/wonderpus/internal/types"
 )
 
 // Manager handles multiple agent instances, one per session.
@@ -22,8 +24,8 @@ type Manager struct {
 	registry  *tool.Registry
 	executor  *tool.Executor
 
-	mu     sync.RWMutex
-	agents map[string]*Agent
+	mu      sync.RWMutex
+	agents  map[string]*Agent
 	limiter *security.RateLimiter
 	tracker *cost.Tracker
 }
@@ -38,7 +40,7 @@ func NewManager(
 	registry *tool.Registry,
 	executor *tool.Executor,
 ) *Manager {
-	return &Manager{
+	m := &Manager{
 		cfg:       cfg,
 		router:    router,
 		sanitizer: sanitizer,
@@ -103,4 +105,10 @@ func (m *Manager) ProcessMessage(ctx context.Context, sessionID, input string) (
 
 	ag := m.GetAgent(sessionID)
 	return ag.HandleMessage(ctx, input)
+}
+
+// ProcessRequest processes a full UserMessage request.
+func (m *Manager) ProcessRequest(ctx context.Context, req types.UserMessage) (types.AgentResponse, error) {
+	resp, err := m.ProcessMessage(ctx, req.SessionID, req.Content)
+	return types.AgentResponse{Content: resp, SessionID: req.SessionID}, err
 }

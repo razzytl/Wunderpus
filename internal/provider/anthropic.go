@@ -6,9 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
+
+	"github.com/wonderpus/wonderpus/internal/errors"
 )
 
 // Anthropic implements the Provider interface for Anthropic's API.
@@ -25,8 +26,18 @@ func NewAnthropic(apiKey, model string, maxTokens int) *Anthropic {
 		apiKey: apiKey,
 		model:  model,
 		maxTok: maxTokens,
-		client: &http.Client{},
+		client: DefaultClient,
 	}
+}
+
+func (a *Anthropic) validate() error {
+	if a.apiKey == "" {
+		return errors.New(errors.ProviderError, "anthropic: API key is missing")
+	}
+	if !strings.HasPrefix(a.apiKey, "sk-ant-") {
+		return errors.New(errors.ProviderError, "anthropic: invalid API key format (expected sk-ant-...)")
+	}
+	return nil
 }
 
 func (a *Anthropic) Name() string { return "anthropic" }
@@ -55,11 +66,19 @@ func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*Comp
 		body["tools"] = toAnthropicTools(req.Tools)
 	}
 
-	resp, err := a.doRequest(ctx, body, false)
+	httpReq, err := a.createRequest(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := RetryDo(ctx, a.client, httpReq, DefaultRetryOptions)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	// Wrap body in size limit
+	resp.Body = LimitResponseReader(resp.Body)
 
 	var result struct {
 		Content []struct {
@@ -133,10 +152,19 @@ func (a *Anthropic) Stream(ctx context.Context, req *CompletionRequest) (<-chan 
 		body["tools"] = toAnthropicTools(req.Tools)
 	}
 
-	resp, err := a.doRequest(ctx, body, true)
+	httpReq, err := a.createRequest(ctx, body)
 	if err != nil {
 		return nil, err
 	}
+
+	resp, err := RetryDo(ctx, a.client, httpReq, DefaultRetryOptions)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Wrap body in size limit
+	resp.Body = LimitResponseReader(resp.Body)
 
 	ch := make(chan StreamChunk, 64)
 	go func() {
@@ -179,33 +207,26 @@ func (a *Anthropic) Stream(ctx context.Context, req *CompletionRequest) (<-chan 
 	return ch, nil
 }
 
-func (a *Anthropic) doRequest(ctx context.Context, body map[string]any, stream bool) (*http.Response, error) {
+func (a *Anthropic) createRequest(ctx context.Context, body map[string]any) (*http.Request, error) {
+	if err := a.validate(); err != nil {
+		return nil, err
+	}
+
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: marshal: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "marshal anthropic request", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: create request: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "create anthropic request", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("x-api-key", a.apiKey)
 	httpReq.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := a.client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("anthropic: request failed: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("anthropic: API error %d: %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	return resp, nil
+	return httpReq, nil
 }
 
 // extractSystem separates the system message from the rest.
@@ -266,9 +287,59 @@ func toAnthropicMessages(msgs []Message) []map[string]any {
 			continue
 		}
 
-		out = append(out, map[string]any{"role": m.Role, "content": m.Content})
+		var content any
+		if len(m.MultiContent) > 0 {
+			parts := make([]map[string]any, 0, len(m.MultiContent))
+			for _, p := range m.MultiContent {
+				if p.Type == "text" {
+					parts = append(parts, map[string]any{
+						"type": "text",
+						"text": p.Text,
+					})
+				} else if p.Type == "image_url" && p.ImageURL != nil {
+					// Anthropic needs base64 and media_type for images
+					// Expect URL to be "data:image/jpeg;base64,..." or similar
+					if strings.HasPrefix(p.ImageURL.URL, "data:") {
+						parts = append(parts, parseAnthropicImage(p.ImageURL.URL))
+					}
+				}
+			}
+			content = parts
+		} else {
+			content = m.Content
+		}
+
+		out = append(out, map[string]any{"role": m.Role, "content": content})
 	}
 	return out
+}
+
+func parseAnthropicImage(dataURL string) map[string]any {
+	// data:image/png;base64,iVBOR...
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	header := parts[0]
+	data := parts[1]
+
+	mediaType := "image/jpeg"
+	if strings.Contains(header, "image/png") {
+		mediaType = "image/png"
+	} else if strings.Contains(header, "image/gif") {
+		mediaType = "image/gif"
+	} else if strings.Contains(header, "image/webp") {
+		mediaType = "image/webp"
+	}
+
+	return map[string]any{
+		"type": "image",
+		"source": map[string]any{
+			"type":       "base64",
+			"media_type": mediaType,
+			"data":       data,
+		},
+	}
 }
 
 func toAnthropicTools(tools []ToolSchema) []map[string]any {

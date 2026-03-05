@@ -23,6 +23,8 @@ func NewFileRead(allowedPaths []string) *FileRead {
 func (f *FileRead) Name() string        { return "file_read" }
 func (f *FileRead) Description() string  { return "Read the contents of a file. Only files within allowed directories can be read." }
 func (f *FileRead) Sensitive() bool      { return false }
+func (f *FileRead) Version() string      { return "1.0.0" }
+func (f *FileRead) Dependencies() []string { return nil }
 func (f *FileRead) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "path", Type: "string", Description: "Path to the file to read", Required: true},
@@ -89,6 +91,8 @@ func NewFileWrite(allowedPaths []string) *FileWrite {
 func (f *FileWrite) Name() string        { return "file_write" }
 func (f *FileWrite) Description() string  { return "Write content to a file. Only files within allowed directories can be written. Requires user approval." }
 func (f *FileWrite) Sensitive() bool      { return true }
+func (f *FileWrite) Version() string      { return "1.0.0" }
+func (f *FileWrite) Dependencies() []string { return nil }
 func (f *FileWrite) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "path", Type: "string", Description: "Path to the file to write", Required: true},
@@ -155,6 +159,8 @@ func NewFileList(allowedPaths []string) *FileList {
 func (f *FileList) Name() string        { return "file_list" }
 func (f *FileList) Description() string  { return "List files and directories in a given path. Only allowed directories can be listed." }
 func (f *FileList) Sensitive() bool      { return false }
+func (f *FileList) Version() string      { return "1.0.0" }
+func (f *FileList) Dependencies() []string { return nil }
 func (f *FileList) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "path", Type: "string", Description: "Directory path to list (defaults to current directory)", Required: false},
@@ -202,6 +208,72 @@ func (f *FileList) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 }
 
 func (f *FileList) isAllowed(absPath string) bool {
+	if strings.Contains(absPath, "..") {
+		return false
+	}
+	for _, allowed := range f.allowedPaths {
+		allowedAbs, err := filepath.Abs(allowed)
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(absPath, allowedAbs) {
+			return true
+		}
+	}
+	return false
+}
+
+// FileGlob finds files using glob patterns within allowed paths.
+type FileGlob struct {
+	allowedPaths []string
+}
+
+// NewFileGlob creates a file glob tool.
+func NewFileGlob(allowedPaths []string) *FileGlob {
+	return &FileGlob{allowedPaths: allowedPaths}
+}
+
+func (f *FileGlob) Name() string        { return "file_glob" }
+func (f *FileGlob) Description() string  { return "Find files using a glob pattern (e.g. 'internal/**/*.go'). Only allowed directories are searched." }
+func (f *FileGlob) Sensitive() bool      { return false }
+func (f *FileGlob) Version() string      { return "1.0.0" }
+func (f *FileGlob) Dependencies() []string { return nil }
+func (f *FileGlob) Parameters() []tool.ParameterDef {
+	return []tool.ParameterDef{
+		{Name: "pattern", Type: "string", Description: "The glob pattern to match", Required: true},
+	}
+}
+
+func (f *FileGlob) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
+	pattern, _ := args["pattern"].(string)
+	if pattern == "" {
+		return &tool.Result{Error: "pattern is required"}, nil
+	}
+
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return &tool.Result{Error: fmt.Sprintf("glob error: %v", err)}, nil
+	}
+
+	var allowedMatches []string
+	for _, m := range matches {
+		abs, err := filepath.Abs(m)
+		if err != nil {
+			continue
+		}
+		if f.isAllowed(abs) {
+			allowedMatches = append(allowedMatches, m)
+		}
+	}
+
+	if len(allowedMatches) == 0 {
+		return &tool.Result{Output: "no matches found"}, nil
+	}
+
+	return &tool.Result{Output: strings.Join(allowedMatches, "\n")}, nil
+}
+
+func (f *FileGlob) isAllowed(absPath string) bool {
 	if strings.Contains(absPath, "..") {
 		return false
 	}

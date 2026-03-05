@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/wonderpus/wonderpus/internal/memory"
@@ -12,21 +13,23 @@ import (
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wonderpus/wonderpus/internal/constants"
 )
 
 // Agent is the core agent that processes user messages.
 type Agent struct {
-	router    *provider.Router
-	sanitizer *security.Sanitizer
-	audit     *security.AuditLogger
-	ctx       *ContextManager
-	registry  *tool.Registry
-	executor  *tool.Executor
-	sysPrompt string
-	temp      float64
-	toolFunc  func(name string, args map[string]any, result string) // optional callback for TUI
-	limiter   *security.RateLimiter
-	sessionID string
+	router         *provider.Router
+	sanitizer      *security.Sanitizer
+	audit          *security.AuditLogger
+	ctx            *ContextManager
+	registry       *tool.Registry
+	executor       *tool.Executor
+	sysPrompt      string
+	temp           float64
+	toolFunc       func(name string, args map[string]any, result string) // optional callback for TUI
+	limiter        *security.RateLimiter
+	sessionID      string
+	encryptionKey  []byte
 }
 
 // NewAgent creates a new agent instance.
@@ -48,7 +51,7 @@ func NewAgent(
 		audit:     audit,
 		registry:  registry,
 		executor:  executor,
-		ctx:       NewContextManager(maxContextTokens, store, sessionID),
+		ctx:       NewContextManager(maxContextTokens, store, sessionID, nil), // defaults to no encryption unless SetEncryptionKey called
 		sysPrompt: systemPrompt,
 		temp:      temperature,
 		sessionID: sessionID,
@@ -63,6 +66,13 @@ func (a *Agent) SetRateLimiter(rl *security.RateLimiter) {
 // SetToolCallback sets a function to be called when a tool executes (useful for TUI).
 func (a *Agent) SetToolCallback(fn func(name string, args map[string]any, result string)) {
 	a.toolFunc = fn
+}
+
+// SetEncryptionKey sets the optional key for encrypting messages at rest.
+func (a *Agent) SetEncryptionKey(key string) {
+	if key != "" {
+		a.encryptionKey = security.DeriveKey(key, nil)
+	}
 }
 
 // HandleMessage processes a user message and returns the agent response.
@@ -107,9 +117,8 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 	// 2. Add user message to context
 	a.ctx.AddMessage(provider.RoleUser, cleaned)
 
-	// 3. Loop for tool execution (up to 5 iterations)
-	maxIterations := 5
-	for i := 0; i < maxIterations; i++ {
+	// 3. Loop for tool execution (up to MaxIterations iterations)
+	for i := 0; i < constants.MaxIterations; i++ {
 		messages := a.buildMessages()
 		prov := a.router.Active()
 		req := &provider.CompletionRequest{
@@ -132,10 +141,25 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 			}
 		}
 
-		resp, err := prov.Complete(ctx, req)
-		if err != nil {
-			return "", fmt.Errorf("provider %s: %w", prov.Name(), err)
+		// Check cache
+		if cached, ok := a.router.Cache.Get(req); ok {
+			logging.L(ctx).Info("cache hit", "provider", prov.Name())
+			resp := cached
+			// Process tool calls as usual if cached
+			if len(resp.ToolCalls) == 0 {
+				a.ctx.AddMessage(provider.RoleAssistant, resp.Content)
+				return resp.Content, nil
+			}
+			// ... continue to tool execution if tool calls are in cache
 		}
+
+		resp, err := a.router.CompleteWithFallback(ctx, req)
+		if err != nil {
+			return "", err
+		}
+
+		// Store in cache
+		a.router.Cache.Set(req, resp)
 
 		// If no tools were called, this is the final response
 		if len(resp.ToolCalls) == 0 {
@@ -153,42 +177,103 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 		// Add assistant's tool-call request to context
 		a.ctx.AddToolCallMessage(resp.Content, resp.ToolCalls)
 
-		// Execute tools
-		for _, tc := range resp.ToolCalls {
-			var args map[string]any
-			// fallback if args aren't unmarshalable, though provider mostly handles this
-			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args) 
+		// Execute tools in parallel
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]struct {
+			id     string
+			output string
+		}, len(resp.ToolCalls))
 
-			toolCall := tool.ToolCall{
-				ID:   tc.ID,
-				Name: tc.Function.Name,
-				Args: args,
-			}
+		for idx, tc := range resp.ToolCalls {
+			wg.Add(1)
+			go func(i int, t provider.ToolCallInfo) {
+				defer wg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						logging.L(ctx).Error("PANIC in tool execution", "tool", t.Function.Name, "panic", r)
+						mu.Lock()
+						results[i] = struct {
+							id     string
+							output string
+						}{id: t.ID, output: "Error: Tool execution panicked"}
+						mu.Unlock()
+					}
+				}()
 
-			start := time.Now()
-			res := a.executor.Execute(ctx, toolCall)
-			logging.ToolExecutionTime.WithLabelValues(tc.Function.Name).Observe(time.Since(start).Seconds())
+				var args map[string]any
+				_ = json.Unmarshal([]byte(t.Function.Arguments), &args)
 
-			outputStr := res.Output
-			if res.Error != "" {
-				outputStr = "Error: " + res.Error
-			}
+				toolCall := tool.ToolCall{
+					ID:   t.ID,
+					Name: t.Function.Name,
+					Args: args,
+				}
 
-			// Fire callback for TUI
-			if a.toolFunc != nil {
-				a.toolFunc(tc.Function.Name, args, outputStr)
-			}
+				start := time.Now()
+				res := a.executor.Execute(ctx, toolCall)
+				logging.ToolExecutionTime.WithLabelValues(t.Function.Name).Observe(time.Since(start).Seconds())
 
-			// Add tool result to context
-			a.ctx.AddToolResultMessage(tc.ID, outputStr)
+				outputStr := res.Output
+				if res.Error != "" {
+					outputStr = "Error: " + res.Error
+				}
+
+				mu.Lock()
+				results[i] = struct {
+					id     string
+					output string
+				}{id: t.ID, output: outputStr}
+				mu.Unlock()
+
+				// Fire callback for TUI
+				if a.toolFunc != nil {
+					a.toolFunc(t.Function.Name, args, outputStr)
+				}
+			}(idx, tc)
+		}
+		wg.Wait()
+
+		// Add tool results to context in order
+		for _, res := range results {
+			a.ctx.AddToolResultMessage(res.id, res.output)
+		}
+
+		// Check if summarization is needed
+		if a.ctx.NeedsSummarization() {
+			a.triggerSummarization(ctx)
 		}
 	}
 
-	return "", fmt.Errorf("agent reached maximum tool call iterations (%d)", maxIterations)
+	return "", fmt.Errorf("agent reached maximum tool call iterations (%d)", constants.MaxIterations)
 }
 
 // HandleComplexTask engages Phase 4 Multi-Agent architecture.
 // It bypasses the simple agent loop, creates a TaskGraph, and runs it through the Orchestrator.
+func (a *Agent) triggerSummarization(ctx context.Context) {
+	slog.Info("context pressure detected, triggering summarization")
+	messages := a.ctx.GetMessages()
+	if len(messages) < 4 {
+		return
+	}
+
+	prompt := "Please provide a concise summary of the key points in this conversation so far, focusing on facts and decisions made. Keep it under 200 words."
+	summaryMsgs := append(messages, provider.Message{Role: provider.RoleUser, Content: prompt})
+	
+	req := &provider.CompletionRequest{
+		Messages:    summaryMsgs,
+		Temperature: 0.3,
+	}
+
+	resp, err := a.router.Active().Complete(ctx, req)
+	if err != nil {
+		slog.Warn("summarization failed", "error", err)
+		return
+	}
+
+	a.ctx.SummarizeOldest(resp.Content)
+}
+
 func (a *Agent) HandleComplexTask(ctx context.Context, input string) (string, error) {
 	a.audit.Log(security.AuditEvent{
 		Timestamp:   time.Now(),

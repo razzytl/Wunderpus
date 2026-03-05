@@ -8,6 +8,7 @@ import (
 
 	_ "modernc.org/sqlite"
 	"github.com/wonderpus/wonderpus/internal/provider"
+	"github.com/wonderpus/wonderpus/internal/security"
 )
 
 // Store manages conversation history and user preferences using SQLite.
@@ -29,6 +30,10 @@ func NewStore(dbPath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("memory: opening db: %w", err)
 	}
+
+	// Optimize SQLite
+	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
 
 	// Create tables if not exist
 	schema := `
@@ -54,6 +59,8 @@ func NewStore(dbPath string) (*Store, error) {
 		key TEXT PRIMARY KEY,
 		value TEXT NOT NULL
 	);
+	
+	CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -61,7 +68,18 @@ func NewStore(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("memory: creating tables: %w", err)
 	}
 
-	return &Store{db: db}, nil
+	store := &Store{db: db}
+	if err := store.Migrate(); err != nil {
+		return nil, fmt.Errorf("memory: migration failed: %w", err)
+	}
+
+	return store, nil
+}
+
+// Backup performs an online backup of the SQLite database.
+func (s *Store) Backup(destPath string) error {
+	_, err := s.db.Exec("VACUUM INTO ?", destPath)
+	return err
 }
 
 // EnsureSession creates a new session if it doesn't exist.
@@ -75,9 +93,21 @@ func (s *Store) EnsureSession(sessionID string) error {
 }
 
 // SaveMessage appends a message to the specified session.
-func (s *Store) SaveMessage(sessionID string, msg provider.Message) error {
+// encryptionKey is optional, if provided content will be encrypted.
+func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKey []byte) error {
 	if err := s.EnsureSession(sessionID); err != nil {
 		return err
+	}
+
+	content := msg.Content
+	isEncrypted := 0
+	if len(encryptionKey) > 0 {
+		var err error
+		content, err = security.Encrypt(msg.Content, encryptionKey)
+		if err != nil {
+			return fmt.Errorf("memory: encrypting message: %w", err)
+		}
+		isEncrypted = 1
 	}
 
 	now := time.Now().Format(time.RFC3339)
@@ -88,9 +118,9 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message) error {
 	}
 
 	_, err := s.db.Exec(`
-		INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		sessionID, msg.Role, msg.Content, msg.ToolCallID, toolCallsStr, now,
+		INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		sessionID, msg.Role, content, msg.ToolCallID, toolCallsStr, now, isEncrypted,
 	)
 
 	if err == nil {
@@ -100,9 +130,10 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message) error {
 }
 
 // LoadSession retrieves all messages for a given session.
-func (s *Store) LoadSession(sessionID string) ([]provider.Message, error) {
+// encryptionKey is required to decrypt encrypted messages.
+func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.Message, error) {
 	rows, err := s.db.Query(`
-		SELECT role, content, tool_call_id, tool_calls 
+		SELECT role, content, tool_call_id, tool_calls, encrypted
 		FROM messages 
 		WHERE session_id = ? 
 		ORDER BY timestamp ASC`, sessionID)
@@ -114,13 +145,24 @@ func (s *Store) LoadSession(sessionID string) ([]provider.Message, error) {
 	var messages []provider.Message
 	for rows.Next() {
 		var role, content, tcID, tcsStr sql.NullString
-		if err := rows.Scan(&role, &content, &tcID, &tcsStr); err != nil {
+		var encrypted int
+		if err := rows.Scan(&role, &content, &tcID, &tcsStr, &encrypted); err != nil {
 			return nil, err
+		}
+
+		msgContent := content.String
+		if encrypted == 1 && len(encryptionKey) > 0 {
+			var err error
+			msgContent, err = security.Decrypt(msgContent, encryptionKey)
+			if err != nil {
+				// Don't fail the whole load, just report an error placeholder or keep encrypted
+				msgContent = "[DECRYPTION FAILED]"
+			}
 		}
 
 		msg := provider.Message{
 			Role:    role.String,
-			Content: content.String,
+			Content: msgContent,
 		}
 		if tcID.Valid && tcID.String != "" {
 			msg.ToolCallID = tcID.String
@@ -154,6 +196,16 @@ func (s *Store) SetPreference(key, value string) error {
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 		key, value)
 	return err
+}
+
+// PruneOldSessions deletes sessions that haven't been updated for the given days.
+func (s *Store) PruneOldSessions(days int) (int64, error) {
+	cutoff := time.Now().AddDate(0, 0, -days).Format(time.RFC3339)
+	res, err := s.db.Exec(`DELETE FROM sessions WHERE updated_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Close closes the database connection.

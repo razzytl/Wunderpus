@@ -2,6 +2,8 @@ package telegram
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,6 +11,8 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/wonderpus/wonderpus/internal/agent"
+	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wonderpus/wonderpus/internal/types"
 )
 
 // Channel implements the Telegram communication channel.
@@ -47,56 +51,98 @@ func (c *Channel) Start(ctx context.Context) error {
 	c.bot = bot
 	slog.Info("telegram channel starting", "bot", bot.Self.UserName)
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := c.bot.GetUpdatesChan(u)
-
 	go func() {
 		for {
-			select {
-			case <-c.stopCh:
-				return
-			case <-ctx.Done():
-				return
-			case update := <-updates:
-				if update.Message == nil {
-					continue
-				}
+			u := tgbotapi.NewUpdate(0)
+			u.Timeout = 60
+			updates := c.bot.GetUpdatesChan(u)
 
-				chatID := update.Message.Chat.ID
-				sessionID := fmt.Sprintf("tg_%d", chatID)
-				text := update.Message.Text
-
-				if text == "" {
-					continue
-				}
-
-				// Handle commands
-				if strings.HasPrefix(text, "/") {
-					c.handleCommand(chatID, text)
-					continue
-				}
-
-				// Standard message processing
-				go func(id int64, sid, input string) {
-					// Show typing indicator
-					c.bot.Send(tgbotapi.NewChatAction(id, tgbotapi.ChatTyping))
-
-					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-					defer cancel()
-
-					resp, err := c.manager.ProcessMessage(ctx, sid, input)
-					if err != nil {
-						msg := tgbotapi.NewMessage(id, "Error: "+err.Error())
-						c.bot.Send(msg)
-						return
+			for {
+				select {
+				case <-c.stopCh:
+					return
+				case <-ctx.Done():
+					return
+				case update, ok := <-updates:
+					if !ok {
+						slog.Warn("telegram: update channel closed, attempting to reconnect...")
+						goto reconnect
 					}
 
-					msg := tgbotapi.NewMessage(id, resp)
-					msg.ParseMode = tgbotapi.ModeMarkdown
-					c.bot.Send(msg)
-				}(chatID, sessionID, text)
+					if update.Message == nil {
+						continue
+					}
+
+					chatID := update.Message.Chat.ID
+					sessionID := fmt.Sprintf("tg_%d", chatID)
+					text := update.Message.Text
+
+					if text == "" {
+						continue
+					}
+
+					// Handle commands
+					if strings.HasPrefix(text, "/") {
+						c.handleCommand(chatID, text)
+						continue
+					}
+
+					// Standard message processing
+					go func(id int64, sid, input string) {
+						defer func() {
+							if r := recover(); r != nil {
+								slog.Error("PANIC in telegram message handler", "panic", r)
+							}
+						}()
+						
+						// Generate correlation ID
+						cidBytes := make([]byte, 8)
+						_, _ = rand.Read(cidBytes)
+						cid := hex.EncodeToString(cidBytes)
+
+						ctx := logging.ContextWithCorrelation(context.Background(), cid)
+						ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+						defer cancel()
+
+						logging.L(ctx).Info("processing telegram message", "chat_id", id, "session_id", sid)
+
+						// Show typing indicator
+						c.bot.Send(tgbotapi.NewChatAction(id, tgbotapi.ChatTyping))
+
+						respRes, err := c.manager.ProcessRequest(ctx, types.UserMessage{
+							SessionID: sid,
+							Content:   input,
+							ChannelID: fmt.Sprintf("%d", id),
+						})
+						if err != nil {
+							logging.L(ctx).Error("failed to process message", "error", err)
+							msg := tgbotapi.NewMessage(id, "Error: "+err.Error())
+							c.bot.Send(msg)
+							return
+						}
+
+						msg := tgbotapi.NewMessage(id, respRes.Content)
+						msg.ParseMode = tgbotapi.ModeMarkdown
+						c.bot.Send(msg)
+					}(chatID, sessionID, text)
+				}
+			}
+
+		reconnect:
+			select {
+			case <-time.After(5 * time.Second):
+			case <-ctx.Done():
+				return
+			case <-c.stopCh:
+				return
+			}
+
+			newBot, err := tgbotapi.NewBotAPI(c.token)
+			if err == nil {
+				c.bot = newBot
+				slog.Info("telegram: reconnected successfully")
+			} else {
+				slog.Error("telegram: reconnection failed", "error", err)
 			}
 		}
 	}()
@@ -122,7 +168,19 @@ func (c *Channel) handleCommand(chatID int64, cmd string) {
 		msg := tgbotapi.NewMessage(chatID, "Welcome to Wonderpus! 🐙\nI am your universal AI assistant. Send me a message to begin.")
 		c.bot.Send(msg)
 	case "/help":
-		msg := tgbotapi.NewMessage(chatID, "I am an AI agent. You can chat with me, or use /reset to clear our conversation history.")
+		msg := tgbotapi.NewMessage(chatID, "I am an AI agent. You can chat with me, or use the buttons below for quick actions:")
+		
+		// Create inline keyboard
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("Reset Chat 🔄", "/reset"),
+				tgbotapi.NewInlineKeyboardButtonData("Status 📊", "/status"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("About 🐙", "/about"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
 		c.bot.Send(msg)
 	case "/reset":
 		sessionID := fmt.Sprintf("tg_%d", chatID)

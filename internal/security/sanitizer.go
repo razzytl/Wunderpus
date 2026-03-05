@@ -3,6 +3,8 @@ package security
 import (
 	"regexp"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // Threat describes a detected prompt injection attempt.
@@ -53,6 +55,16 @@ var injectionPatterns = []struct {
 		description: "Raw prompt template injection",
 		severity:    "high",
 	},
+	{
+		re:          regexp.MustCompile(`(?i)(thought|observation|action|action\s+input)\s*:\s*`),
+		description: "Chain-of-thought/ReAct pattern injection",
+		severity:    "medium",
+	},
+	{
+		re:          regexp.MustCompile(`(?i)translation\s+to\s+l33t|gibberish|base64`),
+		description: "Obfuscated payload attempt",
+		severity:    "low",
+	},
 }
 
 // Sanitizer checks and cleans user input.
@@ -72,11 +84,15 @@ func (s *Sanitizer) Sanitize(input string) (string, []Threat) {
 		return input, nil
 	}
 
-	var threats []Threat
-	cleaned := input
+	// 1. Normalize Unicode (NFC)
+	normalized := norm.NFC.String(input)
 
+	var threats []Threat
+	cleaned := normalized
+
+	// 2. Check for injection patterns
 	for _, p := range injectionPatterns {
-		if p.re.MatchString(input) {
+		if p.re.MatchString(normalized) {
 			threats = append(threats, Threat{
 				Pattern:     p.re.String(),
 				Description: p.description,
@@ -85,7 +101,7 @@ func (s *Sanitizer) Sanitize(input string) (string, []Threat) {
 		}
 	}
 
-	// Strip null bytes and control chars (except newlines and tabs)
+	// 3. Strip null bytes and control chars (except newlines and tabs)
 	cleaned = strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\r' || r == '\t' {
 			return r
@@ -97,6 +113,14 @@ func (s *Sanitizer) Sanitize(input string) (string, []Threat) {
 	}, cleaned)
 
 	return cleaned, threats
+}
+
+// LimitLength truncates input if it exceeds the maximum allowed length.
+func (s *Sanitizer) LimitLength(input string, max int) (string, bool) {
+	if len(input) <= max {
+		return input, false
+	}
+	return input[:max], true
 }
 
 // HasHighSeverity returns true if any threat is high severity.

@@ -15,10 +15,11 @@ type ContextManager struct {
 	store     *memory.Store
 	sessionID string
 	tke       *tiktoken.Tiktoken
+	encKey    []byte
 }
 
 // NewContextManager creates a new context manager.
-func NewContextManager(maxTokens int, store *memory.Store, sessionID string) *ContextManager {
+func NewContextManager(maxTokens int, store *memory.Store, sessionID string, encKey []byte) *ContextManager {
 	// Initialize tiktoken (using cl100k_base which is used by gpt-4/o)
 	tke, err := tiktoken.GetEncoding("cl100k_base")
 	if err != nil {
@@ -30,15 +31,16 @@ func NewContextManager(maxTokens int, store *memory.Store, sessionID string) *Co
 		store:     store,
 		sessionID: sessionID,
 		tke:       tke,
+		encKey:    encKey,
 	}
-	
+
 	if store != nil && sessionID != "" {
-		msgs, err := store.LoadSession(sessionID)
+		msgs, err := store.LoadSession(sessionID, encKey)
 		if err == nil && len(msgs) > 0 {
 			cm.messages = msgs
 		}
 	}
-	
+
 	return cm
 }
 
@@ -50,7 +52,7 @@ func (c *ContextManager) AddMessage(role, content string) {
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg)
+		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
 	}
 	c.truncate()
 }
@@ -64,7 +66,7 @@ func (c *ContextManager) AddToolCallMessage(content string, toolCalls []provider
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg)
+		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
 	}
 	c.truncate()
 }
@@ -78,14 +80,35 @@ func (c *ContextManager) AddToolResultMessage(toolCallID string, content string)
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg)
+		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
 	}
 	c.truncate()
 }
 
 // GetMessages returns all messages within the token budget.
 func (c *ContextManager) GetMessages() []provider.Message {
+	c.truncate()
 	return c.messages
+}
+
+// NeedsSummarization returns true if the context is over 80% full.
+func (c *ContextManager) NeedsSummarization() bool {
+	return float64(c.totalTokens()) > float64(c.maxTokens)*0.8
+}
+
+// SummarizeOldest replaces the first N messages with a summary.
+func (c *ContextManager) SummarizeOldest(summary string) {
+	if len(c.messages) < 4 {
+		return
+	}
+	// Keep the system prompt if we had one (usually handled by Agent.buildMessages)
+	// But ContextManager only sees what was added to it.
+	newMsgs := []provider.Message{
+		{Role: provider.RoleSystem, Content: "Summary of previous conversation: " + summary},
+	}
+	// Keep the last 2 messages for immediate continuity
+	newMsgs = append(newMsgs, c.messages[len(c.messages)-2:]...)
+	c.messages = newMsgs
 }
 
 // Clear removes all in-memory messages but doesn't delete from SQLite.
@@ -113,7 +136,7 @@ func (c *ContextManager) totalTokens() int {
 	for _, m := range c.messages {
 		if c.tke != nil {
 			total += len(c.tke.Encode(m.Content, nil, nil))
-			// roughly 4 tokens for scaffolding 
+			// roughly 4 tokens for scaffolding
 			total += 4
 		} else {
 			// Fallback heuristic if tiktoken failed to load

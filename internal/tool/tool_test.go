@@ -21,6 +21,8 @@ func (m *mockTool) Name() string                                    { return "mo
 func (m *mockTool) Description() string                             { return "A mock tool" }
 func (m *mockTool) Parameters() []tool.ParameterDef                 { return nil }
 func (m *mockTool) Sensitive() bool                                 { return m.sensitive }
+func (m *mockTool) Version() string                                 { return "1.0.0" }
+func (m *mockTool) Dependencies() []string                         { return nil }
 func (m *mockTool) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	if m.errResult != nil {
 		return nil, m.errResult
@@ -60,7 +62,7 @@ func TestRegistry(t *testing.T) {
 
 func TestExecutor_Approval(t *testing.T) {
 	// Need an audit logger for executor
-	audit, _ := security.NewAuditLogger(":memory:")
+	audit, _ := security.NewAuditLogger(":memory:", nil)
 	defer audit.Close()
 
 	reg := tool.NewRegistry()
@@ -94,7 +96,7 @@ func TestExecutor_Approval(t *testing.T) {
 }
 
 func TestExecutor_Analytics(t *testing.T) {
-	audit, _ := security.NewAuditLogger(":memory:")
+	audit, _ := security.NewAuditLogger(":memory:", nil)
 	defer audit.Close()
 
 	reg := tool.NewRegistry()

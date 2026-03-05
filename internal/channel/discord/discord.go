@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/wonderpus/wonderpus/internal/agent"
+	"github.com/wonderpus/wonderpus/internal/types"
 )
 
 // Channel implements the Discord communication channel.
@@ -112,12 +113,17 @@ func (c *Channel) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 
-		resp, err := c.manager.ProcessMessage(ctx, id, input)
+		respRes, err := c.manager.ProcessRequest(ctx, types.UserMessage{
+			SessionID: id,
+			Content:   input,
+			ChannelID: channelID,
+		})
 		if err != nil {
 			s.ChannelMessageSend(channelID, "Error: "+err.Error())
 			return
 		}
 
+		resp := respRes.Content
 		// Discord has a 2000 char limit
 		if len(resp) > 2000 {
 			for i := 0; i < len(resp); i += 1900 {
@@ -141,7 +147,28 @@ func (c *Channel) handleCommand(s *discordgo.Session, m *discordgo.MessageCreate
 	case "!start":
 		s.ChannelMessageSend(m.ChannelID, "Welcome to Wonderpus! 🐙\nI am your universal AI assistant. DM me or mention me in a channel to begin.")
 	case "!help":
-		s.ChannelMessageSend(m.ChannelID, "I am an AI agent. You can chat with me, or use !reset to clear our conversation history.")
+		msg := &discordgo.MessageSend{
+			Content: "I am an AI agent. You can chat with me, or use the buttons below for quick actions:",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{
+							Label:    "Reset Chat",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "reset_chat",
+							Emoji:    &discordgo.ComponentEmoji{Name: "🔄"},
+						},
+						discordgo.Button{
+							Label:    "Status",
+							Style:    discordgo.SecondaryButton,
+							CustomID: "view_status",
+							Emoji:    &discordgo.ComponentEmoji{Name: "📊"},
+						},
+					},
+				},
+			},
+		}
+		s.ChannelMessageSendComplex(m.ChannelID, msg)
 	case "!reset":
 		sessionID := fmt.Sprintf("discord_%s_%s", m.Author.ID, m.ChannelID)
 		ag := c.manager.GetAgent(sessionID)

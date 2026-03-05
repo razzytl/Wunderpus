@@ -11,12 +11,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/wonderpus/wonderpus/internal/agent"
+	"github.com/wonderpus/wonderpus/internal/constants"
+	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 )
 
-const banner = `
-  🐙 Wonderpus
-  Universal AI Agent
+const quickStartGuide = `
+Quick Start:
+  • Type a message and press Enter to chat
+  • /help - Show all commands
+  • /provider <name> - Switch AI provider
+  • Tab - Cycle through providers
+  • Ctrl+L - Clear conversation
+
+Providers: OpenAI ⚡ | Anthropic 🧠 | Ollama 🦙 | Gemini 🌟
 `
 
 // streamDoneMsg signals streaming is complete.
@@ -37,26 +45,37 @@ type toolMsg struct {
 
 // Model is the Bubbletea model for the TUI.
 type Model struct {
-	agent    *agent.Agent
-	viewport viewport.Model
-	input    textarea.Model
-	spinner  spinner.Model
-	chatLog  []string
-	width    int
-	height   int
-	streaming bool
-	streamBuf string
-	ready    bool
-	quitting bool
+	agent           *agent.Agent
+	store           *memory.Store
+	viewport        viewport.Model
+	input           textarea.Model
+	spinner         spinner.Model
+	chatLog         []string
+	width           int
+	height          int
+	streaming       bool
+	streamBuf       string
+	ready           bool
+	quitting        bool
+	history         []string
+	historyPos      int
+	cost            float64
+	tokens          int
+	toolStatus      string
+	latency         int64
+	markdownEnabled bool
+	suggestion      string
+	cmdPalette      bool
 }
 
 // New creates a new TUI model.
-func New(ag *agent.Agent) Model {
+// store can be nil if not available (e.g., when running without memory)
+func New(ag *agent.Agent, store *memory.Store) Model {
 	// Input area
 	ta := textarea.New()
 	ta.Placeholder = "Type a message... (Enter to send, /help for commands)"
 	ta.Focus()
-	ta.CharLimit = 4000
+	ta.CharLimit = constants.MaxInputLength
 	ta.SetHeight(3)
 	ta.ShowLineNumbers = false
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
@@ -71,15 +90,53 @@ func New(ag *agent.Agent) Model {
 	sp.Spinner = spinner.Dot
 	sp.Style = SpinnerStyle
 
+	// Initialize markdown renderer
+	_ = InitMarkdownRendererWithTheme(80)
+
+	// Load saved preferences
+	markdownEnabled := true
+	currentProvider := ag.Router().ActiveName()
+	if store != nil {
+		markdownVal := store.GetPreference("markdown", "true")
+		markdownEnabled = markdownVal != "false"
+
+		// Load saved provider preference
+		if savedProvider := store.GetPreference("provider", ""); savedProvider != "" {
+			_ = ag.Router().SetActive(savedProvider)
+			currentProvider = savedProvider
+		}
+	}
+
+	// Show welcome screen with providers status
+	providers := ag.Router().List()
+	providerStatus := ""
+	for _, p := range providers {
+		icon := GetProviderIcon(p)
+		if p == currentProvider {
+			providerStatus += fmt.Sprintf(" %s[%s] ", icon, p)
+		} else {
+			providerStatus += fmt.Sprintf(" %s%s ", icon, p)
+		}
+	}
+
 	return Model{
 		agent:   ag,
+		store:   store,
 		input:   ta,
 		spinner: sp,
 		chatLog: []string{
-			BannerStyle.Render(banner),
-			DimStyle.Render("  Provider: " + ag.Router().ActiveName() + " │ Type /help for commands"),
+			BannerStyle.Render(bannerArtwork),
+			"",
+			DimStyle.Render("Active Provider:") + " " + StatusActiveStyle.Render(GetProviderIcon(currentProvider)+" "+currentProvider),
+			DimStyle.Render("Available:") + " " + DimStyle.Render(providerStatus),
+			"",
+			DimStyle.Render(quickStartGuide),
 			"",
 		},
+		history:         []string{},
+		historyPos:      -1,
+		markdownEnabled: markdownEnabled,
+		toolStatus:      "idle",
 	}
 }
 
@@ -120,6 +177,91 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlC:
 			m.quitting = true
 			return m, tea.Quit
+		case tea.KeyCtrlL:
+			m.agent.ClearContext()
+			m.chatLog = m.chatLog[:3]
+			m.appendChat(SystemPrefixStyle.Render("✓ Conversation cleared"))
+			m.appendChat("")
+			m.refreshViewport()
+		case tea.KeyCtrlU:
+			m.input.Reset()
+		case tea.KeyCtrlS:
+			// Quick provider switcher via status display
+			providers := m.agent.Router().List()
+			current := m.agent.Router().ActiveName()
+			m.appendChat("")
+			m.appendChat(SystemPrefixStyle.Render("📌 Provider Switcher (press Tab to cycle):"))
+			for _, p := range providers {
+				marker := "  "
+				if p == current {
+					marker = "▸ "
+				}
+				icon := GetProviderIcon(p)
+				m.appendChat(DimStyle.Render(fmt.Sprintf("  %s %s%s", marker, icon, p)))
+			}
+			// Auto-switch to next provider
+			nextIdx := 0
+			for i, p := range providers {
+				if p == current {
+					nextIdx = (i + 1) % len(providers)
+					break
+				}
+			}
+			m.agent.Router().SetActive(providers[nextIdx])
+			m.appendChat(SystemPrefixStyle.Render("✓ Auto-switched to " + providers[nextIdx]))
+			m.appendChat("")
+		case tea.KeyCtrlO:
+			// Open orchestrate mode - prompt for complex task
+			m.appendChat("")
+			m.appendChat(SystemPrefixStyle.Render("🎼 Orchestrate Mode"))
+			m.appendChat(DimStyle.Render("  Enter a complex task to decompose and execute with multiple agents."))
+			m.appendChat(DimStyle.Render("  Example: 'Create a web server with API endpoints for user management'"))
+			m.appendChat("")
+		case tea.KeyEscape:
+			if m.streaming {
+				m.streaming = false
+				m.appendChat(DimStyle.Render("  ↳ Response cancelled"))
+				m.appendChat("")
+			}
+		case tea.KeyTab:
+			providers := m.agent.Router().List()
+			current := m.agent.Router().ActiveName()
+			nextIdx := 0
+			for i, p := range providers {
+				if p == current {
+					nextIdx = (i + 1) % len(providers)
+					break
+				}
+			}
+			m.agent.Router().SetActive(providers[nextIdx])
+			m.appendChat(SystemPrefixStyle.Render("✓ Switched to " + providers[nextIdx]))
+			m.appendChat("")
+		case tea.KeyCtrlP:
+			m.cmdPalette = !m.cmdPalette
+			if m.cmdPalette {
+				m.input.Blur()
+			} else {
+				m.input.Focus()
+			}
+		case tea.KeyUp:
+			if m.streaming {
+				break
+			}
+			if len(m.history) > 0 && m.historyPos < len(m.history)-1 {
+				m.historyPos++
+				m.input.SetValue(m.history[len(m.history)-1-m.historyPos])
+			}
+		case tea.KeyDown:
+			if m.streaming {
+				break
+			}
+			if m.historyPos > 0 {
+				m.historyPos--
+				m.input.SetValue(m.history[len(m.history)-1-m.historyPos])
+			} else if m.historyPos == 0 {
+				m.historyPos = -1
+				m.input.SetValue("")
+			}
 		case tea.KeyEnter:
 			if m.streaming {
 				break
@@ -128,6 +270,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if val == "" {
 				break
 			}
+
+			// Add to history
+			m.history = append(m.history, val)
+			m.historyPos = -1
+
 			m.input.Reset()
 
 			// Handle commands
@@ -149,11 +296,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamDoneMsg:
 		m.streaming = false
-		// Replace the streaming line with final version
-		if len(m.chatLog) > 0 && strings.HasPrefix(m.chatLog[len(m.chatLog)-1], AgentPrefixStyle.Render("🐙")) {
-			m.chatLog[len(m.chatLog)-1] = AgentPrefixStyle.Render("🐙") + " " + MessageStyle.Render(msg.full)
+		var renderedContent string
+		if m.markdownEnabled {
+			renderedContent = RenderMarkdownWithWidth(msg.full, m.width-4)
 		} else {
-			m.appendChat(AgentPrefixStyle.Render("🐙") + " " + MessageStyle.Render(msg.full))
+			renderedContent = MessageStyle.Render(msg.full)
+		}
+		if len(m.chatLog) > 0 && strings.HasPrefix(m.chatLog[len(m.chatLog)-1], AgentPrefixStyle.Render("🐙")) {
+			m.chatLog[len(m.chatLog)-1] = AgentPrefixStyle.Render("🐙") + " " + renderedContent
+		} else {
+			m.appendChat(AgentPrefixStyle.Render("🐙") + " " + renderedContent)
 		}
 		m.appendChat("") // blank line separator
 		m.refreshViewport()
@@ -161,7 +313,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamErrMsg:
 		m.streaming = false
-		m.appendChat(ErrorStyle.Render("Error: " + msg.err.Error()))
+		err := msg.err
+		errStr := err.Error()
+
+		// Friendly error messages
+		friendlyMsg := ""
+		suggestion := ""
+
+		switch {
+		case strings.Contains(errStr, "no api key") || strings.Contains(errStr, "missing api key"):
+			friendlyMsg = "🔑 No API key configured"
+			suggestion = "Set your API key in config.yaml or via environment variable (e.g., OPENAI_API_KEY)"
+		case strings.Contains(errStr, "rate limit"):
+			friendlyMsg = "⏳ Rate limit exceeded"
+			suggestion = "Try again in a few seconds, or switch to a different provider with /provider"
+		case strings.Contains(errStr, "insufficient quota"):
+			friendlyMsg = "💰 API quota exceeded"
+			suggestion = "Check your account billing or switch providers with /provider"
+		case strings.Contains(errStr, "connection") || strings.Contains(errStr, "network"):
+			friendlyMsg = "🌐 Connection error"
+			suggestion = "Check your internet connection and try again"
+		case strings.Contains(errStr, "timeout"):
+			friendlyMsg = "⏱ Request timed out"
+			suggestion = "Try again or switch to a faster provider (try Ollama for local)"
+		case strings.Contains(errStr, "invalid request"):
+			friendlyMsg = "📝 Invalid request"
+			suggestion = "The request was malformed. Try a different prompt"
+		case strings.Contains(errStr, "authentication") || strings.Contains(errStr, "unauthorized"):
+			friendlyMsg = "🔐 Authentication failed"
+			suggestion = "Check your API key is correct and not expired"
+		default:
+			friendlyMsg = "❌ Something went wrong"
+			suggestion = errStr
+		}
+
+		m.appendChat(ErrorStyle.Render(friendlyMsg))
+		if suggestion != errStr {
+			m.appendChat(DimStyle.Render("  💡 " + suggestion))
+		}
 		m.appendChat("")
 		return m, nil
 
@@ -207,21 +396,72 @@ func (m Model) View() string {
 		return DimStyle.Render("Goodbye! 🐙\n")
 	}
 
-	// Status bar
-	providerInfo := StatusActiveStyle.Render("⚡ " + m.agent.Router().ActiveName())
+	// Rich status bar with provider icon, message count, cost, tokens, tool status
+	providerIcon := GetProviderIcon(m.agent.Router().ActiveName())
+	providerInfo := StatusActiveStyle.Render(providerIcon + " " + m.agent.Router().ActiveName())
 	msgCount := StatusBarStyle.Render(fmt.Sprintf("│ msgs: %d", m.agent.MessageCount()))
+
+	var costInfo, tokenInfo, toolStatusInfo, latencyInfo string
+	if m.cost > 0 {
+		costInfo = CostStyle.Render(fmt.Sprintf("│ $%.4f", m.cost))
+	}
+	if m.tokens > 0 {
+		tokenInfo = TokenStyle.Render(fmt.Sprintf("│ %d tokens", m.tokens))
+	}
+	if m.toolStatus != "idle" {
+		toolStatusInfo = ToolStatusRunningStyle.Render(fmt.Sprintf("│ 🔧 %s", m.toolStatus))
+	} else {
+		toolStatusInfo = ToolStatusIdleStyle.Render("│ 🔧 idle")
+	}
+	if m.latency > 0 {
+		latencyInfo = LatencyStyle.Render(fmt.Sprintf("│ ⏱ %dms", m.latency))
+	}
+
 	streamIndicator := ""
 	if m.streaming {
 		streamIndicator = StatusBarStyle.Render(" │ ") + SpinnerStyle.Render(m.spinner.View()+" thinking...")
 	}
-	statusBar := lipgloss.JoinHorizontal(lipgloss.Top, providerInfo, msgCount, streamIndicator)
+
+	statusBar := lipgloss.JoinHorizontal(lipgloss.Top,
+		providerInfo, msgCount, costInfo, tokenInfo, toolStatusInfo, latencyInfo, streamIndicator)
 	statusLine := StatusBarStyle.Width(m.width).Render(statusBar)
+
+	// Character count display
+	charCount := len(m.input.Value())
+	charCountStr := DimStyle.Render(fmt.Sprintf("  %d/%d", charCount, constants.MaxInputLength))
+
+	// Command palette overlay if active
+	var mainView string
+	if m.cmdPalette {
+		palette := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(accentColor).
+			Padding(1, 2).
+			Width(m.width / 2).
+			Render(lipgloss.JoinVertical(lipgloss.Left,
+				StatusActiveStyle.Render("⚡ COMMAND PALETTE"),
+				"",
+				DimStyle.Render(" /help       - Show assistance"),
+				DimStyle.Render(" /provider   - Switch AI model"),
+				DimStyle.Render(" /clear      - Wipe conversation"),
+				DimStyle.Render(" /settings   - Advanced options"),
+				DimStyle.Render(" /exit       - Quit Wunderpus"),
+				"",
+				DimStyle.Render(" Press ESC or Ctrl+P to close"),
+			))
+
+		// Center the palette
+		mainView = lipgloss.Place(m.width, m.viewport.Height, lipgloss.Center, lipgloss.Center, palette)
+	} else {
+		mainView = m.viewport.View()
+	}
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		m.viewport.View(),
+		mainView,
 		statusLine,
 		m.input.View(),
+		charCountStr,
 	)
 }
 
@@ -278,17 +518,90 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 			"",
 			SystemPrefixStyle.Render("Commands:"),
 			DimStyle.Render("  /help              Show this help"),
-			DimStyle.Render("  /clear             Clear conversation"),
+			DimStyle.Render("  /help <cmd>        Show help for specific command"),
+			DimStyle.Render("  /clear             Clear conversation (Ctrl+L)"),
 			DimStyle.Render("  /status            Show agent status"),
 			DimStyle.Render("  /provider <name>   Switch provider (openai, anthropic, ollama, gemini)"),
-			DimStyle.Render("  /providers         List available providers"),
+			DimStyle.Render("  /providers         List available providers (Tab to cycle)"),
 			DimStyle.Render("  /tools             List available tools"),
+			DimStyle.Render("  /settings          Show current settings"),
+			DimStyle.Render("  /set <key> <value> Set a preference"),
 			DimStyle.Render("  /orchestrate <msg> Run multi-agent orchestrator on a complex task"),
 			DimStyle.Render("  /exit              Quit"),
+			"",
+			SystemPrefixStyle.Render("Keyboard Shortcuts:"),
+			DimStyle.Render("  Enter        Send message"),
+			DimStyle.Render("  Shift+Enter  New line in input"),
+			DimStyle.Render("  ↑/↓          Navigate command history"),
+			DimStyle.Render("  Tab          Cycle providers"),
+			DimStyle.Render("  Ctrl+L       Clear conversation"),
+			DimStyle.Render("  Ctrl+U       Clear input line"),
+			DimStyle.Render("  Escape       Cancel streaming"),
+			DimStyle.Render("  Ctrl+C       Quit"),
 			"",
 		}
 		for _, l := range help {
 			m.appendChat(l)
+		}
+
+	case "/settings":
+		m.appendChat("")
+		m.appendChat(SystemPrefixStyle.Render("Settings:"))
+		mdStatus := "on"
+		if !m.markdownEnabled {
+			mdStatus = "off"
+		}
+		DimStyle.Render(fmt.Sprintf("  markdown:     %s", mdStatus))
+		m.appendChat(DimStyle.Render(fmt.Sprintf("  provider:     %s", m.agent.Router().ActiveName())))
+		m.appendChat(DimStyle.Render(fmt.Sprintf("  cost:         $%.4f", m.cost)))
+		m.appendChat(DimStyle.Render(fmt.Sprintf("  messages:     %d", m.agent.MessageCount())))
+		m.appendChat("")
+
+	case "/set":
+		if len(parts) < 3 {
+			m.appendChat(ErrorStyle.Render("Usage: /set <key> <value>"))
+			m.appendChat(DimStyle.Render("Keys: provider, temperature, markdown, timestamps"))
+			m.appendChat("")
+		} else {
+			key := parts[1]
+			value := parts[2]
+			saved := false
+			switch key {
+			case "provider":
+				if err := m.agent.Router().SetActive(value); err != nil {
+					m.appendChat(ErrorStyle.Render("Error: " + err.Error()))
+				} else {
+					m.appendChat(SystemPrefixStyle.Render("✓ Switched to " + value))
+					if m.store != nil {
+						_ = m.store.SetPreference("provider", value)
+						saved = true
+					}
+				}
+			case "markdown":
+				if value == "on" {
+					m.markdownEnabled = true
+					m.appendChat(SystemPrefixStyle.Render("✓ Markdown rendering enabled"))
+					if m.store != nil {
+						_ = m.store.SetPreference("markdown", "true")
+						saved = true
+					}
+				} else if value == "off" {
+					m.markdownEnabled = false
+					m.appendChat(SystemPrefixStyle.Render("✓ Markdown rendering disabled"))
+					if m.store != nil {
+						_ = m.store.SetPreference("markdown", "false")
+						saved = true
+					}
+				} else {
+					m.appendChat(ErrorStyle.Render("Usage: /set markdown on/off"))
+				}
+			default:
+				m.appendChat(ErrorStyle.Render("Unknown setting: " + key))
+			}
+			if saved {
+				m.appendChat(DimStyle.Render("  💾 Settings saved"))
+			}
+			m.appendChat("")
 		}
 
 	case "/clear":
@@ -357,12 +670,12 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 		} else {
 			goal := strings.TrimPrefix(cmd, parts[0])
 			goal = strings.TrimSpace(goal)
-			m.appendChat(UserPrefixStyle.Render("You") + " " + MessageStyle.Render("(/orchestrate) " + goal))
-			
+			m.appendChat(UserPrefixStyle.Render("You") + " " + MessageStyle.Render("(/orchestrate) "+goal))
+
 			// We handle orchestrate outside the streaming logic for ease right now
 			m.streaming = true
 			m.streamBuf = ""
-			
+
 			return m, func() tea.Msg {
 				res, err := m.agent.HandleComplexTask(context.Background(), goal)
 				if err != nil {
@@ -385,9 +698,9 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 }
 
 // Run starts the TUI application.
-func Run(ag *agent.Agent) error {
+func Run(ag *agent.Agent, store *memory.Store) error {
 	_ = provider.RoleSystem // ensure import
-	m := New(ag)
+	m := New(ag, store)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	// Wire up tool callback to send messages to the TUI

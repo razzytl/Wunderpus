@@ -28,20 +28,32 @@ func NewServer(port int) *Server {
 	}
 
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/live", s.handleLiveness)
+	mux.HandleFunc("/ready", s.handleReadiness)
 
 	return s
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	resp := map[string]string{
+	resp := map[string]any{
 		"status": "ok",
-		"uptime": time.Since(s.startTime).Round(time.Second).String(),
+		"uptime": time.Since(s.startTime).String(),
 	}
-
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleLiveness(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
+	// For now, simple readiness.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
 }
 
 // Start runs the health check server in the background.

@@ -7,14 +7,22 @@ import (
 
 // Registry holds all registered tools.
 type Registry struct {
-	mu    sync.RWMutex
-	tools map[string]Tool
+	mu       sync.RWMutex
+	tools    map[string]Tool
+	metadata map[string]ToolMeta
+}
+
+type ToolMeta struct {
+	Name         string
+	Version      string
+	Dependencies []string
 }
 
 // NewRegistry creates an empty tool registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		tools: make(map[string]Tool),
+		tools:    make(map[string]Tool),
+		metadata: make(map[string]ToolMeta),
 	}
 }
 
@@ -27,6 +35,11 @@ func (r *Registry) Register(t Tool) error {
 		return fmt.Errorf("tool %q already registered", t.Name())
 	}
 	r.tools[t.Name()] = t
+	r.metadata[t.Name()] = ToolMeta{
+		Name:         t.Name(),
+		Version:      t.Version(),
+		Dependencies: t.Dependencies(),
+	}
 	return nil
 }
 

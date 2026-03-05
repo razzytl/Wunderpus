@@ -24,4 +24,23 @@ var (
 		Name: "wonderpus_agent_errors_total",
 		Help: "The total number of agent errors",
 	}, []string{"type"})
+
+	// TokenUsage tracks total tokens used.
+	TokenUsage = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "wonderpus_tokens_total",
+		Help: "Total tokens consumed",
+	}, []string{"model", "type"}) // type: input, output
+
+	// ProviderCost tracks total cost in USD.
+	ProviderCost = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "wonderpus_cost_usd_total",
+		Help: "Total estimated provider cost in USD",
+	}, []string{"model", "session"})
+
+	// ProviderLatency tracks LLM response times.
+	ProviderLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "wonderpus_provider_latency_seconds",
+		Help:    "LLM provider response time in seconds",
+		Buckets: []float64{0.5, 1, 2, 5, 10, 20, 30, 60},
+	}, []string{"provider", "model"})
 )

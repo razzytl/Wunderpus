@@ -15,10 +15,24 @@ const (
 
 // Message represents a single chat message.
 type Message struct {
-	Role       string      `json:"role"`
-	Content    string      `json:"content"`
-	ToolCallID string      `json:"tool_call_id,omitempty"` // for tool result messages
-	ToolCalls  []ToolCallInfo `json:"tool_calls,omitempty"` // for assistant messages with tool calls
+	Role         string         `json:"role"`
+	Content      string         `json:"content,omitempty"`
+	MultiContent []ContentPart  `json:"multi_content,omitempty"` // For vision/multimodal
+	ToolCallID   string         `json:"tool_call_id,omitempty"`  // for tool result messages
+	ToolCalls    []ToolCallInfo `json:"tool_calls,omitempty"`    // for assistant messages with tool calls
+}
+
+// ContentPart represents a part of a multimodal message.
+type ContentPart struct {
+	Type     string    `json:"type"` // "text", "image_url"
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
+}
+
+// ImageURL represents a base64 or hosted image for vision models.
+type ImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"` // "auto", "low", "high"
 }
 
 // CompletionRequest is the input for an LLM completion call.
@@ -28,6 +42,7 @@ type CompletionRequest struct {
 	MaxTokens   int
 	Temperature float64
 	Tools       []ToolSchema // tool definitions for function calling
+	ToolChoice  any          `json:"tool_choice,omitempty"` // "auto", "none", "required", or {"type": "function", "function": {"name": "..."}}
 }
 
 // ToolSchema is an OpenAI-compatible tool/function definition.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -11,7 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/wonderpus/wonderpus/internal/agent"
+	"github.com/wonderpus/wonderpus/internal/channel"
+	"github.com/wonderpus/wonderpus/internal/channel/discord"
+	"github.com/wonderpus/wonderpus/internal/channel/telegram"
+	"github.com/wonderpus/wonderpus/internal/channel/websocket"
 	"github.com/wonderpus/wonderpus/internal/config"
 	"github.com/wonderpus/wonderpus/internal/health"
 	"github.com/wonderpus/wonderpus/internal/logging"
@@ -21,16 +27,20 @@ import (
 	"github.com/wonderpus/wonderpus/internal/tool"
 	"github.com/wonderpus/wonderpus/internal/tool/builtin"
 	"github.com/wonderpus/wonderpus/internal/tui"
-	"github.com/wonderpus/wonderpus/internal/channel"
-	"github.com/wonderpus/wonderpus/internal/channel/websocket"
-	"github.com/wonderpus/wonderpus/internal/channel/telegram"
-	"github.com/wonderpus/wonderpus/internal/channel/discord"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+const Version = "0.2.0"
 
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
+	showVersion := flag.Bool("version", false, "show version information")
+	verbose := flag.Bool("verbose", false, "enable debug logging")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("Wonderpus v%s\n", Version)
+		os.Exit(0)
+	}
 
 	// 1. Load config
 	cfg, err := config.Load(*configPath)
@@ -41,9 +51,25 @@ func main() {
 	}
 
 	// 2. Init logging
-	logging.Init(cfg.Logging.Level, cfg.Logging.Format, cfg.Logging.Output)
+	logLevel := cfg.Logging.Level
+	if *verbose {
+		logLevel = "debug"
+	}
+	logging.Init(logLevel, cfg.Logging.Format, cfg.Logging.Output)
+	
+	// Prepare encryption key if enabled
+	var encKey []byte
+	if cfg.Security.Encryption.Enabled && cfg.Security.Encryption.Key != "" {
+		var err error
+		encKey, err = base64.StdEncoding.DecodeString(cfg.Security.Encryption.Key)
+		if err != nil {
+			slog.Error("invalid encryption key", "error", err)
+			os.Exit(1)
+		}
+	}
+
 	slog.Info("wonderpus starting",
-		"version", "0.1.0",
+		"version", Version,
 		"providers", cfg.AvailableProviders(),
 		"default", cfg.DefaultProvider,
 	)
@@ -51,12 +77,17 @@ func main() {
 	// 3. Init security
 	sanitizer := security.NewSanitizer(cfg.Security.SanitizationEnabled)
 
-	audit, err := security.NewAuditLogger(cfg.Security.AuditDBPath)
+	audit, err := security.NewAuditLogger(cfg.Security.AuditDBPath, encKey)
 	if err != nil {
 		slog.Error("failed to init audit logger", "error", err)
 		os.Exit(1)
 	}
 	defer audit.Close()
+
+	// Initial rotation check
+	if err := audit.Rotate(10000); err != nil {
+		slog.Warn("audit rotation failed", "error", err)
+	}
 
 	// 4. Init providers
 	router, err := provider.NewRouter(cfg)
@@ -79,7 +110,7 @@ func main() {
 		registry.Register(builtin.NewCalculator())
 
 		timeout := time.Duration(cfg.Tools.TimeoutSeconds) * time.Second
-		
+
 		approvalFn := func(toolName string, args map[string]any) (bool, error) {
 			// In a full TUI this would pause and ask the user.
 			// For Phase 2 MVP, we log a warning but allow it to proceed,
@@ -87,7 +118,7 @@ func main() {
 			slog.Warn("SENSITIVE TOOL AUTO-APPROVED", "tool", toolName, "args", args)
 			return true, nil
 		}
-		
+
 		executor = tool.NewExecutor(registry, audit, approvalFn, timeout)
 	}
 
@@ -165,7 +196,7 @@ func main() {
 	_ = ctx // used for future background tasks
 
 	// 11. Launch TUI (runs in main thread)
-	if err := tui.Run(ag); err != nil {
+	if err := tui.Run(ag, memStore); err != nil {
 		slog.Error("tui error", "error", err)
 		os.Exit(1)
 	}

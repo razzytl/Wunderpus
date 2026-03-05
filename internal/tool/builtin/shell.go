@@ -40,9 +40,13 @@ func NewShellExec(whitelist []string) *ShellExec {
 	return &ShellExec{whitelist: wl}
 }
 
-func (s *ShellExec) Name() string        { return "shell_exec" }
-func (s *ShellExec) Description() string  { return "Execute a whitelisted shell command. Only safe, read-only commands are allowed. Requires user approval." }
-func (s *ShellExec) Sensitive() bool      { return true }
+func (s *ShellExec) Name() string { return "shell_exec" }
+func (s *ShellExec) Description() string {
+	return "Execute a whitelisted shell command. Only safe, read-only commands are allowed. Requires user approval."
+}
+func (s *ShellExec) Sensitive() bool { return true }
+func (s *ShellExec) Version() string { return "1.0.0" }
+func (s *ShellExec) Dependencies() []string { return nil }
 func (s *ShellExec) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "command", Type: "string", Description: "The shell command to execute", Required: true},
@@ -65,7 +69,20 @@ func (s *ShellExec) Execute(ctx context.Context, args map[string]any) (*tool.Res
 
 	// Block dangerous patterns regardless of whitelist
 	lower := strings.ToLower(command)
-	for _, dangerous := range []string{"rm ", "del ", "rmdir", "format", "mkfs", "> /dev", "sudo", "chmod", "chown"} {
+	dangerousPatterns := []string{
+		"rm ", "rmdir", "del ", "del/",
+		"format", "mkfs",
+		"> /dev", ">nul", "> NUL", "> /null", ">NUL",
+		"sudo", "chmod", "chown",
+		"curl", "wget",
+		"powershell", "ps1", "cmd.exe",
+		"certutil", "base64",
+		"shutdown", "reboot",
+		"kill ", "pkill",
+		"eval", "exec ", "bash -c",
+		"--version", "-version", "/version", // often used to probe, but could be harmless
+	}
+	for _, dangerous := range dangerousPatterns {
 		if strings.Contains(lower, dangerous) {
 			return &tool.Result{Error: fmt.Sprintf("blocked: command contains dangerous pattern %q", dangerous)}, nil
 		}

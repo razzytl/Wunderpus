@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+
+	"golang.org/x/crypto/argon2"
 )
 
 // Encrypt encrypts plaintext using AES-256-GCM.
@@ -59,4 +61,16 @@ func Decrypt(cryptoText string, key []byte) (string, error) {
 	}
 
 	return string(plaintext), nil
+}
+
+// DeriveKey derives a 32-byte key from a passphrase and salt using Argon2id.
+func DeriveKey(passphrase string, salt []byte) []byte {
+	if len(salt) == 0 {
+		// Minimum recommended salt size is 16 bytes. 
+		// For simplicity in this implementation, we use a fixed salt if none provided, 
+		// but production should ideally store a per-user salt.
+		salt = []byte("wonderpus-default-salt-123") 
+	}
+	// Recommended parameters: time=3, memory=64MB, threads=4, keyLen=32
+	return argon2.IDKey([]byte(passphrase), salt, 3, 64*1024, 4, 32)
 }

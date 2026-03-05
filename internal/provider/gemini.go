@@ -6,9 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
+
+	"github.com/wonderpus/wonderpus/internal/errors"
 )
 
 // Gemini implements the Provider interface for Google's Gemini API.
@@ -25,8 +26,15 @@ func NewGemini(apiKey, model string, maxTokens int) *Gemini {
 		apiKey: apiKey,
 		model:  model,
 		maxTok: maxTokens,
-		client: &http.Client{},
+		client: DefaultClient,
 	}
+}
+
+func (g *Gemini) validate() error {
+	if g.apiKey == "" {
+		return errors.New(errors.ProviderError, "gemini: API key is missing")
+	}
+	return nil
 }
 
 func (g *Gemini) Name() string { return "gemini" }
@@ -42,29 +50,31 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		model, g.apiKey,
 	)
 
+	if err := g.validate(); err != nil {
+		return nil, err
+	}
+
 	body := buildGeminiBody(req.Messages, req.Tools, g.maxTok)
 
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: marshal: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "marshal gemini request", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("gemini: create request: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "create gemini request", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.client.Do(httpReq)
+	resp, err := RetryDo(ctx, g.client, httpReq, DefaultRetryOptions)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: request failed: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("gemini: API error %d: %s", resp.StatusCode, string(bodyBytes))
-	}
+	// Wrap body in size limit
+	resp.Body = LimitResponseReader(resp.Body)
 
 	var result struct {
 		Candidates []struct {
@@ -133,29 +143,28 @@ func (g *Gemini) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		model, g.apiKey,
 	)
 
+	if err := g.validate(); err != nil {
+		return nil, err
+	}
+
 	body := buildGeminiBody(req.Messages, req.Tools, g.maxTok)
 
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: marshal: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "marshal gemini request", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("gemini: create request: %w", err)
+		return nil, errors.Wrap(errors.InternalError, "create gemini request", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := g.client.Do(httpReq)
+	resp, err := RetryDo(ctx, g.client, httpReq, DefaultRetryOptions)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: request failed: %w", err)
+		return nil, err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("gemini: API error %d: %s", resp.StatusCode, string(bodyBytes))
-	}
+	// Note: defer resp.Body.Close() is handled by the caller/stream reader
 
 	ch := make(chan StreamChunk, 64)
 	go func() {
@@ -259,11 +268,25 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 		if m.Role == RoleAssistant {
 			role = "model"
 		}
+		
+		parts := make([]map[string]any, 0)
+		if len(m.MultiContent) > 0 {
+			for _, p := range m.MultiContent {
+				if p.Type == "text" {
+					parts = append(parts, map[string]any{"text": p.Text})
+				} else if p.Type == "image_url" && p.ImageURL != nil {
+					if strings.HasPrefix(p.ImageURL.URL, "data:") {
+						parts = append(parts, parseGeminiImage(p.ImageURL.URL))
+					}
+				}
+			}
+		} else {
+			parts = append(parts, map[string]any{"text": m.Content})
+		}
+
 		contents = append(contents, map[string]any{
-			"role": role,
-			"parts": []map[string]any{
-				{"text": m.Content},
-			},
+			"role":  role,
+			"parts": parts,
 		})
 	}
 
@@ -301,4 +324,25 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 	}
 
 	return body
+}
+
+func parseGeminiImage(dataURL string) map[string]any {
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	header := parts[0]
+	data := parts[1]
+
+	mimeType := "image/jpeg"
+	if strings.Contains(header, "image/png") {
+		mimeType = "image/png"
+	}
+
+	return map[string]any{
+		"inline_data": map[string]any{
+			"mime_type": mimeType,
+			"data":      data,
+		},
+	}
 }

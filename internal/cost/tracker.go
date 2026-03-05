@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	"github.com/wonderpus/wonderpus/internal/logging"
 )
 
 // Tracker handles asynchronous cost tracking and budgeting.
@@ -31,6 +32,10 @@ func NewTracker(dbPath string, budget float64) (*Tracker, error) {
 		return nil, fmt.Errorf("cost: opening db: %w", err)
 	}
 
+	// Optimize SQLite
+	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
+
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS cost_log (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +45,8 @@ func NewTracker(dbPath string, budget float64) (*Tracker, error) {
 			input_tokens INTEGER NOT NULL,
 			output_tokens INTEGER NOT NULL,
 			cost         REAL NOT NULL
-		)
+		);
+		CREATE INDEX IF NOT EXISTS idx_cost_session ON cost_log(session_id);
 	`)
 	if err != nil {
 		db.Close()
@@ -72,6 +78,11 @@ func (t *Tracker) Track(sessionID, model string, input, output int) error {
 	t.mu.Lock()
 	t.usage[sessionID] += cost
 	t.mu.Unlock()
+
+	// Update Prometheus metrics
+	logging.TokenUsage.WithLabelValues(model, "input").Add(float64(input))
+	logging.TokenUsage.WithLabelValues(model, "output").Add(float64(output))
+	logging.ProviderCost.WithLabelValues(model, sessionID).Add(cost)
 
 	_, err := t.db.Exec(
 		`INSERT INTO cost_log (timestamp, session_id, model, input_tokens, output_tokens, cost)

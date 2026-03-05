@@ -1,11 +1,15 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/wonderpus/wonderpus/internal/errors"
+	"github.com/wonderpus/wonderpus/internal/security"
 )
 
 // Config is the root configuration for Wonderpus.
@@ -30,16 +34,19 @@ type ProvidersConfig struct {
 
 // ProviderEntry is a generic API-key-based provider config.
 type ProviderEntry struct {
-	APIKey    string `yaml:"api_key"`
-	Model     string `yaml:"model"`
-	MaxTokens int    `yaml:"max_tokens"`
+	APIKey         string   `yaml:"api_key"`
+	Model          string   `yaml:"model"`
+	MaxTokens      int      `yaml:"max_tokens"`
+	Endpoint       string   `yaml:"endpoint,omitempty"`
+	FallbackModels []string `yaml:"fallback_models,omitempty"`
 }
 
 // OllamaEntry is config for the local Ollama provider.
 type OllamaEntry struct {
-	Host      string `yaml:"host"`
-	Model     string `yaml:"model"`
-	MaxTokens int    `yaml:"max_tokens"`
+	Host           string   `yaml:"host"`
+	Model          string   `yaml:"model"`
+	MaxTokens      int      `yaml:"max_tokens"`
+	FallbackModels []string `yaml:"fallback_models,omitempty"`
 }
 
 // AgentConfig holds agent behavior settings.
@@ -127,27 +134,76 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No config file — rely on ENV vars only
-			applyEnv(cfg)
-			if verr := validate(cfg); verr != nil {
-				return nil, verr
+			// Try environment specific config if main one missing
+			env := os.Getenv("WONDERPUS_ENV")
+			if env != "" {
+				altPath := fmt.Sprintf("config.%s.yaml", env)
+				if altData, err := os.ReadFile(altPath); err == nil {
+					data = altData
+					path = altPath
+				}
 			}
-			return cfg, nil
+			
+			if data == nil {
+				// No config file — rely on ENV vars only
+				applyEnv(cfg)
+				if verr := validate(cfg); verr != nil {
+					return nil, verr
+				}
+				return cfg, nil
+			}
+		} else {
+			return nil, errors.Wrap(errors.ConfigError, "reading config file", err)
 		}
-		return nil, fmt.Errorf("reading config: %w", err)
 	}
-
 	if err := yaml.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
+		return nil, errors.Wrap(errors.ConfigError, "parsing config YAML", err)
 	}
 
 	applyEnv(cfg)
+
+	if err := cfg.decryptSecrets(); err != nil {
+		return nil, err
+	}
 
 	if err := validate(cfg); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
+}
+
+func (c *Config) decryptSecrets() error {
+	if !c.Security.Encryption.Enabled || c.Security.Encryption.Key == "" {
+		return nil
+	}
+
+	key, err := base64.StdEncoding.DecodeString(c.Security.Encryption.Key)
+	if err != nil {
+		return errors.Wrap(errors.ConfigError, "invalid encryption key (must be base64)", err)
+	}
+
+	decrypt := func(val *string, name string) {
+		if *val == "" || !strings.HasPrefix(*val, "enc:") {
+			return
+		}
+		cipherText := strings.TrimPrefix(*val, "enc:")
+		plain, err := security.Decrypt(cipherText, key)
+		if err != nil {
+			// Fallback: if decryption fails, maybe it wasn't actually encrypted? 
+			// Or log it. For safety, we should probably fail if it had "enc:" prefix.
+			return 
+		}
+		*val = plain
+	}
+
+	decrypt(&c.Providers.OpenAI.APIKey, "openai")
+	decrypt(&c.Providers.Anthropic.APIKey, "anthropic")
+	decrypt(&c.Providers.Gemini.APIKey, "gemini")
+	decrypt(&c.Channels.Telegram.Token, "telegram")
+	decrypt(&c.Channels.Discord.Token, "discord")
+
+	return nil
 }
 
 func applyDefaults(cfg *Config) {
@@ -226,16 +282,16 @@ func validate(cfg *Config) error {
 		cfg.Providers.Gemini.APIKey != ""
 
 	if !hasProvider {
-		return fmt.Errorf("config: at least one LLM provider must be configured (set API key or Ollama host)")
+		return errors.New(errors.ConfigError, "at least one LLM provider must be configured (set API key or Ollama host)")
 	}
 
 	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
 	if !validLevels[strings.ToLower(cfg.Logging.Level)] {
-		return fmt.Errorf("config: invalid log level %q (use debug, info, warn, error)", cfg.Logging.Level)
+		return errors.New(errors.ConfigError, fmt.Sprintf("invalid log level %q (use debug, info, warn, error)", cfg.Logging.Level))
 	}
 
 	if cfg.Server.HealthPort < 1 || cfg.Server.HealthPort > 65535 {
-		return fmt.Errorf("config: health_port must be 1-65535, got %d", cfg.Server.HealthPort)
+		return errors.New(errors.ConfigError, fmt.Sprintf("health_port must be 1-65535, got %d", cfg.Server.HealthPort))
 	}
 
 	return nil

@@ -17,6 +17,10 @@ type Tool interface {
 	Execute(ctx context.Context, args map[string]any) (*Result, error)
 	// Sensitive returns true if this tool requires user approval before execution.
 	Sensitive() bool
+	// Version returns the tool version string.
+	Version() string
+	// Dependencies returns a list of other tool names this tool relies on.
+	Dependencies() []string
 }
 
 // ParameterDef describes a single tool parameter.

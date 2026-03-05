@@ -6,15 +6,15 @@ import (
 
 // Color palette — dark-friendly, muted purple accent
 var (
-	accentColor    = lipgloss.Color("#9D7CD8") // muted purple
-	dimColor       = lipgloss.Color("#565F89") // dim gray
-	textColor      = lipgloss.Color("#C0CAF5") // soft white
-	userColor      = lipgloss.Color("#7AA2F7") // calm blue
-	agentColor     = lipgloss.Color("#9ECE6A") // soft green
-	systemColor    = lipgloss.Color("#E0AF68") // warm yellow
-	errorColor     = lipgloss.Color("#F7768E") // soft red
-	bgColor        = lipgloss.Color("#1A1B26") // deep dark
-	statusBgColor  = lipgloss.Color("#24283B") // slightly lighter
+	accentColor   = lipgloss.Color("#9D7CD8") // muted purple
+	dimColor      = lipgloss.Color("#565F89") // dim gray
+	textColor     = lipgloss.Color("#C0CAF5") // soft white
+	userColor     = lipgloss.Color("#7AA2F7") // calm blue
+	agentColor    = lipgloss.Color("#9ECE6A") // soft green
+	systemColor   = lipgloss.Color("#E0AF68") // warm yellow
+	errorColor    = lipgloss.Color("#F7768E") // soft red
+	bgColor       = lipgloss.Color("#1A1B26") // deep dark
+	statusBgColor = lipgloss.Color("#24283B") // slightly lighter
 )
 
 // Styles used throughout the TUI.
@@ -72,4 +72,11 @@ var (
 	// Spinner
 	SpinnerStyle = lipgloss.NewStyle().
 			Foreground(accentColor)
+
+	NotifyStyle = lipgloss.NewStyle().
+			Foreground(accentColor).
+			Bold(true).
+			Padding(0, 1).
+			BorderStyle(lipgloss.DoubleBorder()).
+			BorderForeground(accentColor)
 )

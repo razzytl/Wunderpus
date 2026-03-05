@@ -11,7 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/channel"
+	"github.com/wonderpus/wonderpus/internal/types"
 )
 
 var upgrader = websocket.Upgrader{
@@ -101,8 +101,30 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("new websocket client connected", "addr", r.RemoteAddr)
 
+	// Set read deadline for heartbeat
+	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	conn.SetPongHandler(func(string) error { 
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil 
+	})
+
+	// Heartbeat ticker
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
+			}
+		}
+	}()
+
 	for {
-		_, message, err := conn.ReadMessage()
+		messageType, message, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				slog.Error("websocket read error", "error", err)
@@ -110,7 +132,12 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		var req channel.UserMessage
+		if messageType == websocket.BinaryMessage {
+			slog.Info("received binary message, skipping processing for now", "size", len(message))
+			continue
+		}
+
+		var req types.UserMessage
 		if err := json.Unmarshal(message, &req); err != nil {
 			slog.Warn("invalid websocket message", "error", err)
 			continue
@@ -137,7 +164,7 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sendResponse(conn *websocket.Conn, content string) {
-	resp := channel.AgentResponse{
+	resp := types.AgentResponse{
 		Content: content,
 	}
 	b, _ := json.Marshal(resp)

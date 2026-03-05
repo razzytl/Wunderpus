@@ -1,12 +1,16 @@
 package provider
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
 
 	"github.com/wonderpus/wonderpus/internal/config"
+	"github.com/wonderpus/wonderpus/internal/logging"
 	"github.com/wonderpus/wonderpus/internal/security"
+	"sync"
+	"time"
 )
 
 // Router manages available providers and routes to the right one.
@@ -15,6 +19,16 @@ type Router struct {
 	defaultName    string
 	activeName     string
 	activeProvider Provider
+	Cache          *ResponseCache
+	stats          map[string]*ProviderStats
+	mu             sync.RWMutex
+}
+
+type ProviderStats struct {
+	FailCount    int
+	LastFailure  time.Time
+	Latencies    []time.Duration
+	FallbackModels []string
 }
 
 // NewRouter creates a router from the app config.
@@ -22,6 +36,7 @@ func NewRouter(cfg *config.Config) (*Router, error) {
 	r := &Router{
 		providers:   make(map[string]Provider),
 		defaultName: cfg.DefaultProvider,
+		Cache:       NewResponseCache(5 * time.Minute), // Default 5 min TTL
 	}
 
 	// encryption key
@@ -98,6 +113,13 @@ func NewRouter(cfg *config.Config) (*Router, error) {
 		}
 	}
 
+	// Init stats
+	r.stats = make(map[string]*ProviderStats)
+	r.stats["openai"] = &ProviderStats{FallbackModels: cfg.Providers.OpenAI.FallbackModels}
+	r.stats["anthropic"] = &ProviderStats{FallbackModels: cfg.Providers.Anthropic.FallbackModels}
+	r.stats["gemini"] = &ProviderStats{FallbackModels: cfg.Providers.Gemini.FallbackModels}
+	r.stats["ollama"] = &ProviderStats{FallbackModels: cfg.Providers.Ollama.FallbackModels}
+
 	return r, nil
 }
 
@@ -135,4 +157,98 @@ func (r *Router) List() []string {
 // Get returns a provider by name, or nil if not found.
 func (r *Router) Get(name string) Provider {
 	return r.providers[name]
+}
+
+// CompleteWithFallback tries the active provider (with model fallbacks), then others.
+func (r *Router) CompleteWithFallback(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
+	start := time.Now()
+	prov := r.activeProvider
+	name := r.activeName
+
+	// 1. Try active provider (including tiered model fallbacks)
+	models := []string{req.Model}
+	if req.Model == "" {
+		models = []string{""} // Use provider default
+	}
+	if s, ok := r.stats[name]; ok {
+		models = append(models, s.FallbackModels...)
+	}
+
+	var lastErr error
+	for _, m := range models {
+		mReq := *req
+		mReq.Model = m
+		
+		resp, err := prov.Complete(ctx, &mReq)
+		if err == nil {
+			r.recordSuccess(name, time.Since(start))
+			logging.ProviderLatency.WithLabelValues(prov.Name(), m).Observe(time.Since(start).Seconds())
+			return resp, nil
+		}
+		lastErr = err
+		r.recordFailure(name)
+		logging.L(ctx).Warn("model failed, trying internal fallback", "provider", name, "model", m, "error", err)
+	}
+
+	logging.L(ctx).Warn("primary provider exhausted all models, attempting alternative provider", "provider", name, "error", lastErr)
+
+	// 2. Try all other healthy providers
+	for pname, p := range r.providers {
+		if pname == r.activeName || !r.isHealthy(pname) {
+			continue
+		}
+
+		logging.L(ctx).Info("trying fallback provider", "provider", pname)
+		fStart := time.Now()
+		resp, err := p.Complete(ctx, req)
+		if err == nil {
+			r.recordSuccess(pname, time.Since(fStart))
+			logging.ProviderLatency.WithLabelValues(pname, req.Model).Observe(time.Since(fStart).Seconds())
+			logging.L(ctx).Info("fallback successful", "provider", pname)
+			return resp, nil
+		}
+		r.recordFailure(pname)
+		logging.L(ctx).Warn("fallback provider failed", "provider", pname, "error", err)
+	}
+
+	return nil, fmt.Errorf("all providers failed, last error: %w", lastErr)
+}
+
+func (r *Router) recordSuccess(name string, d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.stats[name]
+	if s == nil {
+		return
+	}
+	s.FailCount = 0 // Reset on success
+	s.Latencies = append(s.Latencies, d)
+	if len(s.Latencies) > 20 {
+		s.Latencies = s.Latencies[1:]
+	}
+}
+
+func (r *Router) recordFailure(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.stats[name]
+	if s == nil {
+		return
+	}
+	s.FailCount++
+	s.LastFailure = time.Now()
+}
+
+func (r *Router) isHealthy(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	s := r.stats[name]
+	if s == nil {
+		return true
+	}
+	// Circuit breaker: trip if > 5 fails in last 5 mins
+	if s.FailCount > 5 && time.Since(s.LastFailure) < 5*time.Minute {
+		return false
+	}
+	return true
 }

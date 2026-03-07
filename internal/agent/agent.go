@@ -14,6 +14,7 @@ import (
 	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
 	"github.com/wonderpus/wonderpus/internal/constants"
+	"github.com/wonderpus/wonderpus/internal/skills"
 )
 
 // Agent is the core agent that processes user messages.
@@ -24,6 +25,7 @@ type Agent struct {
 	ctx            *ContextManager
 	registry       *tool.Registry
 	executor       *tool.Executor
+	skillsLoader   *skills.SkillsLoader
 	sysPrompt      string
 	temp           float64
 	toolFunc       func(name string, args map[string]any, result string) // optional callback for TUI
@@ -40,21 +42,32 @@ func NewAgent(
 	store *memory.Store,
 	registry *tool.Registry,
 	executor *tool.Executor,
+	skillsLoader *skills.SkillsLoader,
 	systemPrompt string,
 	maxContextTokens int,
 	temperature float64,
 	sessionID string,
 ) *Agent {
+	// Inject configured core built-in skills if loader is provided
+	if skillsLoader != nil {
+		coreSkills := []string{"agents", "tools", "identity", "soul", "user"}
+		skillsContext := skillsLoader.LoadSkillsForContext(coreSkills)
+		if skillsContext != "" {
+			systemPrompt = systemPrompt + "\n\n" + skillsContext
+		}
+	}
+
 	return &Agent{
-		router:    router,
-		sanitizer: sanitizer,
-		audit:     audit,
-		registry:  registry,
-		executor:  executor,
-		ctx:       NewContextManager(maxContextTokens, store, sessionID, nil), // defaults to no encryption unless SetEncryptionKey called
-		sysPrompt: systemPrompt,
-		temp:      temperature,
-		sessionID: sessionID,
+		router:       router,
+		sanitizer:    sanitizer,
+		audit:        audit,
+		registry:     registry,
+		executor:     executor,
+		skillsLoader: skillsLoader,
+		ctx:          NewContextManager(maxContextTokens, store, sessionID, nil), // defaults to no encryption unless SetEncryptionKey called
+		sysPrompt:    systemPrompt,
+		temp:         temperature,
+		sessionID:    sessionID,
 	}
 }
 

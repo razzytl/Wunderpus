@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 
+	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
 )
 
@@ -19,9 +21,10 @@ var defaultWhitelist = map[string]bool{
 	"tree": true, "sort": true, "uniq": true, "diff": true,
 }
 
-// ShellExec executes whitelisted shell commands.
+// ShellExec executes whitelisted shell commands within the workspace sandbox.
 type ShellExec struct {
 	whitelist map[string]bool
+	sandbox   *security.WorkspaceSandbox
 }
 
 // NewShellExec creates a shell executor with the given command whitelist.
@@ -38,6 +41,13 @@ func NewShellExec(whitelist []string) *ShellExec {
 		}
 	}
 	return &ShellExec{whitelist: wl}
+}
+
+// NewShellExecSandboxed creates a shell executor restricted to the workspace sandbox.
+func NewShellExecSandboxed(whitelist []string, sandbox *security.WorkspaceSandbox) *ShellExec {
+	s := NewShellExec(whitelist)
+	s.sandbox = sandbox
+	return s
 }
 
 func (s *ShellExec) Name() string { return "shell_exec" }
@@ -67,25 +77,32 @@ func (s *ShellExec) Execute(ctx context.Context, args map[string]any) (*tool.Res
 
 	baseCmd := parts[0]
 
-	// Block dangerous patterns regardless of whitelist
+	// Additional dangerous patterns from Phase 3 requirements
 	lower := strings.ToLower(command)
-	dangerousPatterns := []string{
-		"rm ", "rmdir", "del ", "del/",
-		"format", "mkfs",
-		"> /dev", ">nul", "> NUL", "> /null", ">NUL",
+	
+	// Exact substring matches
+	dangerousSubstrings := []string{
+		"rm -rf", "del /f", "rmdir /s",
+		"format", "mkfs", "diskpart",
+		"dd if=",
+		"shutdown", "reboot", "poweroff",
+		":(){ :|:& };:", // fork bomb
+		"> /dev", ">nul", "> null",
 		"sudo", "chmod", "chown",
-		"curl", "wget",
-		"powershell", "ps1", "cmd.exe",
-		"certutil", "base64",
-		"shutdown", "reboot",
-		"kill ", "pkill",
 		"eval", "exec ", "bash -c",
-		"--version", "-version", "/version", // often used to probe, but could be harmless
+		"powershell", "cmd.exe",
 	}
-	for _, dangerous := range dangerousPatterns {
+
+	for _, dangerous := range dangerousSubstrings {
 		if strings.Contains(lower, dangerous) {
 			return &tool.Result{Error: fmt.Sprintf("blocked: command contains dangerous pattern %q", dangerous)}, nil
 		}
+	}
+
+	// Regex matches (e.g. for /dev/sd[a-z])
+	matched, _ := regexp.MatchString(`/dev/sd[a-z]`, lower)
+	if matched {
+		return &tool.Result{Error: "blocked: command contains dangerous pattern for direct disk writes"}, nil
 	}
 
 	// Check whitelist
@@ -97,12 +114,24 @@ func (s *ShellExec) Execute(ctx context.Context, args map[string]any) (*tool.Res
 		return &tool.Result{Error: fmt.Sprintf("command %q is not whitelisted. Allowed: %s", baseCmd, strings.Join(allowed, ", "))}, nil
 	}
 
-	// Execute
+	// Workspace sandbox: restrict command execution paths
+	if s.sandbox != nil {
+		if err := s.sandbox.ValidateCommand(command); err != nil {
+			return &tool.Result{Error: err.Error()}, nil
+		}
+	}
+
+	// Execute — use workspace as working directory when sandboxed
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+	}
+
+	// Set working directory to workspace when sandbox is active
+	if s.sandbox != nil && s.sandbox.IsRestricted() {
+		cmd.Dir = s.sandbox.WorkspacePath()
 	}
 
 	var stdout, stderr bytes.Buffer

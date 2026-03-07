@@ -12,23 +12,39 @@ import (
 
 // Ollama implements the Provider interface for local Ollama inference.
 type Ollama struct {
-	host   string
-	model  string
-	maxTok int
-	client *http.Client
+	host         string
+	model        string
+	maxTok       int
+	providerName string
+	client       *http.Client
 }
 
 // NewOllama creates a new Ollama provider.
 func NewOllama(host, model string, maxTokens int) *Ollama {
 	return &Ollama{
-		host:   host,
-		model:  model,
-		maxTok: maxTokens,
-		client: &http.Client{},
+		host:         host,
+		model:        model,
+		maxTok:       maxTokens,
+		providerName: "ollama",
+		client:       &http.Client{},
 	}
 }
 
-func (o *Ollama) Name() string { return "ollama" }
+// NewOllamaCompatible creates an Ollama provider with a custom name.
+func NewOllamaCompatible(host, model string, maxTokens int, name string) *Ollama {
+	if name == "" {
+		name = "ollama"
+	}
+	return &Ollama{
+		host:         host,
+		model:        model,
+		maxTok:       maxTokens,
+		providerName: name,
+		client:       &http.Client{},
+	}
+}
+
+func (o *Ollama) Name() string { return o.providerName }
 
 func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
 	model := req.Model

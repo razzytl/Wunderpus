@@ -10,6 +10,7 @@ import (
 	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
+	"github.com/wonderpus/wonderpus/internal/skills"
 	"github.com/wonderpus/wonderpus/internal/tool"
 	"github.com/wonderpus/wonderpus/internal/types"
 )
@@ -23,6 +24,7 @@ type Manager struct {
 	store     *memory.Store
 	registry  *tool.Registry
 	executor  *tool.Executor
+	loader    *skills.SkillsLoader
 
 	mu      sync.RWMutex
 	agents  map[string]*Agent
@@ -39,6 +41,7 @@ func NewManager(
 	store *memory.Store,
 	registry *tool.Registry,
 	executor *tool.Executor,
+	loader *skills.SkillsLoader,
 ) *Manager {
 	m := &Manager{
 		cfg:       cfg,
@@ -48,6 +51,7 @@ func NewManager(
 		store:     store,
 		registry:  registry,
 		executor:  executor,
+		loader:    loader,
 		agents:    make(map[string]*Agent),
 	}
 
@@ -83,6 +87,7 @@ func (m *Manager) GetAgent(sessionID string) *Agent {
 		m.store,
 		m.registry,
 		m.executor,
+		m.loader,
 		m.cfg.Agent.SystemPrompt,
 		m.cfg.Agent.MaxContextTokens,
 		m.cfg.Agent.Temperature,
@@ -105,6 +110,11 @@ func (m *Manager) ProcessMessage(ctx context.Context, sessionID, input string) (
 
 	ag := m.GetAgent(sessionID)
 	return ag.HandleMessage(ctx, input)
+}
+
+// GetSkillsLoader returns the skills loader.
+func (m *Manager) GetSkillsLoader() *skills.SkillsLoader {
+	return m.loader
 }
 
 // ProcessRequest processes a full UserMessage request.

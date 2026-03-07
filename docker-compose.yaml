@@ -1,14 +1,70 @@
 version: '3.8'
 
 services:
-  wonderpus:
+  # Gateway mode - continuous operation with all channels and heartbeat
+  wonderpus-gateway:
     build: .
+    profiles:
+      - gateway
     ports:
       - "8080:8080"
       - "9090:9090"
     environment:
       - WONDERPUS_ENCRYPTION_KEY=${WONDERPUS_ENCRYPTION_KEY}
       - WONDERPUS_OPENAI_API_KEY=${WONDERPUS_OPENAI_API_KEY}
+      - WONDERPUS_ANTHROPIC_API_KEY=${WONDERPUS_ANTHROPIC_API_KEY}
+      - WONDERPUS_GEMINI_API_KEY=${WONDERPUS_GEMINI_API_KEY}
+      - WUNDERPUS_HEARTBEAT_ENABLED=${WUNDERPUS_HEARTBEAT_ENABLED:-true}
+      - WUNDERPUS_HEARTBEAT_INTERVAL=${WUNDERPUS_HEARTBEAT_INTERVAL:-30}
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - wonderpus-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: ["gateway"]
+
+  # Agent mode - one-shot or interactive
+  wonderpus-agent:
+    build: .
+    profiles:
+      - agent
+    environment:
+      - WONDERPUS_ENCRYPTION_KEY=${WONDERPUS_ENCRYPTION_KEY}
+      - WONDERPUS_OPENAI_API_KEY=${WONDERPUS_OPENAI_API_KEY}
+      - WONDERPUS_ANTHROPIC_API_KEY=${WONDERPUS_ANTHROPIC_API_KEY}
+      - WONDERPUS_GEMINI_API_KEY=${WONDERPUS_GEMINI_API_KEY}
+      - WUNDERPUS_HEARTBEAT_ENABLED=false
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+      - .:/workspace
+    networks:
+      - wonderpus-net
+    working_dir: /workspace
+    default_command: []
+    stdin_open: true
+    tty: true
+
+  # Legacy wonderpus service (backward compatible)
+  wonderpus:
+    build: .
+    profiles:
+      - legacy
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - WONDERPUS_ENCRYPTION_KEY=${WONDERPUS_ENCRYPTION_KEY}
+      - WONDERPUS_OPENAI_API_KEY=${WONDERPUS_OPENAI_API_KEY}
+      - WONDERPUS_ANTHROPIC_API_KEY=${WONDERPUS_ANTHROPIC_API_KEY}
+      - WONDERPUS_GEMINI_API_KEY=${WONDERPUS_GEMINI_API_KEY}
     volumes:
       - ./data:/app/data
     networks:
@@ -17,6 +73,8 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    profiles:
+      - monitoring
     ports:
       - "9091:9090"
     volumes:
@@ -27,6 +85,8 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    profiles:
+      - monitoring
     ports:
       - "3000:3000"
     volumes:

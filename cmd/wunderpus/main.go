@@ -1,0 +1,253 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/wonderpus/wonderpus/internal/app"
+	"github.com/wonderpus/wonderpus/internal/tui"
+)
+
+var (
+	configPath string
+	verbose    bool
+)
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+var rootCmd = &cobra.Command{
+	Use:   "wunderpus",
+	Short: "Wunderpus - Your expert agentic AI assistant",
+	Long: `Wunderpus is a powerful, vendor-agnostic AI agent framework with 
+security sandboxing, skills system, and multi-channel support.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		runAgent(cmd, args)
+	},
+}
+
+func init() {
+	if envConfig := os.Getenv("WUNDERPUS_CONFIG"); envConfig != "" {
+		configPath = envConfig
+	} else {
+		configPath = "config.yaml"
+	}
+	rootCmd.PersistentFlags().StringVar(&configPath, "config", configPath, "path to config file (or set WUNDERPUS_CONFIG env var)")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
+
+	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(agentCmd)
+	rootCmd.AddCommand(gatewayCmd)
+	rootCmd.AddCommand(onboardCmd)
+	rootCmd.AddCommand(cronCmd)
+	rootCmd.AddCommand(skillsCmd)
+	rootCmd.AddCommand(authCmd)
+
+	agentCmd.Flags().StringP("message", "m", "", "one-shot message to agent")
+
+	cronCmd.AddCommand(cronListCmd)
+	skillsCmd.AddCommand(skillsListCmd)
+	authCmd.AddCommand(authStatusCmd)
+}
+
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show Wunderpus status",
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		fmt.Printf("Wunderpus Status\n")
+		fmt.Printf("Workspace: %s\n", application.Config.Agents.Defaults.Workspace)
+		fmt.Printf("Providers: %v\n", application.Config.AvailableProviders())
+		fmt.Printf("DefaultProvider: %s\n", application.Config.DefaultProvider)
+
+		fmt.Printf("Uptime: %v\n", time.Since(application.HealthServer.StartTime))
+	},
+}
+
+var agentCmd = &cobra.Command{
+	Use:   "agent",
+	Short: "Run the Wunderpus agent",
+	Run: func(cmd *cobra.Command, args []string) {
+		msg, _ := cmd.Flags().GetString("message")
+		if msg != "" {
+			runOneShot(msg)
+			return
+		}
+		runAgent(cmd, args)
+	},
+}
+
+var gatewayCmd = &cobra.Command{
+	Use:   "gateway",
+	Short: "Start the Wunderpus gateway (background services)",
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		fmt.Println("Wunderpus Gateway starting...")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Start channels
+		for _, ch := range application.Channels {
+			if err := ch.Start(ctx); err != nil {
+				fmt.Printf("Failed to start channel %s: %v\n", ch.Name(), err)
+			} else {
+				fmt.Printf("Channel %s started\n", ch.Name())
+			}
+		}
+
+		// Start heartbeat
+		if err := application.HeartbeatScheduler.Start(ctx); err != nil {
+			fmt.Printf("Heartbeat scheduler failed: %v\n", err)
+		}
+
+		fmt.Println("Gateway running. Press Ctrl+C to stop.")
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+		fmt.Println("Shutting down gateway...")
+	},
+}
+
+var onboardCmd = &cobra.Command{
+	Use:   "onboard",
+	Short: "Interactive onboarding and configuration setup",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := app.Onboard(configPath); err != nil {
+			fmt.Printf("Onboarding error: %v\n", err)
+		}
+	},
+}
+
+var cronCmd = &cobra.Command{
+	Use:   "cron",
+	Short: "Manage periodic (heartbeat) tasks",
+}
+
+var cronListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all scheduled tasks in HEARTBEAT.md",
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		status := application.HeartbeatScheduler.GetStatus()
+		fmt.Printf("Periodic Tasks Status: %v\n", status)
+		fmt.Printf("Interval: %v minutes\n", status["interval"])
+		fmt.Printf("Quick Tasks: %v\n", status["quick_tasks"])
+		fmt.Printf("Long Tasks: %v\n", status["long_tasks"])
+	},
+}
+
+var skillsCmd = &cobra.Command{
+	Use:   "skills",
+	Short: "Manage and discover agent skills",
+}
+
+var skillsListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all installed skills",
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		allSkills := application.Manager.GetSkillsLoader().ListSkills()
+		fmt.Printf("Installed Skills (%d):\n", len(allSkills))
+		for _, s := range allSkills {
+			fmt.Printf("- %s (%s): %s\n", s.Name, s.Source, s.Description)
+		}
+	},
+}
+
+var authCmd = &cobra.Command{
+	Use:   "auth",
+	Short: "Manage authentication and API keys",
+}
+
+var authStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show authentication status for all providers",
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		fmt.Println("Authentication Status:")
+		providers := application.Config.AvailableProviders()
+		for _, p := range providers {
+			fmt.Printf("- %s: Authenticated\n", p)
+		}
+		if len(providers) == 0 {
+			fmt.Println("No providers authenticated. Use 'wunderpus onboard' to setup.")
+		}
+	},
+}
+
+func runAgent(cmd *cobra.Command, args []string) {
+	application, err := app.Bootstrap(configPath, verbose)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer application.Close()
+
+	// Launch TUI
+	sessionID := "default_cli_session"
+	ag := application.Manager.GetAgent(sessionID)
+
+	if err := tui.Run(ag, application.MemoryStore); err != nil {
+		fmt.Fprintf(os.Stderr, "TUI Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runOneShot(msg string) {
+	application, err := app.Bootstrap(configPath, verbose)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	defer application.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	resp, err := application.Manager.ProcessMessage(ctx, "oneshot_cli", msg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(resp)
+}

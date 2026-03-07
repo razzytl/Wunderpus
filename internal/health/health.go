@@ -12,7 +12,7 @@ import (
 // Server provides a simple HTTP health check endpoint.
 type Server struct {
 	server    *http.Server
-	startTime time.Time
+	StartTime time.Time
 }
 
 // NewServer creates a new health check server.
@@ -24,7 +24,7 @@ func NewServer(port int) *Server {
 			Addr:    fmt.Sprintf(":%d", port),
 			Handler: mux,
 		},
-		startTime: time.Now(),
+		StartTime: time.Now(),
 	}
 
 	mux.HandleFunc("/health", s.handleHealth)
@@ -38,7 +38,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]any{
 		"status": "ok",
-		"uptime": time.Since(s.startTime).String(),
+		"uptime": time.Since(s.StartTime).String(),
 	}
 	json.NewEncoder(w).Encode(resp)
 }

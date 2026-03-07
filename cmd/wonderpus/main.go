@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -20,10 +21,13 @@ import (
 	"github.com/wonderpus/wonderpus/internal/channel/websocket"
 	"github.com/wonderpus/wonderpus/internal/config"
 	"github.com/wonderpus/wonderpus/internal/health"
+	"github.com/wonderpus/wonderpus/internal/heartbeat"
 	"github.com/wonderpus/wonderpus/internal/logging"
 	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
+	"github.com/wonderpus/wonderpus/internal/skills"
+	"github.com/wonderpus/wonderpus/internal/subagent"
 	"github.com/wonderpus/wonderpus/internal/tool"
 	"github.com/wonderpus/wonderpus/internal/tool/builtin"
 	"github.com/wonderpus/wonderpus/internal/tui"
@@ -56,7 +60,7 @@ func main() {
 		logLevel = "debug"
 	}
 	logging.Init(logLevel, cfg.Logging.Format, cfg.Logging.Output)
-	
+
 	// Prepare encryption key if enabled
 	var encKey []byte
 	if cfg.Security.Encryption.Enabled && cfg.Security.Encryption.Key != "" {
@@ -101,13 +105,23 @@ func main() {
 	registry := tool.NewRegistry()
 	var executor *tool.Executor
 
+	// Workspace sandbox
+	sandbox, err := security.NewWorkspaceSandbox(cfg.Agents.Defaults.Workspace, cfg.Agents.Defaults.RestrictToWorkspace)
+	if err != nil {
+		slog.Error("failed to init workspace sandbox", "error", err)
+		os.Exit(1)
+	}
+
 	if cfg.Tools.Enabled {
-		registry.Register(builtin.NewFileRead(cfg.Tools.AllowedPaths))
-		registry.Register(builtin.NewFileWrite(cfg.Tools.AllowedPaths))
-		registry.Register(builtin.NewFileList(cfg.Tools.AllowedPaths))
-		registry.Register(builtin.NewShellExec(cfg.Tools.ShellWhitelist))
-		registry.Register(builtin.NewHTTPRequest())
+		registry.Register(builtin.NewFileReadSandboxed(sandbox))
+		registry.Register(builtin.NewFileWriteSandboxed(sandbox))
+		registry.Register(builtin.NewFileListSandboxed(sandbox))
+		registry.Register(builtin.NewFileGlobSandboxed(sandbox))
+		registry.Register(builtin.NewSearchFilesSandboxed(sandbox))
+		registry.Register(builtin.NewShellExecSandboxed(cfg.Tools.ShellWhitelist, sandbox))
+		registry.Register(builtin.NewHTTPRequest(cfg.Tools.SSRFBlocklist))
 		registry.Register(builtin.NewCalculator())
+		registry.Register(builtin.NewSystemInfo())
 
 		timeout := time.Duration(cfg.Tools.TimeoutSeconds) * time.Second
 
@@ -130,7 +144,13 @@ func main() {
 	}
 	defer memStore.Close()
 
-	// 7. Init agent manager
+	// 7. Init skills loader
+	homeDir, _ := os.UserHomeDir()
+	globalSkills := filepath.Join(homeDir, ".wunderpus", "skills")
+	builtinSkills := "./skills"
+	skillsLoader := skills.NewSkillsLoader(cfg.Agents.Defaults.Workspace, globalSkills, builtinSkills)
+
+	// 8. Init agent manager
 	manager := agent.NewManager(
 		cfg,
 		router,
@@ -139,17 +159,41 @@ func main() {
 		memStore,
 		registry,
 		executor,
+		skillsLoader,
 	)
+
+	// 9. Init sub-agent manager
+	subAgentMgr := subagent.NewManager(manager, router)
+
+	// Register spawn and message tools
+	if cfg.Tools.Enabled {
+		registry.Register(builtin.NewSpawnTool(subAgentMgr))
+		registry.Register(builtin.NewMessageTool(subAgentMgr))
+	}
 
 	// Hardcode a single session ID for the CLI right now
 	sessionID := "default_cli_session"
 	ag := manager.GetAgent(sessionID)
 
-	// 7. Graceful shutdown handler
+	// 10. Graceful shutdown handler
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 8. Init channels
+	// 11. Init heartbeat scheduler
+	heartbeatCfg := &heartbeat.HeartbeatConfig{
+		Enabled:   cfg.Heartbeat.Enabled,
+		Interval:  cfg.Heartbeat.Interval,
+		Workspace: cfg.Agents.Defaults.Workspace,
+	}
+	heartbeatParser := heartbeat.NewParser()
+	heartbeatScheduler := heartbeat.NewScheduler(heartbeatCfg, heartbeatParser, nil, manager, cfg.Agents.Defaults.Workspace)
+
+	// Start heartbeat scheduler
+	if err := heartbeatScheduler.Start(ctx); err != nil {
+		slog.Warn("heartbeat scheduler failed to start", "error", err)
+	}
+
+	// 12. Init channels
 	var channels []channel.Channel
 	if cfg.Channels.WebSocket.Enabled {
 		channels = append(channels, websocket.NewServer(cfg.Channels.WebSocket.Port, manager))
@@ -185,12 +229,15 @@ func main() {
 		shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer shutCancel()
 
+		// Stop heartbeat scheduler
+		heartbeatScheduler.Stop()
+
 		_ = healthSrv.Shutdown(shutCtx)
 		for _, ch := range channels {
 			_ = ch.Stop()
 		}
 		audit.Close()
-		slog.Info("wonderpus stopped")
+		slog.Info("wunderpus stopped")
 	}()
 
 	_ = ctx // used for future background tasks

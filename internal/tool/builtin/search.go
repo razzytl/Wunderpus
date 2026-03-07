@@ -7,17 +7,27 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
 )
 
-// SearchFiles searches for content inside files.
+// SearchFiles searches for content inside files within the workspace sandbox.
 type SearchFiles struct {
 	allowedPaths []string
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewSearchFiles creates a new content search tool.
 func NewSearchFiles(allowedPaths []string) *SearchFiles {
 	return &SearchFiles{allowedPaths: allowedPaths}
+}
+
+// NewSearchFilesSandboxed creates a content search tool restricted to the workspace sandbox.
+func NewSearchFilesSandboxed(sandbox *security.WorkspaceSandbox) *SearchFiles {
+	return &SearchFiles{
+		allowedPaths: sandbox.AllowedPaths(),
+		sandbox:      sandbox,
+	}
 }
 
 func (s *SearchFiles) Name() string        { return "content_search" }
@@ -48,8 +58,8 @@ func (s *SearchFiles) Execute(ctx context.Context, args map[string]any) (*tool.R
 		return &tool.Result{Error: fmt.Sprintf("invalid path: %v", err)}, nil
 	}
 
-	if !s.isAllowed(absPath) {
-		return &tool.Result{Error: "access denied: path outside allowed boundaries"}, nil
+	if err := s.checkAccess(absPath, path); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
 	var results []string
@@ -101,18 +111,12 @@ func (s *SearchFiles) Execute(ctx context.Context, args map[string]any) (*tool.R
 	return &tool.Result{Output: out}, nil
 }
 
-func (s *SearchFiles) isAllowed(absPath string) bool {
-	if strings.Contains(absPath, "..") {
-		return false
+func (s *SearchFiles) checkAccess(absPath, originalPath string) error {
+	if s.sandbox != nil {
+		return s.sandbox.ValidatePath(originalPath)
 	}
-	for _, allowed := range s.allowedPaths {
-		allowedAbs, err := filepath.Abs(allowed)
-		if err != nil {
-			continue
-		}
-		if strings.HasPrefix(absPath, allowedAbs) {
-			return true
-		}
+	if !isPathAllowed(absPath, s.allowedPaths) {
+		return fmt.Errorf("access denied: %s is outside allowed paths", originalPath)
 	}
-	return false
+	return nil
 }

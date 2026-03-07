@@ -218,7 +218,7 @@ func TestBuiltin_ShellWhitelist(t *testing.T) {
 }
 
 func TestBuiltin_HTTPSSRF(t *testing.T) {
-	http := builtin.NewHTTPRequest() // Built to block internal IPs
+	http := builtin.NewHTTPRequest(nil) // Built to block internal IPs
 
 	tests := []struct {
 		url     string

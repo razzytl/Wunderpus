@@ -1,6 +1,70 @@
 # Wonderpus Configuration
 # Copy to config.yaml and fill in your API keys
 
+# ═══════════════════════════════════════════════════════════════════
+# MODEL LIST — Vendor-agnostic model configuration (RECOMMENDED)
+# ═══════════════════════════════════════════════════════════════════
+# Add any provider with zero code changes. Protocol is auto-detected
+# from the model prefix, or set explicitly via "protocol".
+#
+# Supported protocols:
+#   openai     — OpenAI, OpenRouter, Groq, Together, Mistral, vLLM, etc.
+#   anthropic  — Anthropic Claude
+#   ollama     — Local Ollama
+#   gemini     — Google Gemini
+
+# model_list:
+#   - model_name: "gpt-4o"
+#     model: "openai/gpt-4o"
+#     api_key: "sk-..."
+#     api_base: "https://api.openai.com/v1"
+#     max_tokens: 4096
+#
+#   - model_name: "claude-sonnet"
+#     model: "anthropic/claude-sonnet-4-20250514"
+#     api_key: "sk-ant-..."
+#     max_tokens: 4096
+#
+#   - model_name: "llama-local"
+#     model: "ollama/llama3.2"
+#     api_base: "http://localhost:11434"
+#     max_tokens: 4096
+#
+#   - model_name: "gemini-flash"
+#     model: "gemini/gemini-2.0-flash"
+#     api_key: "AIza..."
+#     max_tokens: 4096
+#
+#   # OpenRouter (OpenAI-compatible protocol, custom base URL)
+#   - model_name: "deepseek-r1"
+#     model: "openrouter/deepseek/deepseek-r1"
+#     api_key: "sk-or-..."
+#     api_base: "https://openrouter.ai/api/v1"
+#     max_tokens: 4096
+#
+#   # Groq (OpenAI-compatible protocol)
+#   - model_name: "groq-llama"
+#     model: "groq/llama-3.3-70b-versatile"
+#     api_key: "gsk_..."
+#     api_base: "https://api.groq.com/openai/v1"
+#     max_tokens: 4096
+#
+#   # Fallback configuration
+#   - model_name: "gpt-primary"
+#     model: "openai/gpt-4o"
+#     api_key: "sk-..."
+#     fallback_models:
+#       - "gpt-4o-mini"
+#       - "gpt-3.5-turbo"
+
+# ═══════════════════════════════════════════════════════════════════
+# LEGACY PROVIDERS — Still supported for backward compatibility
+# ═══════════════════════════════════════════════════════════════════
+# If model_list is empty, these are used instead.
+
+# Default provider to use (openai, anthropic, ollama, gemini)
+default_provider: "openai"
+
 # LLM Providers — configure at least one
 providers:
   # OpenAI
@@ -27,8 +91,23 @@ providers:
     model: "gemini-2.0-flash" # gemini-2.0-flash, gemini-1.5-pro
     max_tokens: 4096
 
-# Default provider to use (openai, anthropic, ollama, gemini)
-default_provider: "openai"
+# ═══════════════════════════════════════════════════════════════════
+# AGENTS — Global agent behavior and security
+# ═══════════════════════════════════════════════════════════════════
+
+stats:
+  enabled: true # Enable cost and usage tracking
+
+agents:
+  defaults:
+    # Workspace directory for agent operations
+    # Use "." for current directory, or an absolute path
+    workspace: "."
+    
+    # When true, all file and command operations are restricted to the workspace.
+    # Attempts to access paths outside the workspace will result in an error.
+    # Set to false to disable this sandbox (CAUTION).
+    restrict_to_workspace: true
 
 # Agent settings
 agent:
@@ -40,22 +119,49 @@ agent:
 tools:
   enabled: true
   timeout_seconds: 30
+  
+  # Allowed paths for file operations (if agents.defaults.restrict_to_workspace is false)
   allowed_paths:
-    - "."                    # only allow file operations in current directory
+    - "."
+    - "/tmp"
+    
+  # Allowed shell commands for agent execution
   shell_whitelist:
     - "ls"
     - "dir"
     - "cat"
     - "type"
     - "echo"
-    - "head"
-    - "tail"
-    - "wc"
+    - "grep"
+    - "find"
+    - "git"
+    
+  # Additional domains or IPs to block for HTTP requests (prevents SSRF)
+  # Localhost and private IPs (10.x, 172.16.x, 192.168.x) are blocked by default.
+  ssrf_blocklist:
+    - "internal.company.com"
+    - "admin.local"
     - "grep"
     - "find"
     - "pwd"
     - "date"
     - "whoami"
+
+  # Skills system configuration
+  skills:
+    enabled: true
+    # Global skills directory (~/.wunderpus/skills)
+    global_skills_path: "~/.wunderpus/skills"
+    # Built-in skills directory (shipped with wunderpus)
+    builtin_skills_path: "./skills"
+    
+    # Skill registries
+    registries:
+      # ClawHub registry (https://clawhub.ai)
+      clawhub:
+        enabled: false            # Set to true to enable
+        base_url: "https://clawhub.ai"
+        auth_token: ""           # Optional: for elevated rate limits
 
 # Security
 security:
@@ -71,3 +177,10 @@ logging:
 # Health check server
 server:
   health_port: 8080
+
+# Heartbeat — Periodic task execution
+# Wunderpus reads HEARTBEAT.md periodically and executes tasks
+heartbeat:
+  enabled: true           # Set to false to disable heartbeat
+  interval: 30            # Interval in minutes (minimum: 5)
+

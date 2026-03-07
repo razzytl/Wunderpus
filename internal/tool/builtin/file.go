@@ -7,17 +7,27 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/wonderpus/wonderpus/internal/security"
 	"github.com/wonderpus/wonderpus/internal/tool"
 )
 
-// FileRead reads a file within allowed paths.
+// FileRead reads a file within the workspace sandbox.
 type FileRead struct {
 	allowedPaths []string
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewFileRead creates a file read tool with allowed base paths.
 func NewFileRead(allowedPaths []string) *FileRead {
 	return &FileRead{allowedPaths: allowedPaths}
+}
+
+// NewFileReadSandboxed creates a file read tool restricted to the workspace sandbox.
+func NewFileReadSandboxed(sandbox *security.WorkspaceSandbox) *FileRead {
+	return &FileRead{
+		allowedPaths: sandbox.AllowedPaths(),
+		sandbox:      sandbox,
+	}
 }
 
 func (f *FileRead) Name() string        { return "file_read" }
@@ -42,8 +52,8 @@ func (f *FileRead) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 		return &tool.Result{Error: fmt.Sprintf("invalid path: %v", err)}, nil
 	}
 
-	if !f.isAllowed(absPath) {
-		return &tool.Result{Error: fmt.Sprintf("access denied: %s is outside allowed paths", path)}, nil
+	if err := f.checkAccess(absPath, path); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
 	data, err := os.ReadFile(absPath)
@@ -60,32 +70,33 @@ func (f *FileRead) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 	return &tool.Result{Output: content}, nil
 }
 
-func (f *FileRead) isAllowed(absPath string) bool {
-	// Block path traversal
-	if strings.Contains(absPath, "..") {
-		return false
+func (f *FileRead) checkAccess(absPath, originalPath string) error {
+	if f.sandbox != nil {
+		return f.sandbox.ValidatePath(originalPath)
 	}
-
-	for _, allowed := range f.allowedPaths {
-		allowedAbs, err := filepath.Abs(allowed)
-		if err != nil {
-			continue
-		}
-		if strings.HasPrefix(absPath, allowedAbs) {
-			return true
-		}
+	if !isPathAllowed(absPath, f.allowedPaths) {
+		return fmt.Errorf("access denied: %s is outside allowed paths", originalPath)
 	}
-	return false
+	return nil
 }
 
-// FileWrite writes content to a file within allowed paths.
+// FileWrite writes content to a file within the workspace sandbox.
 type FileWrite struct {
 	allowedPaths []string
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewFileWrite creates a file write tool with allowed base paths.
 func NewFileWrite(allowedPaths []string) *FileWrite {
 	return &FileWrite{allowedPaths: allowedPaths}
+}
+
+// NewFileWriteSandboxed creates a file write tool restricted to the workspace sandbox.
+func NewFileWriteSandboxed(sandbox *security.WorkspaceSandbox) *FileWrite {
+	return &FileWrite{
+		allowedPaths: sandbox.AllowedPaths(),
+		sandbox:      sandbox,
+	}
 }
 
 func (f *FileWrite) Name() string        { return "file_write" }
@@ -113,8 +124,8 @@ func (f *FileWrite) Execute(ctx context.Context, args map[string]any) (*tool.Res
 		return &tool.Result{Error: fmt.Sprintf("invalid path: %v", err)}, nil
 	}
 
-	if !f.isAllowed(absPath) {
-		return &tool.Result{Error: fmt.Sprintf("access denied: %s is outside allowed paths", path)}, nil
+	if err := f.checkAccess(absPath, path); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
 	// Ensure parent directory exists
@@ -130,30 +141,33 @@ func (f *FileWrite) Execute(ctx context.Context, args map[string]any) (*tool.Res
 	return &tool.Result{Output: fmt.Sprintf("Successfully wrote %d bytes to %s", len(content), path)}, nil
 }
 
-func (f *FileWrite) isAllowed(absPath string) bool {
-	if strings.Contains(absPath, "..") {
-		return false
+func (f *FileWrite) checkAccess(absPath, originalPath string) error {
+	if f.sandbox != nil {
+		return f.sandbox.ValidatePath(originalPath)
 	}
-	for _, allowed := range f.allowedPaths {
-		allowedAbs, err := filepath.Abs(allowed)
-		if err != nil {
-			continue
-		}
-		if strings.HasPrefix(absPath, allowedAbs) {
-			return true
-		}
+	if !isPathAllowed(absPath, f.allowedPaths) {
+		return fmt.Errorf("access denied: %s is outside allowed paths", originalPath)
 	}
-	return false
+	return nil
 }
 
-// FileList lists files in a directory within allowed paths.
+// FileList lists files in a directory within the workspace sandbox.
 type FileList struct {
 	allowedPaths []string
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewFileList creates a file list tool with allowed base paths.
 func NewFileList(allowedPaths []string) *FileList {
 	return &FileList{allowedPaths: allowedPaths}
+}
+
+// NewFileListSandboxed creates a file list tool restricted to the workspace sandbox.
+func NewFileListSandboxed(sandbox *security.WorkspaceSandbox) *FileList {
+	return &FileList{
+		allowedPaths: sandbox.AllowedPaths(),
+		sandbox:      sandbox,
+	}
 }
 
 func (f *FileList) Name() string        { return "file_list" }
@@ -178,8 +192,8 @@ func (f *FileList) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 		return &tool.Result{Error: fmt.Sprintf("invalid path: %v", err)}, nil
 	}
 
-	if !f.isAllowed(absPath) {
-		return &tool.Result{Error: fmt.Sprintf("access denied: %s is outside allowed paths", path)}, nil
+	if err := f.checkAccess(absPath, path); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
 	entries, err := os.ReadDir(absPath)
@@ -207,30 +221,33 @@ func (f *FileList) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 	return &tool.Result{Output: strings.Join(lines, "\n")}, nil
 }
 
-func (f *FileList) isAllowed(absPath string) bool {
-	if strings.Contains(absPath, "..") {
-		return false
+func (f *FileList) checkAccess(absPath, originalPath string) error {
+	if f.sandbox != nil {
+		return f.sandbox.ValidatePath(originalPath)
 	}
-	for _, allowed := range f.allowedPaths {
-		allowedAbs, err := filepath.Abs(allowed)
-		if err != nil {
-			continue
-		}
-		if strings.HasPrefix(absPath, allowedAbs) {
-			return true
-		}
+	if !isPathAllowed(absPath, f.allowedPaths) {
+		return fmt.Errorf("access denied: %s is outside allowed paths", originalPath)
 	}
-	return false
+	return nil
 }
 
-// FileGlob finds files using glob patterns within allowed paths.
+// FileGlob finds files using glob patterns within the workspace sandbox.
 type FileGlob struct {
 	allowedPaths []string
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewFileGlob creates a file glob tool.
 func NewFileGlob(allowedPaths []string) *FileGlob {
 	return &FileGlob{allowedPaths: allowedPaths}
+}
+
+// NewFileGlobSandboxed creates a file glob tool restricted to the workspace sandbox.
+func NewFileGlobSandboxed(sandbox *security.WorkspaceSandbox) *FileGlob {
+	return &FileGlob{
+		allowedPaths: sandbox.AllowedPaths(),
+		sandbox:      sandbox,
+	}
 }
 
 func (f *FileGlob) Name() string        { return "file_glob" }
@@ -261,7 +278,11 @@ func (f *FileGlob) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 		if err != nil {
 			continue
 		}
-		if f.isAllowed(abs) {
+		if f.sandbox != nil {
+			if f.sandbox.ValidatePath(m) == nil {
+				allowedMatches = append(allowedMatches, m)
+			}
+		} else if isPathAllowed(abs, f.allowedPaths) {
 			allowedMatches = append(allowedMatches, m)
 		}
 	}
@@ -273,11 +294,12 @@ func (f *FileGlob) Execute(ctx context.Context, args map[string]any) (*tool.Resu
 	return &tool.Result{Output: strings.Join(allowedMatches, "\n")}, nil
 }
 
-func (f *FileGlob) isAllowed(absPath string) bool {
+// isPathAllowed is a shared helper for legacy allowed-paths checking.
+func isPathAllowed(absPath string, allowedPaths []string) bool {
 	if strings.Contains(absPath, "..") {
 		return false
 	}
-	for _, allowed := range f.allowedPaths {
+	for _, allowed := range allowedPaths {
 		allowedAbs, err := filepath.Abs(allowed)
 		if err != nil {
 			continue

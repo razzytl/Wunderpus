@@ -14,19 +14,42 @@ import (
 
 // Anthropic implements the Provider interface for Anthropic's API.
 type Anthropic struct {
-	apiKey string
-	model  string
-	maxTok int
-	client *http.Client
+	apiKey       string
+	model        string
+	maxTok       int
+	baseURL      string
+	providerName string
+	client       *http.Client
 }
 
 // NewAnthropic creates a new Anthropic provider.
 func NewAnthropic(apiKey, model string, maxTokens int) *Anthropic {
 	return &Anthropic{
-		apiKey: apiKey,
-		model:  model,
-		maxTok: maxTokens,
-		client: DefaultClient,
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		baseURL:      "https://api.anthropic.com",
+		providerName: "anthropic",
+		client:       DefaultClient,
+	}
+}
+
+// NewAnthropicCompatible creates an Anthropic provider with a custom base URL.
+func NewAnthropicCompatible(apiKey, model string, maxTokens int, baseURL, name string) *Anthropic {
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com"
+	}
+	if name == "" {
+		name = "anthropic"
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &Anthropic{
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		baseURL:      baseURL,
+		providerName: name,
+		client:       DefaultClient,
 	}
 }
 
@@ -34,13 +57,14 @@ func (a *Anthropic) validate() error {
 	if a.apiKey == "" {
 		return errors.New(errors.ProviderError, "anthropic: API key is missing")
 	}
-	if !strings.HasPrefix(a.apiKey, "sk-ant-") {
+	// Only enforce sk-ant- prefix for the default Anthropic endpoint
+	if a.baseURL == "https://api.anthropic.com" && !strings.HasPrefix(a.apiKey, "sk-ant-") {
 		return errors.New(errors.ProviderError, "anthropic: invalid API key format (expected sk-ant-...)")
 	}
 	return nil
 }
 
-func (a *Anthropic) Name() string { return "anthropic" }
+func (a *Anthropic) Name() string { return a.providerName }
 
 func (a *Anthropic) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
 	model := req.Model
@@ -217,7 +241,8 @@ func (a *Anthropic) createRequest(ctx context.Context, body map[string]any) (*ht
 		return nil, errors.Wrap(errors.InternalError, "marshal anthropic request", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(data))
+	url := a.baseURL + "/v1/messages"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
 		return nil, errors.Wrap(errors.InternalError, "create anthropic request", err)
 	}

@@ -12,25 +12,50 @@ import (
 	"github.com/wonderpus/wonderpus/internal/errors"
 )
 
-// OpenAI implements the Provider interface for OpenAI's API.
+// OpenAI implements the Provider interface for OpenAI-compatible APIs.
+// This includes OpenAI, OpenRouter, Groq, vLLM, Together, Mistral, etc.
 type OpenAI struct {
-	apiKey string
-	model  string
-	maxTok int
-	client *http.Client
+	apiKey       string
+	model        string
+	maxTok       int
+	baseURL      string // Configurable API base (e.g. "https://api.openai.com/v1")
+	providerName string // Custom name for this provider instance
+	client       *http.Client
 }
 
-// NewOpenAI creates a new OpenAI provider.
+// NewOpenAI creates a new OpenAI-compatible provider.
 func NewOpenAI(apiKey, model string, maxTokens int) *OpenAI {
 	return &OpenAI{
-		apiKey: apiKey,
-		model:  model,
-		maxTok: maxTokens,
-		client: DefaultClient,
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		baseURL:      "https://api.openai.com/v1",
+		providerName: "openai",
+		client:       DefaultClient,
 	}
 }
 
-func (o *OpenAI) Name() string { return "openai" }
+// NewOpenAICompatible creates a provider for any OpenAI-compatible API endpoint.
+func NewOpenAICompatible(apiKey, model string, maxTokens int, baseURL, name string) *OpenAI {
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+	if name == "" {
+		name = "openai"
+	}
+	// Ensure baseURL doesn't end with trailing slash
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &OpenAI{
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		baseURL:      baseURL,
+		providerName: name,
+		client:       DefaultClient,
+	}
+}
+
+func (o *OpenAI) Name() string { return o.providerName }
 
 func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
 	model := req.Model
@@ -177,7 +202,8 @@ func (o *OpenAI) createRequest(ctx context.Context, body map[string]any) (*http.
 		return nil, errors.Wrap(errors.InternalError, "marshal openai request", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(data))
+	url := o.baseURL + "/chat/completions"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
 		return nil, errors.Wrap(errors.InternalError, "create openai request", err)
 	}

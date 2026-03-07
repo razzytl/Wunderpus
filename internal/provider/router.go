@@ -2,15 +2,13 @@ package provider
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/wonderpus/wonderpus/internal/config"
 	"github.com/wonderpus/wonderpus/internal/logging"
-	"github.com/wonderpus/wonderpus/internal/security"
-	"sync"
-	"time"
 )
 
 // Router manages available providers and routes to the right one.
@@ -32,72 +30,58 @@ type ProviderStats struct {
 }
 
 // NewRouter creates a router from the app config.
+// It supports both the new model_list format and the legacy providers format.
 func NewRouter(cfg *config.Config) (*Router, error) {
 	r := &Router{
 		providers:   make(map[string]Provider),
 		defaultName: cfg.DefaultProvider,
-		Cache:       NewResponseCache(5 * time.Minute), // Default 5 min TTL
+		Cache:       NewResponseCache(5 * time.Minute),
+		stats:       make(map[string]*ProviderStats),
 	}
 
-	// encryption key
-	var decodedKey []byte
-	if cfg.Security.Encryption.Enabled && cfg.Security.Encryption.Key != "" {
-		var err error
-		decodedKey, err = base64.StdEncoding.DecodeString(cfg.Security.Encryption.Key)
-		if err != nil {
-			return nil, fmt.Errorf("invalid encryption key: %w", err)
+	// Determine which model entries to use
+	var modelEntries []config.ModelEntry
+	if len(cfg.ModelList) > 0 {
+		// Use the new model_list format
+		modelEntries = cfg.ModelList
+	} else {
+		// Convert legacy providers to model entries
+		modelEntries = config.ConvertLegacyToModelList(cfg)
+	}
+
+	if len(modelEntries) > 0 {
+		// Build providers from model entries via the factory
+		for _, entry := range modelEntries {
+			// Skip entries already registered (support multiple entries with same name for load balancing later)
+			if _, exists := r.providers[entry.ModelName]; exists {
+				continue
+			}
+
+			p, err := NewFromModelEntry(entry)
+			if err != nil {
+				slog.Warn("failed to create provider from model_list entry", "model_name", entry.ModelName, "error", err)
+				continue
+			}
+			r.providers[entry.ModelName] = p
+			r.stats[entry.ModelName] = &ProviderStats{FallbackModels: entry.FallbackModels}
+			slog.Info("provider registered", "name", entry.ModelName, "model", entry.ModelID(), "protocol", entry.DetectProtocol())
 		}
-	}
 
-	// Helper to get key (decrypt if needed)
-	getKey := func(k string) (string, error) {
-		if k == "" {
-			return "", nil
+		// Also register by protocol name for backward compatibility with SetActive("openai")
+		for _, entry := range modelEntries {
+			protocol := entry.DetectProtocol()
+			if _, exists := r.providers[protocol]; !exists {
+				if p, exists2 := r.providers[entry.ModelName]; exists2 {
+					r.providers[protocol] = p
+					if _, exists3 := r.stats[protocol]; !exists3 {
+						r.stats[protocol] = r.stats[entry.ModelName]
+					}
+				}
+			}
 		}
-		if len(decodedKey) > 0 {
-			return security.Decrypt(k, decodedKey)
-		}
-		return k, nil
-	}
-
-	// OpenAI
-	openAIKey, err := getKey(cfg.Providers.OpenAI.APIKey)
-	if err != nil {
-		return nil, fmt.Errorf("openai key decryption: %w", err)
-	}
-	if openAIKey != "" {
-		p := NewOpenAI(openAIKey, cfg.Providers.OpenAI.Model, cfg.Providers.OpenAI.MaxTokens)
-		r.providers["openai"] = p
-		slog.Info("provider registered", "name", "openai", "model", cfg.Providers.OpenAI.Model)
-	}
-
-	// Anthropic
-	anthropicKey, err := getKey(cfg.Providers.Anthropic.APIKey)
-	if err != nil {
-		return nil, fmt.Errorf("anthropic key decryption: %w", err)
-	}
-	if anthropicKey != "" {
-		p := NewAnthropic(anthropicKey, cfg.Providers.Anthropic.Model, cfg.Providers.Anthropic.MaxTokens)
-		r.providers["anthropic"] = p
-		slog.Info("provider registered", "name", "anthropic", "model", cfg.Providers.Anthropic.Model)
-	}
-
-	// Ollama (no key needed)
-	if cfg.Providers.Ollama.Host != "" {
-		p := NewOllama(cfg.Providers.Ollama.Host, cfg.Providers.Ollama.Model, cfg.Providers.Ollama.MaxTokens)
-		r.providers["ollama"] = p
-		slog.Info("provider registered", "name", "ollama", "model", cfg.Providers.Ollama.Model)
-	}
-
-	// Gemini
-	geminiKey, err := getKey(cfg.Providers.Gemini.APIKey)
-	if err != nil {
-		return nil, fmt.Errorf("gemini key decryption: %w", err)
-	}
-	if geminiKey != "" {
-		p := NewGemini(geminiKey, cfg.Providers.Gemini.Model, cfg.Providers.Gemini.MaxTokens)
-		r.providers["gemini"] = p
-		slog.Info("provider registered", "name", "gemini", "model", cfg.Providers.Gemini.Model)
+	} else {
+		// Fallback: legacy hardcoded path (should not happen if config has any providers)
+		return nil, fmt.Errorf("no providers configured")
 	}
 
 	if len(r.providers) == 0 {
@@ -112,13 +96,6 @@ func NewRouter(cfg *config.Config) (*Router, error) {
 			break
 		}
 	}
-
-	// Init stats
-	r.stats = make(map[string]*ProviderStats)
-	r.stats["openai"] = &ProviderStats{FallbackModels: cfg.Providers.OpenAI.FallbackModels}
-	r.stats["anthropic"] = &ProviderStats{FallbackModels: cfg.Providers.Anthropic.FallbackModels}
-	r.stats["gemini"] = &ProviderStats{FallbackModels: cfg.Providers.Gemini.FallbackModels}
-	r.stats["ollama"] = &ProviderStats{FallbackModels: cfg.Providers.Ollama.FallbackModels}
 
 	return r, nil
 }

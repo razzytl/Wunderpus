@@ -14,19 +14,35 @@ import (
 
 // Gemini implements the Provider interface for Google's Gemini API.
 type Gemini struct {
-	apiKey string
-	model  string
-	maxTok int
-	client *http.Client
+	apiKey       string
+	model        string
+	maxTok       int
+	providerName string
+	client       *http.Client
 }
 
 // NewGemini creates a new Gemini provider.
 func NewGemini(apiKey, model string, maxTokens int) *Gemini {
 	return &Gemini{
-		apiKey: apiKey,
-		model:  model,
-		maxTok: maxTokens,
-		client: DefaultClient,
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		providerName: "gemini",
+		client:       DefaultClient,
+	}
+}
+
+// NewGeminiCompatible creates a Gemini provider with a custom name.
+func NewGeminiCompatible(apiKey, model string, maxTokens int, name string) *Gemini {
+	if name == "" {
+		name = "gemini"
+	}
+	return &Gemini{
+		apiKey:       apiKey,
+		model:        model,
+		maxTok:       maxTokens,
+		providerName: name,
+		client:       DefaultClient,
 	}
 }
 
@@ -37,7 +53,7 @@ func (g *Gemini) validate() error {
 	return nil
 }
 
-func (g *Gemini) Name() string { return "gemini" }
+func (g *Gemini) Name() string { return g.providerName }
 
 func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
 	model := req.Model

@@ -11,6 +11,30 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// MinSaltSize is the minimum recommended salt size in bytes (16 bytes = 128 bits)
+const MinSaltSize = 16
+
+// GenerateSalt generates a cryptographically secure random salt of the specified size.
+func GenerateSalt(size int) ([]byte, error) {
+	if size < MinSaltSize {
+		size = MinSaltSize
+	}
+	salt := make([]byte, size)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return nil, err
+	}
+	return salt, nil
+}
+
+// GenerateSaltString generates a cryptographically secure random salt and returns it as a base64 string.
+func GenerateSaltString() (string, error) {
+	salt, err := GenerateSalt(MinSaltSize)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(salt), nil
+}
+
 // Encrypt encrypts plaintext using AES-256-GCM.
 func Encrypt(plaintext string, key []byte) (string, error) {
 	block, err := aes.NewCipher(key)
@@ -64,13 +88,27 @@ func Decrypt(cryptoText string, key []byte) (string, error) {
 }
 
 // DeriveKey derives a 32-byte key from a passphrase and salt using Argon2id.
-func DeriveKey(passphrase string, salt []byte) []byte {
-	if len(salt) == 0 {
-		// Minimum recommended salt size is 16 bytes. 
-		// For simplicity in this implementation, we use a fixed salt if none provided, 
-		// but production should ideally store a per-user salt.
-		salt = []byte("wonderpus-default-salt-123") 
+// The salt parameter must be at least MinSaltSize (16) bytes.
+// Returns an error if the salt is too small or invalid.
+func DeriveKey(passphrase string, salt []byte) ([]byte, error) {
+	if len(salt) < MinSaltSize {
+		return nil, errors.New("salt must be at least 16 bytes for secure key derivation")
 	}
 	// Recommended parameters: time=3, memory=64MB, threads=4, keyLen=32
-	return argon2.IDKey([]byte(passphrase), salt, 3, 64*1024, 4, 32)
+	return argon2.IDKey([]byte(passphrase), salt, 3, 64*1024, 4, 32), nil
+}
+
+// DeriveKeyFromBase64 derives a key from a passphrase and a base64-encoded salt string.
+// This is a convenience wrapper around DeriveKey for use with config values.
+func DeriveKeyFromBase64(passphrase string, saltBase64 string) ([]byte, error) {
+	if saltBase64 == "" {
+		return nil, errors.New("salt is required for key derivation (found empty string)")
+	}
+
+	salt, err := base64.StdEncoding.DecodeString(saltBase64)
+	if err != nil {
+		return nil, errors.New("invalid salt: must be valid base64")
+	}
+
+	return DeriveKey(passphrase, salt)
 }

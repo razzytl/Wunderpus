@@ -33,7 +33,7 @@ type Config struct {
 	Heartbeat       HeartbeatConfig `yaml:"heartbeat"`
 }
 
-const CurrentConfigVersion = 2
+const CurrentConfigVersion = 3
 
 // AgentsConfig holds agent-level defaults including workspace restriction.
 type AgentsConfig struct {
@@ -144,7 +144,8 @@ type RateLimitConfig struct {
 // EncryptionConfig holds encryption settings.
 type EncryptionConfig struct {
 	Enabled bool   `yaml:"enabled"`
-	Key     string `yaml:"key"` // Base64 encoded 32-byte key
+	Key     string `yaml:"key"`  // Base64 encoded 32-byte key
+	Salt    string `yaml:"salt"` // Base64 encoded 16+ byte salt for key derivation
 }
 
 // LoggingConfig holds logging settings.
@@ -318,6 +319,9 @@ func (c *Config) migrate() bool {
 	if c.Version == 1 {
 		migrated = c.migrateV1toV2() || migrated
 	}
+	if c.Version == 2 {
+		migrated = c.migrateV2toV3() || migrated
+	}
 
 	if migrated {
 		c.Version = CurrentConfigVersion
@@ -346,6 +350,22 @@ func (c *Config) migrateV1toV2() bool {
 
 	if c.Agents.Defaults.Workspace != "" && c.Agents.Defaults.RestrictToWorkspace && c.Security.SanitizationEnabled {
 		migrated = true
+	}
+
+	return migrated
+}
+
+func (c *Config) migrateV2toV3() bool {
+	migrated := false
+
+	// Migration for encryption salt: generate a new salt if encryption is enabled but no salt exists
+	if c.Security.Encryption.Enabled && c.Security.Encryption.Key != "" && c.Security.Encryption.Salt == "" {
+		// Generate a new random salt for key derivation
+		newSalt, err := security.GenerateSaltString()
+		if err == nil {
+			c.Security.Encryption.Salt = newSalt
+			migrated = true
+		}
 	}
 
 	return migrated
@@ -519,6 +539,12 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WONDERPUS_ENCRYPTION_KEY"); v != "" {
 		cfg.Security.Encryption.Key = v
 		cfg.Security.Encryption.Enabled = true
+		// Auto-generate salt if not set
+		if cfg.Security.Encryption.Salt == "" {
+			if newSalt, err := security.GenerateSaltString(); err == nil {
+				cfg.Security.Encryption.Salt = newSalt
+			}
+		}
 	}
 
 	// Workspace restriction override

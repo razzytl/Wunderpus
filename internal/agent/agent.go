@@ -2,36 +2,37 @@ package agent
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/memory"
+	"github.com/wonderpus/wonderpus/internal/constants"
 	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wonderpus/wonderpus/internal/memory"
 	"github.com/wonderpus/wonderpus/internal/provider"
 	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/tool"
-	"github.com/wonderpus/wonderpus/internal/constants"
 	"github.com/wonderpus/wonderpus/internal/skills"
+	"github.com/wonderpus/wonderpus/internal/tool"
 )
 
 // Agent is the core agent that processes user messages.
 type Agent struct {
-	router         *provider.Router
-	sanitizer      *security.Sanitizer
-	audit          *security.AuditLogger
-	ctx            *ContextManager
-	registry       *tool.Registry
-	executor       *tool.Executor
-	skillsLoader   *skills.SkillsLoader
-	sysPrompt      string
-	temp           float64
-	toolFunc       func(name string, args map[string]any, result string) // optional callback for TUI
-	limiter        *security.RateLimiter
-	sessionID      string
-	encryptionKey  []byte
+	router        *provider.Router
+	sanitizer     *security.Sanitizer
+	audit         *security.AuditLogger
+	ctx           *ContextManager
+	registry      *tool.Registry
+	executor      *tool.Executor
+	skillsLoader  *skills.SkillsLoader
+	sysPrompt     string
+	temp          float64
+	toolFunc      func(name string, args map[string]any, result string) // optional callback for TUI
+	limiter       *security.RateLimiter
+	sessionID     string
+	encryptionKey []byte
 }
 
 // NewAgent creates a new agent instance.
@@ -82,9 +83,15 @@ func (a *Agent) SetToolCallback(fn func(name string, args map[string]any, result
 }
 
 // SetEncryptionKey sets the optional key for encrypting messages at rest.
+// The key should be a base64-encoded 32-byte (256-bit) key.
 func (a *Agent) SetEncryptionKey(key string) {
 	if key != "" {
-		a.encryptionKey = security.DeriveKey(key, nil)
+		decoded, err := base64.StdEncoding.DecodeString(key)
+		if err != nil || len(decoded) != 32 {
+			slog.Warn("invalid encryption key - must be 32 bytes (base64 encoded)", "error", err)
+			return
+		}
+		a.encryptionKey = decoded
 	}
 }
 
@@ -272,7 +279,7 @@ func (a *Agent) triggerSummarization(ctx context.Context) {
 
 	prompt := "Please provide a concise summary of the key points in this conversation so far, focusing on facts and decisions made. Keep it under 200 words."
 	summaryMsgs := append(messages, provider.Message{Role: provider.RoleUser, Content: prompt})
-	
+
 	req := &provider.CompletionRequest{
 		Messages:    summaryMsgs,
 		Temperature: 0.3,
@@ -297,12 +304,12 @@ func (a *Agent) HandleComplexTask(ctx context.Context, input string) (string, er
 
 	// 1. Planner decomposes the task
 	planner := NewTaskPlanner(a.router.Active(), a.router.ActiveName()) // Use current model
-	
+
 	// Print a little callback letting TUI know we are planning
 	if a.toolFunc != nil {
 		a.toolFunc("system:planner", map[string]any{"goal": input}, "Decomposing task into dependency graph...")
 	}
-	
+
 	graph, err := planner.Decompose(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("planner failed: %w", err)
@@ -314,14 +321,14 @@ func (a *Agent) HandleComplexTask(ctx context.Context, input string) (string, er
 
 	// 2. Orchestrator executes graph
 	orchestator := NewOrchestrator(a.router, a.registry, a.executor, a.router.ActiveName())
-	
+
 	finalRes, err := orchestator.Execute(ctx, graph)
 	if err != nil {
 		return "", fmt.Errorf("orchestrator failed: %w", err)
 	}
 
 	// Add final result to main agent context so it remembers the synthesis
-	a.ctx.AddMessage(provider.RoleUser, "Deep Task: " + input)
+	a.ctx.AddMessage(provider.RoleUser, "Deep Task: "+input)
 	a.ctx.AddMessage(provider.RoleAssistant, finalRes)
 
 	a.audit.Log(security.AuditEvent{
@@ -379,10 +386,10 @@ func (a *Agent) StreamMessage(ctx context.Context, input string) (<-chan provide
 	// or the logic fundamentally switches from streaming back to the user vs executing.
 	// For Phase 2, if tools are enabled, we do a synchronous Complete loop until the final text response, THEN stream?
 	// Actually, doing full multi-step streaming is complex. M37: For simplicity, if streaming, we don't expose tools
-	// OR we just execute tools synchronously and then start streaming. 
+	// OR we just execute tools synchronously and then start streaming.
 	// For Phase 2 let's enable tools but if it returns a tool call during stream, we abort streaming, execute, and stream the next step.
 	// We'll leave `StreamMessage` for simple text for now, or adapt it inside.
-	
+
 	prov := a.router.Active()
 	req := &provider.CompletionRequest{
 		Messages:    messages,

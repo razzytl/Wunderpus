@@ -21,14 +21,94 @@ var defaultWhitelist = map[string]bool{
 	"tree": true, "sort": true, "uniq": true, "diff": true,
 }
 
+// defaultDenyPatterns is a comprehensive list of regex patterns for dangerous commands.
+// These patterns use word boundaries and are more precise than simple substring matching.
+var defaultDenyPatterns = []*regexp.Regexp{
+	// Recursive delete with flags
+	regexp.MustCompile(`\brm\s+-[rf]{1,2}\b`),
+	regexp.MustCompile(`\bdel\s+/[fq]\b`),
+	regexp.MustCompile(`\brmdir\s+/s\b`),
+	// Disk wiping commands
+	regexp.MustCompile(`\b(format|mkfs|diskpart)\b\s`),
+	// Direct disk writes
+	regexp.MustCompile(`\bdd\s+if=`),
+	// Block device writes
+	regexp.MustCompile(`>\s*/dev/(sd[a-z]|hd[a-z]|vd[a-z]|xvd[a-z]|nvme\d|mmcblk\d|loop\d|dm-\d|md\d|sr\d|nbd\d)`),
+	// System shutdown/reboot
+	regexp.MustCompile(`\b(shutdown|reboot|poweroff)\b`),
+	// Fork bombs
+	regexp.MustCompile(`:\(\)\s*\{.*\};\s*:`),
+	// Command substitution
+	regexp.MustCompile(`\$\([^)]+\)`),
+	regexp.MustCompile(`\$\{[^}]+\}`),
+	regexp.MustCompile("`[^`]+`"),
+	// Pipe to shell
+	regexp.MustCompile(`\|\s*sh\b`),
+	regexp.MustCompile(`\|\s*bash\b`),
+	// Chained delete
+	regexp.MustCompile(`;\s*rm\s+-[rf]`),
+	regexp.MustCompile(`&&\s*rm\s+-[rf]`),
+	regexp.MustCompile(`\|\|\s*rm\s+-[rf]`),
+	// Here-docs
+	regexp.MustCompile(`<<\s*EOF`),
+	// Command substitution with dangerous commands
+	regexp.MustCompile(`\$\(\s*cat\s+`),
+	regexp.MustCompile(`\$\(\s*curl\s+`),
+	regexp.MustCompile(`\$\(\s*wget\s+`),
+	regexp.MustCompile(`\$\(\s*which\s+`),
+	// Privilege escalation
+	regexp.MustCompile(`\bsudo\b`),
+	regexp.MustCompile(`\bchmod\s+[0-7]{3,4}\b`),
+	regexp.MustCompile(`\bchown\b`),
+	// Process termination
+	regexp.MustCompile(`\bpkill\b`),
+	regexp.MustCompile(`\bkillall\b`),
+	regexp.MustCompile(`\bkill\s+-[9]\b`),
+	// Pipe curl/wget to shell (common attack vector)
+	regexp.MustCompile(`\bcurl\b.*\|\s*(sh|bash)`),
+	regexp.MustCompile(`\bwget\b.*\|\s*(sh|bash)`),
+	// Package managers
+	regexp.MustCompile(`\bnpm\s+install\s+-g\b`),
+	regexp.MustCompile(`\bpip\s+install\s+--user\b`),
+	regexp.MustCompile(`\bapt\s+(install|remove|purge)\b`),
+	regexp.MustCompile(`\byum\s+(install|remove)\b`),
+	regexp.MustCompile(`\bdnf\s+(install|remove)\b`),
+	// Docker
+	regexp.MustCompile(`\bdocker\s+run\b`),
+	regexp.MustCompile(`\bdocker\s+exec\b`),
+	// Git force push
+	regexp.MustCompile(`\bgit\s+push\b`),
+	regexp.MustCompile(`\bgit\s+force\b`),
+	// SSH
+	regexp.MustCompile(`\bssh\b.*@`),
+	// Eval
+	regexp.MustCompile(`\beval\b`),
+	// Source shell scripts
+	regexp.MustCompile(`\bsource\s+.*\.sh\b`),
+}
+
+// absolutePathPattern matches absolute file paths in commands (Unix and Windows).
+var absolutePathPattern = regexp.MustCompile(`[A-Za-z]:\\[^\\"']+|/[^\s"']+`)
+
+// safePaths are kernel pseudo-devices that are always safe to reference in commands.
+var safePaths = map[string]bool{
+	"/dev/null":    true,
+	"/dev/zero":    true,
+	"/dev/random":  true,
+	"/dev/urandom": true,
+	"/dev/stdin":   true,
+	"/dev/stdout":  true,
+	"/dev/stderr":  true,
+}
+
 // ShellExec executes whitelisted shell commands within the workspace sandbox.
 type ShellExec struct {
-	whitelist map[string]bool
-	sandbox   *security.WorkspaceSandbox
+	whitelist    map[string]bool
+	denyPatterns []*regexp.Regexp
+	sandbox      *security.WorkspaceSandbox
 }
 
 // NewShellExec creates a shell executor with the given command whitelist.
-// If whitelist is nil, the default whitelist is used.
 func NewShellExec(whitelist []string) *ShellExec {
 	wl := make(map[string]bool)
 	if len(whitelist) == 0 {
@@ -40,7 +120,10 @@ func NewShellExec(whitelist []string) *ShellExec {
 			wl[cmd] = true
 		}
 	}
-	return &ShellExec{whitelist: wl}
+	return &ShellExec{
+		whitelist:    wl,
+		denyPatterns: defaultDenyPatterns,
+	}
 }
 
 // NewShellExecSandboxed creates a shell executor restricted to the workspace sandbox.
@@ -54,13 +137,48 @@ func (s *ShellExec) Name() string { return "shell_exec" }
 func (s *ShellExec) Description() string {
 	return "Execute a whitelisted shell command. Only safe, read-only commands are allowed. Requires user approval."
 }
-func (s *ShellExec) Sensitive() bool { return true }
-func (s *ShellExec) Version() string { return "1.0.0" }
+func (s *ShellExec) Sensitive() bool        { return true }
+func (s *ShellExec) Version() string        { return "1.1.0" }
 func (s *ShellExec) Dependencies() []string { return nil }
 func (s *ShellExec) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "command", Type: "string", Description: "The shell command to execute", Required: true},
 	}
+}
+
+// isPathAllowed checks if a given path is allowed (either in safe list or within workspace).
+func (s *ShellExec) isPathAllowed(path string) bool {
+	// Check safe paths
+	if safePaths[strings.ToLower(path)] {
+		return true
+	}
+	// If sandboxed, let the sandbox validate
+	if s.sandbox != nil && s.sandbox.IsRestricted() {
+		return s.sandbox.ValidatePath(path) == nil
+	}
+	// No sandbox - allow absolute paths (but dangerous ones are caught by deny patterns)
+	return true
+}
+
+// validatePaths checks all absolute paths in the command against the allowlist.
+func (s *ShellExec) validatePaths(command string) error {
+	matches := absolutePathPattern.FindAllString(command, -1)
+	for _, path := range matches {
+		if !s.isPathAllowed(path) {
+			return fmt.Errorf("blocked: path %q is not allowed", path)
+		}
+	}
+	return nil
+}
+
+// checkDenyPatterns checks the command against all dangerous regex patterns.
+func (s *ShellExec) checkDenyPatterns(command string) error {
+	for _, pattern := range s.denyPatterns {
+		if pattern.MatchString(command) {
+			return fmt.Errorf("blocked: command contains dangerous pattern (%s)", pattern.String())
+		}
+	}
+	return nil
 }
 
 func (s *ShellExec) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
@@ -77,32 +195,14 @@ func (s *ShellExec) Execute(ctx context.Context, args map[string]any) (*tool.Res
 
 	baseCmd := parts[0]
 
-	// Additional dangerous patterns from Phase 3 requirements
-	lower := strings.ToLower(command)
-	
-	// Exact substring matches
-	dangerousSubstrings := []string{
-		"rm -rf", "del /f", "rmdir /s",
-		"format", "mkfs", "diskpart",
-		"dd if=",
-		"shutdown", "reboot", "poweroff",
-		":(){ :|:& };:", // fork bomb
-		"> /dev", ">nul", "> null",
-		"sudo", "chmod", "chown",
-		"eval", "exec ", "bash -c",
-		"powershell", "cmd.exe",
+	// Check against dangerous regex patterns (word-boundary aware)
+	if err := s.checkDenyPatterns(command); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
-	for _, dangerous := range dangerousSubstrings {
-		if strings.Contains(lower, dangerous) {
-			return &tool.Result{Error: fmt.Sprintf("blocked: command contains dangerous pattern %q", dangerous)}, nil
-		}
-	}
-
-	// Regex matches (e.g. for /dev/sd[a-z])
-	matched, _ := regexp.MatchString(`/dev/sd[a-z]`, lower)
-	if matched {
-		return &tool.Result{Error: "blocked: command contains dangerous pattern for direct disk writes"}, nil
+	// Validate absolute paths
+	if err := s.validatePaths(command); err != nil {
+		return &tool.Result{Error: err.Error()}, nil
 	}
 
 	// Check whitelist

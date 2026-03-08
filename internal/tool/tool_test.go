@@ -17,12 +17,12 @@ type mockTool struct {
 	errResult error
 }
 
-func (m *mockTool) Name() string                                    { return "mock_tool" }
-func (m *mockTool) Description() string                             { return "A mock tool" }
-func (m *mockTool) Parameters() []tool.ParameterDef                 { return nil }
-func (m *mockTool) Sensitive() bool                                 { return m.sensitive }
-func (m *mockTool) Version() string                                 { return "1.0.0" }
-func (m *mockTool) Dependencies() []string                         { return nil }
+func (m *mockTool) Name() string                    { return "mock_tool" }
+func (m *mockTool) Description() string             { return "A mock tool" }
+func (m *mockTool) Parameters() []tool.ParameterDef { return nil }
+func (m *mockTool) Sensitive() bool                 { return m.sensitive }
+func (m *mockTool) Version() string                 { return "1.0.0" }
+func (m *mockTool) Dependencies() []string          { return nil }
 func (m *mockTool) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	if m.errResult != nil {
 		return nil, m.errResult
@@ -169,16 +169,16 @@ func TestBuiltin_FileSandbox(t *testing.T) {
 	}{
 		// These paths will depend heavily on the environment and how filepath.Abs resolves them.
 		// A common way to test this robustly is to use known relative paths string manipulations.
-		{"../../../etc/passwd", true},                  // Traversal should be blocked
-		{"/allow/this/path/file.txt", false},           // direct child
-		{"/allow/this/path/sub/file.txt", false},       // nested child
-		{"/allow/this/path/../../other/file", true},  // attempts to break out
-		{"/deny/this/path", true},                      // completely outside
+		{"../../../etc/passwd", true},               // Traversal should be blocked
+		{"/allow/this/path/file.txt", false},        // direct child
+		{"/allow/this/path/sub/file.txt", false},    // nested child
+		{"/allow/this/path/../../other/file", true}, // attempts to break out
+		{"/deny/this/path", true},                   // completely outside
 	}
 
 	for _, tt := range tests {
 		res, _ := fr.Execute(context.Background(), map[string]any{"path": tt.path})
-		
+
 		isBlocked := strings.Contains(res.Error, "access denied") || strings.Contains(res.Error, "outside allowed paths")
 		// The tool blocks paths that have "..", and those outside allowed.
 		if strings.Contains(tt.path, "..") {
@@ -210,10 +210,12 @@ func TestBuiltin_ShellWhitelist(t *testing.T) {
 		t.Errorf("expected not whitelisted error, got: %v", res.Error)
 	}
 
-	// Dangreous even if tool whitelisted (e.g., if somehow a dangerous command is passed)
-	res, _ = se.Execute(context.Background(), map[string]any{"command": "echo test > /dev/null"})
-	if !strings.Contains(res.Error, "blocked: command contains dangerous pattern") {
-		t.Errorf("expected dangerous pattern block, got: %s", res.Error)
+	// Dangerous even if tool whitelisted (e.g., if somehow a dangerous command is passed)
+	// Note: /dev/null, /dev/zero, /dev/urandom are safe paths and are allowed
+	// Test with pipe to shell which is blocked
+	res, _ = se.Execute(context.Background(), map[string]any{"command": "echo test | sh"})
+	if !strings.Contains(res.Error, "blocked") {
+		t.Errorf("expected dangerous pattern block for pipe to shell, got: %s", res.Error)
 	}
 }
 
@@ -228,8 +230,8 @@ func TestBuiltin_HTTPSSRF(t *testing.T) {
 		{"http://127.0.0.1", true},
 		{"http://169.254.169.254/metadata", true}, // AWS metadata
 		{"http://10.0.0.1", true},                 // Private network
-		{"http://192.168.1.1", true},               // Private network
-		{"https://google.com", false},              // Valid public
+		{"http://192.168.1.1", true},              // Private network
+		{"https://google.com", false},             // Valid public
 	}
 
 	for _, tt := range tests {

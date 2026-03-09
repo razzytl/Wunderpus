@@ -1,16 +1,21 @@
 package security
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 )
 
-// RateLimiter implements a simple sliding window rate limiter for sessions.
+// RateLimiter implements a sliding window rate limiter with optional automatic cleanup.
 type RateLimiter struct {
 	mu          sync.Mutex
 	limits      map[string][]time.Time
 	window      time.Duration
 	maxRequests int
+
+	// Automatic cleanup
+	stopCleanup chan struct{}
+	wg          sync.WaitGroup
 }
 
 // NewRateLimiter creates a new RateLimiter.
@@ -48,7 +53,7 @@ func (rl *RateLimiter) Allow(sessionID string) bool {
 	return true
 }
 
-// Cleanup periodically removes expired entries from memory.
+// Cleanup manually removes expired entries from memory.
 func (rl *RateLimiter) Cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -69,4 +74,56 @@ func (rl *RateLimiter) Cleanup() {
 			rl.limits[id] = valid
 		}
 	}
+}
+
+// StartAutoCleanup starts a background goroutine that periodically cleans up
+// expired entries. The interval parameter specifies how often to run cleanup.
+// If interval is 0 or negative, no automatic cleanup is started.
+// Call StopAutoCleanup to stop the background goroutine.
+func (rl *RateLimiter) StartAutoCleanup(interval time.Duration) {
+	if interval <= 0 {
+		slog.Debug("rate limiter: automatic cleanup disabled (interval <= 0)")
+		return
+	}
+
+	rl.stopCleanup = make(chan struct{})
+	rl.wg.Add(1)
+
+	go func() {
+		defer rl.wg.Done()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		slog.Debug("rate limiter: started automatic cleanup", "interval", interval)
+		for {
+			select {
+			case <-rl.stopCleanup:
+				slog.Debug("rate limiter: stopped automatic cleanup")
+				return
+			case <-ticker.C:
+				rl.Cleanup()
+				slog.Debug("rate limiter: performed automatic cleanup")
+			}
+		}
+	}()
+}
+
+// StopAutoCleanup stops the background cleanup goroutine.
+// It waits for the goroutine to finish before returning.
+func (rl *RateLimiter) StopAutoCleanup() {
+	if rl.stopCleanup == nil {
+		return
+	}
+
+	close(rl.stopCleanup)
+	rl.wg.Wait()
+	rl.stopCleanup = nil
+	slog.Debug("rate limiter: cleanup goroutine stopped")
+}
+
+// Len returns the current number of sessions being tracked.
+func (rl *RateLimiter) Len() int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return len(rl.limits)
 }

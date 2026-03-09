@@ -62,7 +62,7 @@
 # ═══════════════════════════════════════════════════════════════════
 # If model_list is empty, these are used instead.
 
-# Default provider to use (openai, anthropic, ollama, gemini)
+# Default provider to use (openai, anthropic, ollama, gemini, openrouter, groq, etc.)
 default_provider: "openai"
 
 # LLM Providers — configure at least one
@@ -71,6 +71,98 @@ providers:
   openai:
     api_key: ""              # sk-...
     model: "gpt-4o"          # gpt-4, gpt-4o, gpt-4o-mini
+    max_tokens: 4096
+
+  # Anthropic
+  anthropic:
+    api_key: ""              # sk-ant-...
+    model: "claude-sonnet-4-20250514"  # claude-3-5-sonnet, claude-sonnet-4-20250514
+    max_tokens: 4096
+
+  # Ollama (local)
+  ollama:
+    host: "http://localhost:11434"
+    model: "llama3.2"        # any model pulled in Ollama
+    max_tokens: 4096
+
+  # Google Gemini
+  gemini:
+    api_key: ""              # AIza...
+    model: "gemini-2.0-flash" # gemini-2.0-flash, gemini-1.5-pro
+    max_tokens: 4096
+
+  # OpenRouter (aggregates many providers)
+  openrouter:
+    api_key: ""              # sk-or-...
+    model: "deepseek/deepseek-r1"
+    max_tokens: 4096
+
+  # Groq (fast inference)
+  groq:
+    api_key: ""              # gsk_...
+    model: "llama-3.3-70b-versatile"
+    max_tokens: 4096
+
+  # Zhipu (GLM - Chinese models)
+  zhipu:
+    api_key: ""              # glm-...
+    model: "glm-4"
+    max_tokens: 4096
+
+  # DeepSeek
+  deepseek:
+    api_key: ""              # sk-...
+    model: "deepseek-chat"
+    max_tokens: 4096
+
+  # Moonshot (Kimi - Chinese models)
+  moonshot:
+    api_key: ""              # sk-...
+    model: "kimi-latest"
+    max_tokens: 4096
+
+  # Cerebras (fastest inference)
+  cerebras:
+    api_key: ""              # cbrs-...
+    model: "llama-3.3-70b"
+    max_tokens: 4096
+
+  # NVIDIA NIM
+  nvidia:
+    api_key: ""              # nvapi-...
+    model: "nvidia/llama-3.1-nemotron-70b-instruct"
+    max_tokens: 4096
+
+  # LiteLLM Proxy
+  litellm:
+    api_key: ""              # Optional: for LiteLLM proxy
+    endpoint: "http://localhost:4000/v1"
+    model: "gpt-4"
+    max_tokens: 4096
+
+  # vLLM (self-hosted)
+  vllm:
+    endpoint: "http://localhost:8000/v1"
+    api_key: ""              # Optional: if vLLM requires auth
+    model: "llama-3.2"
+    max_tokens: 4096
+
+  # Mistral
+  mistral:
+    api_key: ""              # sm-...
+    model: "mistral-large-latest"
+    max_tokens: 4096
+
+  # Volcanic Engine (ByteDance)
+  volcanic:
+    api_key: ""              # ark-...
+    model: "doubao-1-5-pro-32k"
+    max_tokens: 4096
+
+  # Qwen (Alibaba)
+  qwen:
+    api_key: ""              # sk-...
+    model: "qwen-turbo"
     max_tokens: 4096
 
   # Anthropic
@@ -162,6 +254,14 @@ tools:
         enabled: false            # Set to true to enable
         base_url: "https://clawhub.ai"
         auth_token: ""           # Optional: for elevated rate limits
+
+  # Web search providers (DuckDuckGo is free fallback)
+  # Priority: Brave > Tavily > DuckDuckGo
+  search:
+    brave_api_key: ""            # Get from https://brave.com/search/api/
+    tavily_api_key: ""           # Get from https://tavily.com/api/
+    tavily_base_url: ""         # Optional: custom Tavily endpoint
+    perplexity_key: ""          # Get from https://www.perplexity.ai/
 
 # Security
 security:

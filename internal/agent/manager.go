@@ -60,6 +60,10 @@ func NewManager(
 			time.Duration(cfg.Security.RateLimit.WindowSec)*time.Second,
 			cfg.Security.RateLimit.MaxRequests,
 		)
+		// Start automatic cleanup if configured (default: every 5 minutes)
+		if cfg.Security.RateLimit.CleanupIntervalSec > 0 {
+			m.limiter.StartAutoCleanup(time.Duration(cfg.Security.RateLimit.CleanupIntervalSec) * time.Second)
+		}
 	}
 
 	tr, err := cost.NewTracker(cfg.Agent.CostDBPath, cfg.Agent.Budget)

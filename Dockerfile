@@ -1,52 +1,50 @@
+# Multi-stage build for minimal size
+
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
 
 # Copy dependencies
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download -x
 
 # Copy source
 COPY . .
 
-# Build static binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o wonderpus -ldflags="-s -w" ./cmd/wonderpus
+# Build static binary with symbol table and debug info stripped
+RUN CGO_ENABLED=0 GOOS=linux go build -o wonderpus \
+    -ldflags="-s -w -buildid=" \
+    -trimpath \
+    ./cmd/wonderpus
 
-# Production stage
-FROM alpine:3.19.1
+# Production stage - Ultra minimal
+FROM scratch
 
 LABEL org.opencontainers.image.source="https://github.com/wonderpus/wonderpus"
 LABEL org.opencontainers.image.description="Universal Autonomous AI Agent in Go"
 
-# Create non-root user
-RUN addgroup -S wonderpus && adduser -S wonderpus -G wonderpus
+# Copy CA certificates for HTTPS
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
+# Copy binary
+COPY --from=builder /app/wonderpus /usr/local/bin/wunderpus
+
+# Copy config
+COPY --from=builder /app/config.example.yaml /app/config.yaml
+
+# Set working directory
 WORKDIR /app
-
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
-
-# Create data directory and set permissions
-RUN mkdir -p /app/data && chown -R wonderpus:wonderpus /app
-
-# Copy binary from builder
-COPY --from=builder /app/wonderpus .
-COPY --from=builder --chown=wonderpus:wonderpus /app/config.example.yaml ./config.yaml
-
-# Switch to non-root user
-USER wonderpus
 
 # Expose ports
 # Health & Metrics: 8080
-# WebSocket: 9090 (default)
+# WebSocket: 9090
 EXPOSE 8080 9090
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:8080/live || exit 1
+# Non-root user (using numeric UID for scratch compatibility)
+USER 1000:1000
 
-ENTRYPOINT ["./wonderpus"]
+ENTRYPOINT ["/usr/local/bin/wunderpus"]

@@ -62,10 +62,22 @@ type ModelEntry struct {
 
 // ProvidersConfig holds all LLM provider configurations (legacy format).
 type ProvidersConfig struct {
-	OpenAI    ProviderEntry `yaml:"openai"`
-	Anthropic ProviderEntry `yaml:"anthropic"`
-	Ollama    OllamaEntry   `yaml:"ollama"`
-	Gemini    ProviderEntry `yaml:"gemini"`
+	OpenAI     ProviderEntry `yaml:"openai"`
+	Anthropic  ProviderEntry `yaml:"anthropic"`
+	Ollama     OllamaEntry   `yaml:"ollama"`
+	Gemini     ProviderEntry `yaml:"gemini"`
+	OpenRouter ProviderEntry `yaml:"openrouter"`
+	Groq       ProviderEntry `yaml:"groq"`
+	Zhipu      ProviderEntry `yaml:"zhipu"`
+	DeepSeek   ProviderEntry `yaml:"deepseek"`
+	Moonshot   ProviderEntry `yaml:"moonshot"`
+	Cerebras   ProviderEntry `yaml:"cerebras"`
+	NVIDIA     ProviderEntry `yaml:"nvidia"`
+	LiteLLM    ProviderEntry `yaml:"litellm"`
+	VLLM       ProviderEntry `yaml:"vllm"`
+	Mistral    ProviderEntry `yaml:"mistral"`
+	Volcanic   ProviderEntry `yaml:"volcanic"`
+	Qwen       ProviderEntry `yaml:"qwen"`
 }
 
 // ProviderEntry is a generic API-key-based provider config.
@@ -103,6 +115,35 @@ type ToolsConfig struct {
 	ShellWhitelist []string     `yaml:"shell_whitelist"`
 	SSRFBlocklist  []string     `yaml:"ssrf_blocklist"`
 	Skills         SkillsConfig `yaml:"skills"`
+	Search         SearchConfig `yaml:"search"`
+	MCP            MCPConfig    `yaml:"mcp"`
+}
+
+// SearchConfig holds search provider configuration.
+type SearchConfig struct {
+	BraveAPIKey   string `yaml:"brave_api_key"`
+	TavilyAPIKey  string `yaml:"tavily_api_key"`
+	TavilyBaseURL string `yaml:"tavily_base_url"`
+	PerplexityKey string `yaml:"perplexity_key"`
+	Proxy         string `yaml:"proxy"`
+}
+
+// MCPConfig holds MCP (Model Context Protocol) server configuration.
+type MCPConfig struct {
+	Enabled bool                       `yaml:"enabled"`
+	Servers map[string]MCPServerConfig `yaml:"servers"`
+}
+
+// MCPServerConfig holds configuration for a single MCP server.
+type MCPServerConfig struct {
+	Enabled bool              `yaml:"enabled"`
+	Command string            `yaml:"command"`
+	Args    []string          `yaml:"args"`
+	URL     string            `yaml:"url"`
+	Type    string            `yaml:"type"` // "stdio" or "sse"
+	Env     map[string]string `yaml:"env"`
+	EnvFile string            `yaml:"env_file"`
+	Headers map[string]string `yaml:"headers"`
 }
 
 // SkillsConfig holds configuration for the skills system.
@@ -136,9 +177,10 @@ type SecurityConfig struct {
 
 // RateLimitConfig holds rate limiting settings.
 type RateLimitConfig struct {
-	Enabled     bool `yaml:"enabled"`
-	MaxRequests int  `yaml:"max_requests"`
-	WindowSec   int  `yaml:"window_sec"`
+	Enabled            bool `yaml:"enabled"`
+	MaxRequests        int  `yaml:"max_requests"`
+	WindowSec          int  `yaml:"window_sec"`
+	CleanupIntervalSec int  `yaml:"cleanup_interval_sec"` // Automatic cleanup interval in seconds (0 = disabled, default: 300)
 }
 
 // EncryptionConfig holds encryption settings.
@@ -169,6 +211,10 @@ type ChannelsConfig struct {
 	WhatsApp  WhatsAppConfig  `yaml:"whatsapp"`
 	Feishu    FeishuConfig    `yaml:"feishu"`
 	Line      LineConfig      `yaml:"line"`
+	QQ        QQConfig        `yaml:"qq"`
+	WeCom     WeComConfig     `yaml:"wecom"`
+	DingTalk  DingTalkConfig  `yaml:"dingtalk"`
+	OneBot    OneBotConfig    `yaml:"onebot"`
 }
 
 // HeartbeatConfig holds configuration for the heartbeat (periodic task) system.
@@ -225,6 +271,43 @@ type LineConfig struct {
 	Enabled       bool   `yaml:"enabled"`
 	ChannelSecret string `yaml:"channel_secret"`
 	AccessToken   string `yaml:"access_token"`
+}
+
+// QQConfig holds QQ (Discord-like platform) bot settings.
+type QQConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	AppID        string `yaml:"app_id"`
+	AppSecret    string `yaml:"app_secret"`
+	AllowFrom    string `yaml:"allow_from"`
+	GroupTrigger string `yaml:"group_trigger"`
+}
+
+// WeComConfig holds WeCom (WeChat Work) bot settings.
+type WeComConfig struct {
+	Enabled        bool   `yaml:"enabled"`
+	CorpID         string `yaml:"corp_id"`
+	CorpSecret     string `yaml:"corp_secret"`
+	AgentID        string `yaml:"agent_id"`
+	Token          string `yaml:"token"`
+	EncodingAESKey string `yaml:"encoding_aes_key"`
+	AllowFrom      string `yaml:"allow_from"`
+	Mode           string `yaml:"mode"` // "bot", "app", "aibot"
+}
+
+// DingTalkConfig holds DingTalk bot settings.
+type DingTalkConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	AppKey    string `yaml:"app_key"`
+	AppSecret string `yaml:"app_secret"`
+	AgentID   string `yaml:"agent_id"`
+	AllowFrom string `yaml:"allow_from"`
+}
+
+// OneBotConfig holds OneBot (QQ bot framework) settings.
+type OneBotConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	WebSocketURL string `yaml:"web_socket_url"`
+	AllowFrom    string `yaml:"allow_from"`
 }
 
 // Load reads config from a YAML file, then overlays environment variables.
@@ -466,6 +549,7 @@ func applyDefaults(cfg *Config) {
 	cfg.Security.RateLimit.Enabled = true
 	cfg.Security.RateLimit.MaxRequests = 10
 	cfg.Security.RateLimit.WindowSec = 60
+	cfg.Security.RateLimit.CleanupIntervalSec = 300 // 5 minutes default
 	cfg.Security.Encryption.Enabled = false
 
 	// Skills system defaults
@@ -739,6 +823,210 @@ func ConvertLegacyToModelList(cfg *Config) []ModelEntry {
 			MaxTokens:      cfg.Providers.Gemini.MaxTokens,
 			FallbackModels: cfg.Providers.Gemini.FallbackModels,
 			Weight:         1,
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.OpenRouter.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.OpenRouter.Model,
+			Model:          "openrouter/" + cfg.Providers.OpenRouter.Model,
+			APIKey:         cfg.Providers.OpenRouter.APIKey,
+			APIBase:        cfg.Providers.OpenRouter.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.OpenRouter.MaxTokens,
+			FallbackModels: cfg.Providers.OpenRouter.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://openrouter.ai/api/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Groq.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Groq.Model,
+			Model:          "groq/" + cfg.Providers.Groq.Model,
+			APIKey:         cfg.Providers.Groq.APIKey,
+			APIBase:        cfg.Providers.Groq.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Groq.MaxTokens,
+			FallbackModels: cfg.Providers.Groq.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://api.groq.com/openai/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Zhipu.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Zhipu.Model,
+			Model:          "zhipu/" + cfg.Providers.Zhipu.Model,
+			APIKey:         cfg.Providers.Zhipu.APIKey,
+			APIBase:        cfg.Providers.Zhipu.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Zhipu.MaxTokens,
+			FallbackModels: cfg.Providers.Zhipu.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://open.bigmodel.cn/api/paas/v4"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.DeepSeek.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.DeepSeek.Model,
+			Model:          "deepseek/" + cfg.Providers.DeepSeek.Model,
+			APIKey:         cfg.Providers.DeepSeek.APIKey,
+			APIBase:        cfg.Providers.DeepSeek.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.DeepSeek.MaxTokens,
+			FallbackModels: cfg.Providers.DeepSeek.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://api.deepseek.com/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Moonshot.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Moonshot.Model,
+			Model:          "moonshot/" + cfg.Providers.Moonshot.Model,
+			APIKey:         cfg.Providers.Moonshot.APIKey,
+			APIBase:        cfg.Providers.Moonshot.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Moonshot.MaxTokens,
+			FallbackModels: cfg.Providers.Moonshot.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://api.moonshot.cn/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Cerebras.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Cerebras.Model,
+			Model:          "cerebras/" + cfg.Providers.Cerebras.Model,
+			APIKey:         cfg.Providers.Cerebras.APIKey,
+			APIBase:        cfg.Providers.Cerebras.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Cerebras.MaxTokens,
+			FallbackModels: cfg.Providers.Cerebras.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://api.cerebras.ai/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.NVIDIA.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.NVIDIA.Model,
+			Model:          "nvidia/" + cfg.Providers.NVIDIA.Model,
+			APIKey:         cfg.Providers.NVIDIA.APIKey,
+			APIBase:        cfg.Providers.NVIDIA.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.NVIDIA.MaxTokens,
+			FallbackModels: cfg.Providers.NVIDIA.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://integrate.api.nvidia.com/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.LiteLLM.APIKey != "" || cfg.Providers.LiteLLM.Endpoint != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.LiteLLM.Model,
+			Model:          "litellm/" + cfg.Providers.LiteLLM.Model,
+			APIKey:         cfg.Providers.LiteLLM.APIKey,
+			APIBase:        cfg.Providers.LiteLLM.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.LiteLLM.MaxTokens,
+			FallbackModels: cfg.Providers.LiteLLM.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "http://localhost:4000/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.VLLM.Endpoint != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.VLLM.Model,
+			Model:          "vllm/" + cfg.Providers.VLLM.Model,
+			APIKey:         cfg.Providers.VLLM.APIKey,
+			APIBase:        cfg.Providers.VLLM.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.VLLM.MaxTokens,
+			FallbackModels: cfg.Providers.VLLM.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "http://localhost:8000/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Mistral.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Mistral.Model,
+			Model:          "mistral/" + cfg.Providers.Mistral.Model,
+			APIKey:         cfg.Providers.Mistral.APIKey,
+			APIBase:        cfg.Providers.Mistral.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Mistral.MaxTokens,
+			FallbackModels: cfg.Providers.Mistral.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://api.mistral.ai/v1"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Volcanic.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Volcanic.Model,
+			Model:          "volcanic/" + cfg.Providers.Volcanic.Model,
+			APIKey:         cfg.Providers.Volcanic.APIKey,
+			APIBase:        cfg.Providers.Volcanic.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Volcanic.MaxTokens,
+			FallbackModels: cfg.Providers.Volcanic.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://ark.cn-beijing.volces.com/api/v3"
+		}
+		entries = append(entries, entry)
+	}
+
+	if cfg.Providers.Qwen.APIKey != "" {
+		entry := ModelEntry{
+			ModelName:      cfg.Providers.Qwen.Model,
+			Model:          "qwen/" + cfg.Providers.Qwen.Model,
+			APIKey:         cfg.Providers.Qwen.APIKey,
+			APIBase:        cfg.Providers.Qwen.Endpoint,
+			Protocol:       "openai",
+			MaxTokens:      cfg.Providers.Qwen.MaxTokens,
+			FallbackModels: cfg.Providers.Qwen.FallbackModels,
+			Weight:         1,
+		}
+		if entry.APIBase == "" {
+			entry.APIBase = "https://dashscope.aliyuncs.com/api/v1"
 		}
 		entries = append(entries, entry)
 	}

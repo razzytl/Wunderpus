@@ -13,19 +13,21 @@ import (
 
 // Router manages available providers and routes to the right one.
 type Router struct {
-	providers      map[string]Provider
-	defaultName    string
-	activeName     string
-	activeProvider Provider
-	Cache          *ResponseCache
-	stats          map[string]*ProviderStats
-	mu             sync.RWMutex
+	providers       map[string]Provider
+	defaultName     string
+	activeName      string
+	activeProvider  Provider
+	Cache           *ResponseCache
+	stats           map[string]*ProviderStats
+	cooldown        *CooldownTracker
+	errorClassifier *ErrorClassifier
+	mu              sync.RWMutex
 }
 
 type ProviderStats struct {
-	FailCount    int
-	LastFailure  time.Time
-	Latencies    []time.Duration
+	FailCount      int
+	LastFailure    time.Time
+	Latencies      []time.Duration
 	FallbackModels []string
 }
 
@@ -33,10 +35,12 @@ type ProviderStats struct {
 // It supports both the new model_list format and the legacy providers format.
 func NewRouter(cfg *config.Config) (*Router, error) {
 	r := &Router{
-		providers:   make(map[string]Provider),
-		defaultName: cfg.DefaultProvider,
-		Cache:       NewResponseCache(5 * time.Minute),
-		stats:       make(map[string]*ProviderStats),
+		providers:       make(map[string]Provider),
+		defaultName:     cfg.DefaultProvider,
+		Cache:           NewResponseCache(5 * time.Minute),
+		stats:           make(map[string]*ProviderStats),
+		cooldown:        NewCooldownTracker(),
+		errorClassifier: &ErrorClassifier{},
 	}
 
 	// Determine which model entries to use
@@ -155,7 +159,7 @@ func (r *Router) CompleteWithFallback(ctx context.Context, req *CompletionReques
 	for _, m := range models {
 		mReq := *req
 		mReq.Model = m
-		
+
 		resp, err := prov.Complete(ctx, &mReq)
 		if err == nil {
 			r.recordSuccess(name, time.Since(start))
@@ -223,9 +227,28 @@ func (r *Router) isHealthy(name string) bool {
 	if s == nil {
 		return true
 	}
-	// Circuit breaker: trip if > 5 fails in last 5 mins
+	if r.cooldown != nil && r.cooldown.IsInCooldown(name) {
+		return false
+	}
 	if s.FailCount > 5 && time.Since(s.LastFailure) < 5*time.Minute {
 		return false
 	}
 	return true
+}
+
+// GetProviderHealth returns health status for all providers
+func (r *Router) GetProviderHealth() map[string]map[string]any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	health := make(map[string]map[string]any)
+	for name, stats := range r.stats {
+		health[name] = map[string]any{
+			"fail_count":   stats.FailCount,
+			"last_failure": stats.LastFailure,
+			"in_cooldown":  r.cooldown.IsInCooldown(name),
+			"healthy":      r.isHealthy(name),
+		}
+	}
+	return health
 }

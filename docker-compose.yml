@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Agent service - interactive mode
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wonderpus:agent
+    container_name: wonderpus-agent
+    profiles:
+      - agent
+    environment:
+      - WONDERPUS_CONFIG=/app/config.yaml
+    volumes:
+      - wonderpus-data:/app/data
+      - ./skills:/app/skills:ro
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+  # Gateway service - background mode
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wonderpus:gateway
+    container_name: wonderpus-gateway
+    profiles:
+      - gateway
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - WONDERPUS_CONFIG=/app/config.yaml
+    volumes:
+      - wonderpus-data:/app/data
+      - ./skills:/app/skills:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Development service with full tools
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wonderpus:dev
+    container_name: wonderpus-dev
+    profiles:
+      - dev
+    environment:
+      - WONDERPUS_CONFIG=/app/config.yaml
+    volumes:
+      - wonderpus-data:/app/data
+      - ./skills:/app/skills
+      - ./workspace:/app/workspace
+    stdin_open: true
+    tty: true
+    restart: no
+
+volumes:
+  wonderpus-data:
+    driver: local

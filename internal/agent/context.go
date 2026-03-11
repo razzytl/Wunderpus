@@ -4,8 +4,8 @@ import (
 	"log/slog"
 
 	"github.com/pkoukk/tiktoken-go"
-	"github.com/wonderpus/wonderpus/internal/memory"
-	"github.com/wonderpus/wonderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/memory"
+	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
 // ContextManager manages conversation history with token-based truncation and sqlite persistence.

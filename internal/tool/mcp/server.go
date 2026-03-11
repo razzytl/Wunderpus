@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // Server exposes local tools via MCP protocol.

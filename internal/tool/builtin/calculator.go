@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // Calculator evaluates mathematical expressions.

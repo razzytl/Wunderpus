@@ -23,17 +23,20 @@ func NewWorkspaceSandbox(workspace string, restricted bool) (*WorkspaceSandbox, 
 		return nil, fmt.Errorf("invalid workspace path %q: %w", workspace, err)
 	}
 
-	// Ensure workspace directory exists (create if needed)
-	if restricted {
-		if err := os.MkdirAll(absWorkspace, 0755); err != nil {
-			return nil, fmt.Errorf("cannot create workspace directory %q: %w", absWorkspace, err)
-		}
-	}
-
 	return &WorkspaceSandbox{
 		workspace:  absWorkspace,
 		restricted: restricted,
 	}, nil
+}
+
+// Initialize ensures the workspace directory exists.
+func (ws *WorkspaceSandbox) Initialize() error {
+	if ws.restricted {
+		if err := os.MkdirAll(ws.workspace, 0755); err != nil {
+			return fmt.Errorf("cannot create workspace directory %q: %w", ws.workspace, err)
+		}
+	}
+	return nil
 }
 
 // WorkspacePath returns the absolute workspace path.
@@ -53,20 +56,33 @@ func (ws *WorkspaceSandbox) ValidatePath(path string) error {
 		return nil // No restriction
 	}
 
-	absPath, err := filepath.Abs(path)
+	// Resolve the path relative to the workspace if it's not absolute
+	absPath := path
+	if !filepath.IsAbs(path) {
+		// On Windows, paths starting with / or \ are root-relative, not relative to CWD.
+		// filepath.Join will handle this correctly on Unix, but on Windows we need to be careful.
+		if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
+			// This is a root-relative path. Resolve it to an absolute path on the current drive.
+			var err error
+			absPath, err = filepath.Abs(path)
+			if err != nil {
+				return fmt.Errorf("workspace sandbox: invalid path %q: %w", path, err)
+			}
+		} else {
+			absPath = filepath.Clean(filepath.Join(ws.workspace, path))
+		}
+	} else {
+		absPath = filepath.Clean(path)
+	}
+
+	// Check if the path is within workspace
+	rel, err := filepath.Rel(ws.workspace, absPath)
 	if err != nil {
 		return fmt.Errorf("workspace sandbox: invalid path %q: %w", path, err)
 	}
 
-	// Block path traversal attempts
-	if strings.Contains(path, "..") {
-		return fmt.Errorf("workspace sandbox: access denied — path traversal detected in %q", path)
-	}
-
-	// Check that the path is within workspace
-	// Use filepath.Rel to properly check containment
-	rel, err := filepath.Rel(ws.workspace, absPath)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	// Check if rel starts with ".." or is ".."
+	if strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
 		return fmt.Errorf(
 			"workspace sandbox: access denied — %q is outside workspace %q. "+
 				"Set restrict_to_workspace: false in config to disable this restriction",
@@ -88,27 +104,38 @@ func (ws *WorkspaceSandbox) AllowedPaths() []string {
 }
 
 // ValidateCommand checks that a shell command doesn't attempt to access
-// paths outside the workspace. This is a best-effort check that inspects
-// common file path patterns in the command string.
+// paths outside the workspace or use dangerous command chaining.
 func (ws *WorkspaceSandbox) ValidateCommand(command string) error {
 	if !ws.restricted {
 		return nil
 	}
 
+	// Block command chaining characters that could bypass simple checks
+	chainingChars := []string{";", "&&", "||", "|", "`", "$(", ">", "<"}
+	for _, char := range chainingChars {
+		if strings.Contains(command, char) {
+			return fmt.Errorf("workspace sandbox: access denied — command chaining or redirection (%q) is prohibited in restricted mode", char)
+		}
+	}
+
 	// Block cd to outside workspace
-	lower := strings.ToLower(command)
-	cdPatterns := []string{"cd ", "cd\t", "pushd ", "chdir "}
-	for _, pat := range cdPatterns {
-		if strings.Contains(lower, pat) {
-			// Extract the directory argument (very basic parsing)
-			idx := strings.Index(lower, pat)
-			rest := strings.TrimSpace(command[idx+len(pat):])
-			// Remove quotes
-			rest = strings.Trim(rest, "\"'")
-			if rest != "" {
-				if err := ws.ValidatePath(rest); err != nil {
-					return fmt.Errorf("workspace sandbox: command attempts to access path outside workspace: %w", err)
-				}
+	lower := strings.ToLower(strings.TrimSpace(command))
+	
+	// Basic field splitting to get command and arguments
+	fields := strings.Fields(lower)
+	if len(fields) == 0 {
+		return nil
+	}
+
+	cmd := fields[0]
+	cdCommands := map[string]bool{"cd": true, "pushd": true, "chdir": true}
+	
+	if cdCommands[cmd] {
+		if len(fields) > 1 {
+			// Check the first argument as a path
+			path := strings.Trim(fields[1], "\"'")
+			if err := ws.ValidatePath(path); err != nil {
+				return fmt.Errorf("workspace sandbox: command attempts to access path outside workspace: %w", err)
 			}
 		}
 	}

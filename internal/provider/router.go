@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/config"
-	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/logging"
 )
 
 // Router manages available providers and routes to the right one.
@@ -22,6 +22,13 @@ type Router struct {
 	cooldown        *CooldownTracker
 	errorClassifier *ErrorClassifier
 	mu              sync.RWMutex
+}
+
+// ParallelConfig holds configuration for parallel provider probing
+type ParallelConfig struct {
+	Enabled      bool
+	Timeout      time.Duration // Max time to wait for any provider
+	MaxProviders int           // Max number of providers to probe in parallel (0 = all)
 }
 
 type ProviderStats struct {
@@ -251,4 +258,92 @@ func (r *Router) GetProviderHealth() map[string]map[string]any {
 		}
 	}
 	return health
+}
+
+// CompleteParallel attempts multiple providers in parallel and returns the first successful response.
+// This is useful when you want the fastest response regardless of which provider provides it.
+// The config controls how many providers to probe and the timeout.
+func (r *Router) CompleteParallel(ctx context.Context, req *CompletionRequest, cfg ParallelConfig) (*CompletionResponse, string, error) {
+	if !cfg.Enabled {
+		return nil, "", fmt.Errorf("parallel mode is not enabled")
+	}
+
+	// Get list of healthy providers
+	r.mu.RLock()
+	var healthyProviders []struct {
+		name     string
+		provider Provider
+	}
+	for name, p := range r.providers {
+		if r.isHealthy(name) {
+			healthyProviders = append(healthyProviders, struct {
+				name     string
+				provider Provider
+			}{name, p})
+		}
+	}
+	r.mu.RUnlock()
+
+	if len(healthyProviders) == 0 {
+		return nil, "", fmt.Errorf("no healthy providers available")
+	}
+
+	// Limit number of providers if configured
+	if cfg.MaxProviders > 0 && len(healthyProviders) > cfg.MaxProviders {
+		healthyProviders = healthyProviders[:cfg.MaxProviders]
+	}
+
+	// Set up timeout
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second // default timeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// Result channel
+	type result struct {
+		resp     *CompletionResponse
+		provider string
+		err      error
+	}
+	resultCh := make(chan result, len(healthyProviders))
+
+	// Launch all providers in parallel
+	var wg sync.WaitGroup
+	for _, hp := range healthyProviders {
+		wg.Add(1)
+		go func(name string, p Provider) {
+			defer wg.Done()
+			resp, err := p.Complete(ctx, req)
+			select {
+			case resultCh <- result{resp, name, err}:
+			default:
+				// Another result already came through, this one is irrelevant
+			}
+		}(hp.name, hp.provider)
+	}
+
+	// Wait for first result or timeout
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	// Collect results
+	var firstErr error
+	for res := range resultCh {
+		if res.err == nil {
+			r.recordSuccess(res.provider, 0) // Duration not tracked in parallel mode
+			return res.resp, res.provider, nil
+		}
+		if firstErr == nil {
+			firstErr = res.err
+		}
+	}
+
+	if firstErr != nil {
+		return nil, "", fmt.Errorf("all parallel providers failed: %w", firstErr)
+	}
+	return nil, "", fmt.Errorf("no providers completed in time")
 }

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/errors"
+	"github.com/wunderpus/wunderpus/internal/errors"
 )
 
 // DefaultClient is the shared HTTP client for all providers.

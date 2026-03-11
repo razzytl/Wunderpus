@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"github.com/wonderpus/wonderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/config"
 )
 
 // Onboard runs the interactive configuration wizard.

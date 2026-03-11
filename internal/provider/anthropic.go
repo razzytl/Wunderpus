@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/errors"
+	"github.com/wunderpus/wunderpus/internal/errors"
 )
 
 // Anthropic implements the Provider interface for Anthropic's API.

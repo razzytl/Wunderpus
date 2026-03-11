@@ -10,9 +10,9 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/logging"
-	"github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Channel implements the Telegram communication channel.

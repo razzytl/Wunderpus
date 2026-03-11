@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/security"
 )
 
 // ApprovalFunc is called before executing sensitive tools.

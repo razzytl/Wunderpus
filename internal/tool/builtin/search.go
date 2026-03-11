@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // SearchFiles searches for content inside files within the workspace sandbox.

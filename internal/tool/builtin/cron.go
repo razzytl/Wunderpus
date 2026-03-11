@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 type CronCallback func(jobID, message string)

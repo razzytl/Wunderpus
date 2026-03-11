@@ -3,7 +3,7 @@ package channel
 import (
 	"context"
 
-	"github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Channel defines the interface for communication platforms (Telegram, Discord, etc.)

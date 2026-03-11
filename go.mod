@@ -1,4 +1,4 @@
-module github.com/wonderpus/wonderpus
+module github.com/wunderpus/wunderpus
 
 go 1.25.0
 

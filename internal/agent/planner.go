@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/wonderpus/wonderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
 // Subtask represents a single actionable step toward a larger goal.

@@ -12,8 +12,8 @@ import (
 	"github.com/tencent-connect/botgo/token"
 	"golang.org/x/oauth2"
 
-	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/types"
 )
 
 type Channel struct {

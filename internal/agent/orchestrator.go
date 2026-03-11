@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/wonderpus/wonderpus/internal/provider"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // Orchestrator manages the execution of a TaskGraph through concurrent worker arms.

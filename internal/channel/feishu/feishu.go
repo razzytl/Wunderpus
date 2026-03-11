@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Channel implements the Feishu (Lark) communication channel.

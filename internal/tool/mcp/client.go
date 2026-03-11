@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/wonderpus/wonderpus/internal/config"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 type ServerConnection struct {

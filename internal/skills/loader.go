@@ -25,6 +25,7 @@ const (
 type SkillMetadata struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Version     string `json:"version"`
 }
 
 type SkillInfo struct {
@@ -32,6 +33,7 @@ type SkillInfo struct {
 	Path        string `json:"path"`
 	Source      string `json:"source"`
 	Description string `json:"description"`
+	Version     string `json:"version"`
 }
 
 func (info SkillInfo) validate() error {
@@ -112,7 +114,7 @@ func (sl *SkillsLoader) ListSkills() []SkillInfo {
 				if filepath.Ext(d.Name()) == ".md" {
 					skillFile := filepath.Join(dir, d.Name())
 					baseName := strings.TrimSuffix(d.Name(), ".md")
-					
+
 					info := SkillInfo{
 						Name:   baseName,
 						Path:   skillFile,
@@ -122,12 +124,13 @@ func (sl *SkillsLoader) ListSkills() []SkillInfo {
 					if metadata != nil {
 						info.Description = metadata.Description
 						info.Name = metadata.Name
+						info.Version = metadata.Version
 					}
 					// Auto inject description if missing for flat files
 					if info.Description == "" {
 						info.Description = baseName + " system skill"
 					}
-					
+
 					if err := info.validate(); err != nil {
 						slog.Warn("invalid skill file from "+source, "name", info.Name, "error", err)
 						continue
@@ -140,7 +143,7 @@ func (sl *SkillsLoader) ListSkills() []SkillInfo {
 				}
 				continue
 			}
-			
+
 			// Subdirectory format: skills/name/SKILL.md
 			skillFile := filepath.Join(dir, d.Name(), "SKILL.md")
 			if _, err := os.Stat(skillFile); err != nil {
@@ -155,6 +158,7 @@ func (sl *SkillsLoader) ListSkills() []SkillInfo {
 			if metadata != nil {
 				info.Description = metadata.Description
 				info.Name = metadata.Name
+				info.Version = metadata.Version
 			}
 			if err := info.validate(); err != nil {
 				slog.Warn("invalid skill from "+source, "name", info.Name, "error", err)
@@ -236,12 +240,16 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 		escapedName := escapeXML(s.Name)
 		escapedDesc := escapeXML(s.Description)
 		escapedPath := escapeXML(s.Path)
+		escapedVersion := escapeXML(s.Version)
 
 		lines = append(lines, fmt.Sprintf("  <skill>"))
 		lines = append(lines, fmt.Sprintf("    <name>%s</name>", escapedName))
 		lines = append(lines, fmt.Sprintf("    <description>%s</description>", escapedDesc))
 		lines = append(lines, fmt.Sprintf("    <location>%s</location>", escapedPath))
 		lines = append(lines, fmt.Sprintf("    <source>%s</source>", s.Source))
+		if s.Version != "" {
+			lines = append(lines, fmt.Sprintf("    <version>%s</version>", escapedVersion))
+		}
 		lines = append(lines, "  </skill>")
 	}
 	lines = append(lines, "</skills>")
@@ -267,11 +275,13 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath, fallbackName string) *SkillM
 	var jsonMeta struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Version     string `json:"version"`
 	}
 	if err := json.Unmarshal([]byte(frontmatter), &jsonMeta); err == nil {
 		return &SkillMetadata{
 			Name:        jsonMeta.Name,
 			Description: jsonMeta.Description,
+			Version:     jsonMeta.Version,
 		}
 	}
 
@@ -280,6 +290,7 @@ func (sl *SkillsLoader) getSkillMetadata(skillPath, fallbackName string) *SkillM
 	return &SkillMetadata{
 		Name:        yamlMeta["name"],
 		Description: yamlMeta["description"],
+		Version:     yamlMeta["version"],
 	}
 }
 

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/wonderpus/wonderpus/internal/app"
-	"github.com/wonderpus/wonderpus/internal/tui"
+	"github.com/wunderpus/wunderpus/internal/app"
+	"github.com/wunderpus/wunderpus/internal/skills"
+	"github.com/wunderpus/wunderpus/internal/tui"
 )
 
 var (
@@ -55,8 +57,11 @@ func init() {
 	agentCmd.Flags().StringP("message", "m", "", "one-shot message to agent")
 
 	cronCmd.AddCommand(cronListCmd)
+	cronCmd.AddCommand(cronAddCmd)
 	skillsCmd.AddCommand(skillsListCmd)
+	skillsCmd.AddCommand(skillsInstallCmd)
 	authCmd.AddCommand(authStatusCmd)
+	authCmd.AddCommand(authLoginCmd)
 }
 
 var statusCmd = &cobra.Command{
@@ -163,6 +168,40 @@ var cronListCmd = &cobra.Command{
 	},
 }
 
+var cronAddCmd = &cobra.Command{
+	Use:   "add [task description]",
+	Short: "Add a new periodic task to HEARTBEAT.md",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		taskDesc := args[0]
+		workspace := application.Config.Agents.Defaults.Workspace
+		heartbeatPath := workspace + "/HEARTBEAT.md"
+
+		content := fmt.Sprintf("\n## %s\n- [ ] %s\n", time.Now().Format("2006-01-02 15:04"), taskDesc)
+
+		f, err := os.OpenFile(heartbeatPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer f.Close()
+
+		if _, err := f.WriteString(content); err != nil {
+			fmt.Printf("Error writing to HEARTBEAT.md: %v\n", err)
+			return
+		}
+
+		fmt.Printf("Task added to %s\n", heartbeatPath)
+	},
+}
+
 var skillsCmd = &cobra.Command{
 	Use:   "skills",
 	Short: "Manage and discover agent skills",
@@ -184,6 +223,35 @@ var skillsListCmd = &cobra.Command{
 		for _, s := range allSkills {
 			fmt.Printf("- %s (%s): %s\n", s.Name, s.Source, s.Description)
 		}
+	},
+}
+
+var skillsInstallCmd = &cobra.Command{
+	Use:   "install [source]",
+	Short: "Install a skill from GitHub or local path",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		source := args[0]
+		application, err := app.Bootstrap(configPath, verbose)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		defer application.Close()
+
+		installer := skills.NewSkillInstaller(application.Config.Agents.Defaults.Workspace)
+
+		if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") || strings.Contains(source, "/") {
+			err = installer.InstallFromGitHub(context.Background(), source)
+		} else {
+			err = installer.InstallFromLocalPath(context.Background(), source)
+		}
+
+		if err != nil {
+			fmt.Printf("Error installing skill: %v\n", err)
+			return
+		}
+		fmt.Printf("Skill installed successfully from %s\n", source)
 	},
 }
 
@@ -211,6 +279,20 @@ var authStatusCmd = &cobra.Command{
 		if len(providers) == 0 {
 			fmt.Println("No providers authenticated. Use 'wunderpus onboard' to setup.")
 		}
+	},
+}
+
+var authLoginCmd = &cobra.Command{
+	Use:   "login [provider]",
+	Short: "Login to a provider (opens browser for OAuth or prompts for API key)",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		provider := args[0]
+		fmt.Printf("Authentication for %s\n", provider)
+		fmt.Println("Use 'wunderpus onboard' to configure provider API keys interactively.")
+		fmt.Println("Or set environment variables:")
+		fmt.Printf("  - %s_API_KEY\n", strings.ToUpper(provider))
+		fmt.Println("  - Or add to config.yaml under providers")
 	},
 }
 

@@ -1,5 +1,7 @@
 package provider
 
+//go:generate stringer -type=FailoverReason -linecomment
+
 import (
 	"context"
 	"fmt"
@@ -7,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/logging"
 )
 
 type FailoverReason int

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/subagent"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/subagent"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // SpawnTool spawns a new sub-agent for long-running tasks

@@ -1,5 +1,7 @@
 package tui
 
+//go:generate stringer -type=NotificationType -linecomment
+
 import (
 	"fmt"
 	"time"

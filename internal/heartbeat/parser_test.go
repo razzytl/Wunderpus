@@ -251,3 +251,93 @@ func TestParseResult_LastModified(t *testing.T) {
 		t.Error("expected LastModified to be set")
 	}
 }
+
+func TestParser_CronExpression(t *testing.T) {
+	// Create a temporary HEARTBEAT.md file with cron schedules
+	tmpDir := t.TempDir()
+	heartbeatFile := filepath.Join(tmpDir, "HEARTBEAT.md")
+
+	content := `# Heartbeat Test
+
+## Quick Tasks (respond directly)
+- [daily at 9am] Report the current time
+- [hourly] Check system status
+- [every 2 hours] Summarize the conversation
+
+## Long Tasks (spawn subagents)
+- [weekdays at 6pm] Search for tech news
+- [at 14:30] Check for updates
+`
+
+	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	parser := NewParser()
+	result, err := parser.Parse(heartbeatFile)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+
+	// Verify quick tasks with schedules
+	if len(result.QuickTasks) != 3 {
+		t.Errorf("expected 3 quick tasks, got %d", len(result.QuickTasks))
+	}
+
+	// Check first task: "daily at 9am" -> "0 9 * * *"
+	if result.QuickTasks[0].CronExpr != "0 9 * * *" {
+		t.Errorf("expected cron '0 9 * * *', got '%s'", result.QuickTasks[0].CronExpr)
+	}
+	if result.QuickTasks[0].Schedule != "daily at 9am" {
+		t.Errorf("expected schedule 'daily at 9am', got '%s'", result.QuickTasks[0].Schedule)
+	}
+	// Content should have schedule removed
+	if result.QuickTasks[0].Content != "Report the current time" {
+		t.Errorf("expected content 'Report the current time', got '%s'", result.QuickTasks[0].Content)
+	}
+
+	// Check second task: "hourly"
+	if result.QuickTasks[1].CronExpr != "0 * * * *" {
+		t.Errorf("expected cron '0 * * * *', got '%s'", result.QuickTasks[1].CronExpr)
+	}
+
+	// Check third task: "every 2 hours"
+	if result.QuickTasks[2].CronExpr != "0 */2 * * *" {
+		t.Errorf("expected cron '0 */2 * * *', got '%s'", result.QuickTasks[2].CronExpr)
+	}
+
+	// Check fourth task: "weekdays at 6pm" -> "0 18 * * 1-5"
+	if len(result.LongTasks) != 2 {
+		t.Errorf("expected 2 long tasks, got %d", len(result.LongTasks))
+	}
+	if result.LongTasks[0].CronExpr != "0 18 * * 1-5" {
+		t.Errorf("expected cron '0 18 * * 1-5', got '%s'", result.LongTasks[0].CronExpr)
+	}
+
+	// Check "at 14:30" -> "30 14 * * *"
+	if result.LongTasks[1].CronExpr != "30 14 * * *" {
+		t.Errorf("expected cron '30 14 * * *', got '%s'", result.LongTasks[1].CronExpr)
+	}
+}
+
+func TestDefaultIntervals(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hourly", "0 * * * *"},
+		{"daily", "0 0 * * *"},
+		{"weekly", "0 0 * * 0"},
+		{"monthly", "0 0 1 * *"},
+		{"yearly", "0 0 1 1 *"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := DefaultIntervals[tt.input]; got != tt.expected {
+				t.Errorf("DefaultIntervals[%s] = %s; want %s", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

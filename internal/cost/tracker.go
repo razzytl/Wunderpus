@@ -7,7 +7,7 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
-	"github.com/wonderpus/wonderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/logging"
 )
 
 // Tracker handles asynchronous cost tracking and budgeting.

@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // SystemInfo provides information about the host system.

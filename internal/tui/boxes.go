@@ -1,5 +1,7 @@
 package tui
 
+//go:generate stringer -type=BoxStyle -linecomment
+
 import (
 	"github.com/charmbracelet/lipgloss"
 )

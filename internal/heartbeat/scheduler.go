@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/agent"
 )
 
 // TaskExecutor executes heartbeat tasks

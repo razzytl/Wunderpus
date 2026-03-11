@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/subagent"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/subagent"
 )
 
 // HeartbeatExecutor executes heartbeat tasks using the agent manager

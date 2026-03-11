@@ -3,7 +3,7 @@ package agent
 import (
 	"testing"
 
-	"github.com/wonderpus/wonderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
 func TestAgentCreation(t *testing.T) {

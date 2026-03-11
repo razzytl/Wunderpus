@@ -1,4 +1,4 @@
-.PHONY: all build install uninstall clean help test lint vet deps update-deps check run docker-build docker-run
+.PHONY: all build install uninstall clean help test lint vet deps update-deps check run docker-build docker-run generate
 
 # Build variables
 BINARY_NAME=wonderpus
@@ -174,6 +174,12 @@ update-deps:
 
 ## check: Run vet, fmt, and verify dependencies
 check: deps vet fmt test
+
+## generate: Run go generate for code generation
+generate:
+	@echo "Running go generate..."
+	$(GO) generate ./...
+	@echo "Generate complete"
 
 ## run: Build and run wonderpus
 run: build

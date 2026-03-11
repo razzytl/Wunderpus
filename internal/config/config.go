@@ -11,9 +11,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/wonderpus/wonderpus/internal/errors"
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/skills"
+	"github.com/wunderpus/wunderpus/internal/errors"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/skills"
 )
 
 // Config is the root configuration for Wonderpus.
@@ -455,10 +455,10 @@ func (c *Config) migrateV2toV3() bool {
 }
 
 func tryGenerateConfig(path string) (bool, error) {
-	hasOpenAI := os.Getenv("WONDERPUS_OPENAI_API_KEY") != ""
-	hasAnthropic := os.Getenv("WONDERPUS_ANTHROPIC_API_KEY") != ""
-	hasGemini := os.Getenv("WONDERPUS_GEMINI_API_KEY") != ""
-	hasOllama := os.Getenv("WONDERPUS_OLLAMA_HOST") != ""
+	hasOpenAI := os.Getenv("WUNDERPUS_OPENAI_API_KEY") != ""
+	hasAnthropic := os.Getenv("WUNDERPUS_ANTHROPIC_API_KEY") != ""
+	hasGemini := os.Getenv("WUNDERPUS_GEMINI_API_KEY") != ""
+	hasOllama := os.Getenv("WUNDERPUS_OLLAMA_HOST") != ""
 
 	if !hasOpenAI && !hasAnthropic && !hasGemini && !hasOllama {
 		return false, nil
@@ -602,25 +602,25 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WUNDERPUS_HOME"); v != "" {
 		cfg.Home = v
 	}
-	if v := os.Getenv("WONDERPUS_OPENAI_API_KEY"); v != "" {
+	if v := os.Getenv("WUNDERPUS_OPENAI_API_KEY"); v != "" {
 		cfg.Providers.OpenAI.APIKey = v
 	}
-	if v := os.Getenv("WONDERPUS_ANTHROPIC_API_KEY"); v != "" {
+	if v := os.Getenv("WUNDERPUS_ANTHROPIC_API_KEY"); v != "" {
 		cfg.Providers.Anthropic.APIKey = v
 	}
-	if v := os.Getenv("WONDERPUS_GEMINI_API_KEY"); v != "" {
+	if v := os.Getenv("WUNDERPUS_GEMINI_API_KEY"); v != "" {
 		cfg.Providers.Gemini.APIKey = v
 	}
-	if v := os.Getenv("WONDERPUS_OLLAMA_HOST"); v != "" {
+	if v := os.Getenv("WUNDERPUS_OLLAMA_HOST"); v != "" {
 		cfg.Providers.Ollama.Host = v
 	}
-	if v := os.Getenv("WONDERPUS_DEFAULT_PROVIDER"); v != "" {
+	if v := os.Getenv("WUNDERPUS_DEFAULT_PROVIDER"); v != "" {
 		cfg.DefaultProvider = v
 	}
-	if v := os.Getenv("WONDERPUS_LOG_LEVEL"); v != "" {
+	if v := os.Getenv("WUNDERPUS_LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = v
 	}
-	if v := os.Getenv("WONDERPUS_ENCRYPTION_KEY"); v != "" {
+	if v := os.Getenv("WUNDERPUS_ENCRYPTION_KEY"); v != "" {
 		cfg.Security.Encryption.Key = v
 		cfg.Security.Encryption.Enabled = true
 		// Auto-generate salt if not set
@@ -650,13 +650,13 @@ func applyEnv(cfg *Config) {
 	}
 
 	// Channel Overrides
-	if v := os.Getenv("WONDERPUS_SLACK_TOKEN"); v != "" {
+	if v := os.Getenv("WUNDERPUS_SLACK_TOKEN"); v != "" {
 		cfg.Channels.Slack.Token = v
 	}
-	if v := os.Getenv("WONDERPUS_SLACK_APP_TOKEN"); v != "" {
+	if v := os.Getenv("WUNDERPUS_SLACK_APP_TOKEN"); v != "" {
 		cfg.Channels.Slack.AppToken = v
 	}
-	if v := os.Getenv("WONDERPUS_WHATSAPP_ENABLED"); v != "" {
+	if v := os.Getenv("WUNDERPUS_WHATSAPP_ENABLED"); v != "" {
 		cfg.Channels.WhatsApp.Enabled = strings.ToLower(v) == "true" || v == "1"
 	}
 }

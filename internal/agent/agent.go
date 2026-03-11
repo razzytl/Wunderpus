@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/constants"
-	"github.com/wonderpus/wonderpus/internal/logging"
-	"github.com/wonderpus/wonderpus/internal/memory"
-	"github.com/wonderpus/wonderpus/internal/provider"
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/skills"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/constants"
+	"github.com/wunderpus/wunderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/memory"
+	"github.com/wunderpus/wunderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/skills"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // Agent is the core agent that processes user messages.

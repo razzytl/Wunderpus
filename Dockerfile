@@ -24,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o wonderpus \
 # Production stage - Ultra minimal
 FROM scratch
 
-LABEL org.opencontainers.image.source="https://github.com/wonderpus/wonderpus"
+LABEL org.opencontainers.image.source="https://github.com/wunderpus/wunderpus"
 LABEL org.opencontainers.image.description="Universal Autonomous AI Agent in Go"
 
 # Copy CA certificates for HTTPS

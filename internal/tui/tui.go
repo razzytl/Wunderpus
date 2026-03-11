@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/wonderpus/wonderpus/internal/agent"
-	"github.com/wonderpus/wonderpus/internal/constants"
-	"github.com/wonderpus/wonderpus/internal/memory"
-	"github.com/wonderpus/wonderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/constants"
+	"github.com/wunderpus/wunderpus/internal/memory"
+	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
 const quickStartGuide = `

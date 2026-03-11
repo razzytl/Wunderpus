@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/errors"
+	"github.com/wunderpus/wunderpus/internal/errors"
 )
 
 // Gemini implements the Provider interface for Google's Gemini API.

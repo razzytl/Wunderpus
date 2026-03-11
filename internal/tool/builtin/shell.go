@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // defaultWhitelist is the set of commands allowed by default.

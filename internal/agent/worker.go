@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/provider"
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // TaskType constants correspond to the types emitted by the Planner.

@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool"
 )
 
 // HTTPRequest makes HTTP requests with SSRF protection.

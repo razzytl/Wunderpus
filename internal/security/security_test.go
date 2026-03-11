@@ -133,3 +133,56 @@ func TestEncryption(t *testing.T) {
 		}
 	})
 }
+
+func TestWorkspaceSandbox(t *testing.T) {
+	tmpDir := t.TempDir()
+	ws, err := NewWorkspaceSandbox(tmpDir, true)
+	if err != nil {
+		t.Fatalf("failed to create sandbox: %v", err)
+	}
+
+	t.Run("ValidatePath", func(t *testing.T) {
+		tests := []struct {
+			path    string
+			wantErr bool
+		}{
+			{"file.txt", false},
+			{"subdir/file.txt", false},
+			{"../outside.txt", true},
+			{"/etc/passwd", true},
+		}
+
+		for _, tt := range tests {
+			err := ws.ValidatePath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePath(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		}
+	})
+
+	t.Run("ValidateCommand", func(t *testing.T) {
+		tests := []struct {
+			cmd     string
+			wantErr bool
+		}{
+			{"ls -la", false},
+			{"cat file.txt", false},
+			{"cd subdir", false},
+			{"cd ..", true},
+			{"ls ; cat /etc/passwd", true},
+			{"ls && cat /etc/passwd", true},
+			{"ls || cat /etc/passwd", true},
+			{"ls | grep foo", true},
+			{"cat `ls` ", true},
+			{"cat $(ls)", true},
+			{"ls > file.txt", true},
+		}
+
+		for _, tt := range tests {
+			err := ws.ValidateCommand(tt.cmd)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateCommand(%q) error = %v, wantErr %v", tt.cmd, err, tt.wantErr)
+			}
+		}
+	})
+}

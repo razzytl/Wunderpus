@@ -13,8 +13,8 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
-	"github.com/wonderpus/wonderpus/internal/agent"
-	wunderpusTypes "github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	wunderpusTypes "github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Channel implements the WhatsApp communication channel.

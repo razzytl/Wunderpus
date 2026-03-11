@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/tool"
-	"github.com/wonderpus/wonderpus/internal/tool/builtin"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/tool/builtin"
 )
 
 // mockTool is a simple tool for testing the executor.

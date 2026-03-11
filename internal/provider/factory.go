@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/config"
 )
 
 // NewFromModelEntry creates a Provider instance from a ModelEntry using protocol-based routing.

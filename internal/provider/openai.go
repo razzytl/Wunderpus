@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/wonderpus/wonderpus/internal/errors"
+	"github.com/wunderpus/wunderpus/internal/errors"
 )
 
 // OpenAI implements the Provider interface for OpenAI-compatible APIs.

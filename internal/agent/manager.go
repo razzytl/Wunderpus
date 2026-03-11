@@ -5,14 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wonderpus/wonderpus/internal/config"
-	"github.com/wonderpus/wonderpus/internal/cost"
-	"github.com/wonderpus/wonderpus/internal/memory"
-	"github.com/wonderpus/wonderpus/internal/provider"
-	"github.com/wonderpus/wonderpus/internal/security"
-	"github.com/wonderpus/wonderpus/internal/skills"
-	"github.com/wonderpus/wonderpus/internal/tool"
-	"github.com/wonderpus/wonderpus/internal/types"
+	"github.com/wunderpus/wunderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/cost"
+	"github.com/wunderpus/wunderpus/internal/memory"
+	"github.com/wunderpus/wunderpus/internal/provider"
+	"github.com/wunderpus/wunderpus/internal/security"
+	"github.com/wunderpus/wunderpus/internal/skills"
+	"github.com/wunderpus/wunderpus/internal/tool"
+	"github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Manager handles multiple agent instances, one per session.

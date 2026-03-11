@@ -6,15 +6,104 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // HeartbeatTask represents a parsed task from HEARTBEAT.md
 type HeartbeatTask struct {
-	Type    string // "quick" or "long"
-	Content string // The task description
-	Line    int    // Line number in the source file
+	Type     string // "quick" or "long"
+	Content  string // The task description
+	Line     int    // Line number in the source file
+	CronExpr string // Cron expression (e.g., "0 9 * * *")
+	Schedule string // Original schedule string (e.g., "daily at 9am")
+}
+
+// DefaultIntervals returns default intervals for common schedule patterns
+var DefaultIntervals = map[string]string{
+	"hourly":  "0 * * * *",
+	"daily":   "0 0 * * *",
+	"weekly":  "0 0 * * 0",
+	"monthly": "0 0 1 * *",
+	"yearly":  "0 0 1 1 *",
+}
+
+// parseScheduleToCron converts natural language schedule to cron expression
+func parseScheduleToCron(schedule string) (string, bool) {
+	schedule = strings.ToLower(strings.TrimSpace(schedule))
+
+	// Direct mappings for common schedules (check these first)
+	if cron, ok := DefaultIntervals[schedule]; ok {
+		return cron, true
+	}
+
+	// Parse "weekday at X" or "weekdays at X" - check BEFORE general "at" pattern
+	weekdayPattern := regexp.MustCompile(`weekdays?\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?`)
+	if match := weekdayPattern.FindStringSubmatch(schedule); match != nil {
+		hour, _ := strconv.Atoi(match[1])
+		minute := 0
+		if match[2] != "" {
+			minute, _ = strconv.Atoi(match[2])
+		}
+		period := match[3]
+
+		if period == "pm" && hour < 12 {
+			hour += 12
+		} else if period == "am" && hour == 12 {
+			hour = 0
+		}
+
+		// Monday to Friday (1-5)
+		return fmt.Sprintf("%d %d * * 1-5", minute, hour), true
+	}
+
+	// Parse just "weekdays" (without at) - weekdays at midnight
+	weekdaysOnlyPattern := regexp.MustCompile(`^weekdays?$`)
+	if weekdaysOnlyPattern.MatchString(schedule) {
+		// Weekdays at midnight
+		return "0 0 * * 1-5", true
+	}
+
+	// Parse "every X" (e.g., "every 5 minutes", "every 2 hours")
+	everyPattern := regexp.MustCompile(`every\s+(\d+)\s+(minute|minutes|hour|hours|day|days|week|weeks)`)
+	if match := everyPattern.FindStringSubmatch(schedule); match != nil {
+		interval, _ := strconv.Atoi(match[1])
+		unit := match[2]
+
+		switch unit {
+		case "minute", "minutes":
+			// Custom interval - not standard cron, use @every
+			return fmt.Sprintf("@every %dm", interval), true
+		case "hour", "hours":
+			return fmt.Sprintf("0 */%d * * *", interval), true
+		case "day", "days":
+			return fmt.Sprintf("0 0 */%d * *", interval), true
+		case "week", "weeks":
+			return fmt.Sprintf("0 0 * * %d", (interval*7)%7), true
+		}
+	}
+
+	// Parse "at X" (e.g., "at 9am", "at 14:30") - check after more specific patterns
+	atPattern := regexp.MustCompile(`at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?`)
+	if match := atPattern.FindStringSubmatch(schedule); match != nil {
+		hour, _ := strconv.Atoi(match[1])
+		minute := 0
+		if match[2] != "" {
+			minute, _ = strconv.Atoi(match[2])
+		}
+		period := match[3]
+
+		if period == "pm" && hour < 12 {
+			hour += 12
+		} else if period == "am" && hour == 12 {
+			hour = 0
+		}
+
+		return fmt.Sprintf("%d %d * * *", minute, hour), true
+	}
+
+	return "", false
 }
 
 // HeartbeatConfig holds the heartbeat configuration
@@ -56,6 +145,7 @@ func (p *Parser) Parse(path string) (*ParseResult, error) {
 	currentSection := ""
 	taskPattern := regexp.MustCompile(`^-\s+(.+)$`)
 	headerPattern := regexp.MustCompile(`^##?\s+(.+)$`)
+	schedulePattern := regexp.MustCompile(`\[([^\]]+)\]`)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -75,10 +165,25 @@ func (p *Parser) Parse(path string) (*ParseResult, error) {
 		// Check for task items
 		if taskPattern.MatchString(trimmed) && currentSection != "" {
 			match := taskPattern.FindStringSubmatch(trimmed)
+			taskContent := strings.TrimSpace(match[1])
+
 			task := HeartbeatTask{
 				Type:    currentSection,
-				Content: strings.TrimSpace(match[1]),
+				Content: taskContent,
 				Line:    i + 1,
+			}
+
+			// Check for schedule in brackets [schedule]
+			if schedMatch := schedulePattern.FindStringSubmatch(taskContent); schedMatch != nil {
+				schedule := schedMatch[1]
+				task.Schedule = schedule
+				// Try to convert to cron expression
+				if cron, ok := parseScheduleToCron(schedule); ok {
+					task.CronExpr = cron
+				}
+				// Remove schedule from content
+				task.Content = schedulePattern.ReplaceAllString(taskContent, "")
+				task.Content = strings.TrimSpace(task.Content)
 			}
 
 			if currentSection == "quick" {

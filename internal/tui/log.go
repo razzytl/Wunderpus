@@ -1,5 +1,7 @@
 package tui
 
+//go:generate stringer -type=LogLevel -linecomment
+
 import (
 	"fmt"
 	"strings"

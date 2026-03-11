@@ -181,9 +181,12 @@ func (c *Channel) sendMessage(userID, content string) {
 	body, _ := json.Marshal(payload)
 	req, _ := http.NewRequest("POST", url, strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-acs-dingtalk-access-token", token)
+	req.Header.Set("X-Acs-Dingtalk-Access-Token", token)
 
-	http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil {
+		resp.Body.Close()
+	}
 }
 
 func (c *Channel) VerifySignature(timestamp, signature string) bool {

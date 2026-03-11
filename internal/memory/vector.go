@@ -38,7 +38,7 @@ func (s *Store) SearchMemories(ctx context.Context, query string, encKey []byte)
 			// Note: Decrypt function is in security package
 			// results will only contain what can be decrypted
 		}
-		
+
 		results = append(results, SearchResult{
 			SessionID: sID,
 			Content:   content,

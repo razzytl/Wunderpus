@@ -84,7 +84,7 @@ func (o *Orchestrator) Execute(ctx context.Context, graph *TaskGraph) (string, e
 
 					// Spawn a worker arm with the specific role
 					worker := NewWorkerArm(subtask.ID, subtask.Type, o.router, o.globalRegistry, o.executor)
-					
+
 					res, err := worker.ExecuteSubtask(ctx, subtask, contextData)
 
 					if err != nil {
@@ -124,7 +124,7 @@ func (o *Orchestrator) Execute(ctx context.Context, graph *TaskGraph) (string, e
 
 func (o *Orchestrator) synthesize(ctx context.Context, originalGoal string, results map[string]string) (string, error) {
 	sysPrompt := "You are the final synthesizer agent. Your job is to take the original user goal and a raw dump of answers from specialized sub-agents, and return a clean, cohesive final response to the user."
-	
+
 	compiledContext := fmt.Sprintf("Original Goal: %s\n\nSub-agent reports:\n", originalGoal)
 	for id, res := range results {
 		compiledContext += fmt.Sprintf("--- Report from %s ---\n%s\n\n", id, res)

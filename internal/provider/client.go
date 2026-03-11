@@ -27,7 +27,7 @@ var DefaultClient = &http.Client{
 		TLSClientConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		},
-		ForceAttemptHTTP2: true,
+		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,

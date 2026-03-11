@@ -117,9 +117,9 @@ func (c *Channel) processMessage(channelID, userID, text string) {
 	// Clean text (remove bot mention)
 	// Slack mentions are like <@U12345678>
 	// For simplicity, we just pass the text as is or do minimal cleaning
-	
+
 	sessionID := fmt.Sprintf("slack_%s_%s", userID, channelID)
-	
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
@@ -129,7 +129,7 @@ func (c *Channel) processMessage(channelID, userID, text string) {
 			Content:   text,
 			ChannelID: channelID,
 		})
-		
+
 		var reply string
 		if err != nil {
 			reply = "Error: " + err.Error()

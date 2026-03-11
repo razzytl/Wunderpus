@@ -69,7 +69,7 @@ func (s *Server) Stop() error {
 	if s.server != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		s.mu.Lock()
 		for conn := range s.conns {
 			conn.Close()
@@ -103,9 +103,9 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 
 	// Set read deadline for heartbeat
 	conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	conn.SetPongHandler(func(string) error { 
+	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil 
+		return nil
 	})
 
 	// Heartbeat ticker

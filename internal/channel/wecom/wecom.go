@@ -229,7 +229,34 @@ func (c *Channel) sendMessage(userID, content string) {
 	req, _ := http.NewRequest("POST", url, strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 
-	http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil {
+		resp.Body.Close()
+	}
+}
+
+// decrypt decrypts an encrypted string using AES-CFB
+func (c *Channel) decrypt(encryptedStr string) (string, error) {
+	if c.encodingAESKey == "" {
+		return encryptedStr, nil
+	}
+
+	key, _ := base64.StdEncoding.DecodeString(c.encodingAESKey + "=")
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	cipherText, _ := base64.StdEncoding.DecodeString(encryptedStr)
+	iv := cipherText[:aes.BlockSize]
+	cipherText = cipherText[aes.BlockSize:]
+
+	stream := cipher.NewCFBDecrypter(block, iv)
+	stream.XORKeyStream(cipherText, cipherText)
+
+	cipherText = cipherText[:len(cipherText)-32]
+	result := string(cipherText)[20:]
+	return result, nil
 }
 
 func (c *Channel) decryptMessage(encryptStr, signature, timestamp, nonce string) (string, error) {
@@ -246,22 +273,7 @@ func (c *Channel) decryptMessage(encryptStr, signature, timestamp, nonce string)
 		return "", fmt.Errorf("signature mismatch")
 	}
 
-	key, _ := base64.StdEncoding.DecodeString(c.encodingAESKey + "=")
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	cipherText, _ := base64.StdEncoding.DecodeString(encryptStr)
-	iv := cipherText[:aes.BlockSize]
-	cipherText = cipherText[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(cipherText, cipherText)
-
-	cipherText = cipherText[:len(cipherText)-32]
-	result := string(cipherText)[20:]
-	return result, nil
+	return c.decrypt(encryptStr)
 }
 
 func (c *Channel) decryptEcho(echostr, signature, timestamp, nonce string) (string, error) {
@@ -278,20 +290,5 @@ func (c *Channel) decryptEcho(echostr, signature, timestamp, nonce string) (stri
 		return "", fmt.Errorf("signature mismatch")
 	}
 
-	key, _ := base64.StdEncoding.DecodeString(c.encodingAESKey + "=")
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-
-	cipherText, _ := base64.StdEncoding.DecodeString(echostr)
-	iv := cipherText[:aes.BlockSize]
-	cipherText = cipherText[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-	stream.XORKeyStream(cipherText, cipherText)
-
-	cipherText = cipherText[:len(cipherText)-32]
-	result := string(cipherText)[20:]
-	return result, nil
+	return c.decrypt(echostr)
 }

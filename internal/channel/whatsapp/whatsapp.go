@@ -7,14 +7,14 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/wunderpus/wunderpus/internal/agent"
+	wunderpusTypes "github.com/wunderpus/wunderpus/internal/types"
 	"go.mau.fi/whatsmeow"
+	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
-	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
-	"github.com/wunderpus/wunderpus/internal/agent"
-	wunderpusTypes "github.com/wunderpus/wunderpus/internal/types"
 )
 
 // Channel implements the WhatsApp communication channel.
@@ -45,7 +45,7 @@ func (c *Channel) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("whatsapp: failed to init sqlstore: %w", err)
 	}
-	
+
 	deviceRes, err := container.GetFirstDevice(ctx)
 	if err != nil {
 		return fmt.Errorf("whatsapp: failed to get device: %w", err)
@@ -62,7 +62,7 @@ func (c *Channel) Start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		
+
 		go func() {
 			for evt := range qrChan {
 				if evt.Event == "code" {
@@ -100,7 +100,7 @@ func (c *Channel) eventHandler(evt interface{}) {
 		if v.Info.IsFromMe {
 			return
 		}
-		
+
 		text := ""
 		if v.Message.GetConversation() != "" {
 			text = v.Message.GetConversation()
@@ -113,7 +113,7 @@ func (c *Channel) eventHandler(evt interface{}) {
 		}
 
 		sessionID := fmt.Sprintf("whatsapp_%s", v.Info.Sender.String())
-		
+
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 			defer cancel()
@@ -123,7 +123,7 @@ func (c *Channel) eventHandler(evt interface{}) {
 				Content:   text,
 				ChannelID: v.Info.Chat.String(),
 			})
-			
+
 			var reply string
 			if err != nil {
 				reply = "Error: " + err.Error()

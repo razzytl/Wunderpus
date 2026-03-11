@@ -10,10 +10,10 @@ import (
 
 // Subtask represents a single actionable step toward a larger goal.
 type Subtask struct {
-	ID          string   `json:"id"`
-	Description string   `json:"description"`
+	ID           string   `json:"id"`
+	Description  string   `json:"description"`
 	Dependencies []string `json:"dependencies"` // IDs of tasks that must complete before this one
-	Type        string   `json:"type"`         // io, compute, general
+	Type         string   `json:"type"`         // io, compute, general
 }
 
 // TaskGraph represents a decomposed goal.

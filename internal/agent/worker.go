@@ -19,18 +19,18 @@ const (
 
 // WorkerArm represents an isolated execution unit for a specific subtask.
 type WorkerArm struct {
-	id        string
-	taskType  string
-	router    *provider.Router
-	executor  *tool.Executor
-	registry  *tool.Registry // A scoped registry just for this worker
+	id       string
+	taskType string
+	router   *provider.Router
+	executor *tool.Executor
+	registry *tool.Registry // A scoped registry just for this worker
 }
 
 // NewWorkerArm creates a new specialized worker arm.
 func NewWorkerArm(id, taskType string, router *provider.Router, globalRegistry *tool.Registry, globalExecutor *tool.Executor) *WorkerArm {
 	// Create a scoped registry that only contains tools relevant to the task type
 	scopedRegistry := tool.NewRegistry()
-	
+
 	if globalRegistry != nil {
 		allTools := globalRegistry.List()
 		for _, t := range allTools {
@@ -73,7 +73,7 @@ func (w *WorkerArm) ExecuteSubtask(ctx context.Context, subtask Subtask, context
 Your objective: %s
 Any relevant context provided from prior dependencies: %s
 
-Think step by step and execute any tools required to achieve this objective. Output the final summary of what you accomplished.`, 
+Think step by step and execute any tools required to achieve this objective. Output the final summary of what you accomplished.`,
 		w.taskType, subtask.Description, contextData)
 
 	messages := []provider.Message{

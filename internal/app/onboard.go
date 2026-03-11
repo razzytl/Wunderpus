@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"github.com/wunderpus/wunderpus/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 // Onboard runs the interactive configuration wizard.
@@ -39,23 +39,23 @@ func Onboard(configPath string) error {
 	// Create config
 	cfg := &config.Config{}
 	// Load defaults first
-	// Note: config.Load uses internal helper, but we can manually populate for now 
-	// or use a helper if we refactor config further. 
+	// Note: config.Load uses internal helper, but we can manually populate for now
+	// or use a helper if we refactor config further.
 	// For MVP, we'll just write a basic config.
-	
+
 	cfg.Providers.OpenAI.APIKey = openAIKey
 	cfg.Providers.OpenAI.Model = "gpt-4o"
 	cfg.Providers.Anthropic.APIKey = anthropicKey
 	cfg.Providers.Anthropic.Model = "claude-3-5-sonnet-20240620"
 	cfg.Providers.Gemini.APIKey = geminiKey
 	cfg.Providers.Gemini.Model = "gemini-1.5-pro"
-	
+
 	cfg.Agents.Defaults.Workspace = workspace
 	cfg.Agents.Defaults.RestrictToWorkspace = true
-	
+
 	cfg.Channels.Telegram.Enabled = enableTelegram
 	cfg.Channels.Telegram.Token = telegramToken
-	
+
 	cfg.Logging.Level = "info"
 	cfg.Logging.Format = "json"
 	cfg.Logging.Output = "stderr"

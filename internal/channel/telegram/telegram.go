@@ -94,7 +94,7 @@ func (c *Channel) Start(ctx context.Context) error {
 								slog.Error("PANIC in telegram message handler", "panic", r)
 							}
 						}()
-						
+
 						// Generate correlation ID
 						cidBytes := make([]byte, 8)
 						_, _ = rand.Read(cidBytes)
@@ -169,7 +169,7 @@ func (c *Channel) handleCommand(chatID int64, cmd string) {
 		c.bot.Send(msg)
 	case "/help":
 		msg := tgbotapi.NewMessage(chatID, "I am an AI agent. You can chat with me, or use the buttons below for quick actions:")
-		
+
 		// Create inline keyboard
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -193,4 +193,3 @@ func (c *Channel) handleCommand(chatID int64, cmd string) {
 		c.bot.Send(msg)
 	}
 }
-

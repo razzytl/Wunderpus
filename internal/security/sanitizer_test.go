@@ -63,7 +63,7 @@ func TestSanitizer_LimitLength(t *testing.T) {
 func TestSanitizer_Normalization(t *testing.T) {
 	s := NewSanitizer(true)
 	// 'e' + combining acute accent
-	input := "caf\u0065\u0301" 
+	input := "caf\u0065\u0301"
 	cleaned, _ := s.Sanitize(input)
 
 	// Should be NFC 'é'

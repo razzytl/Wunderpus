@@ -67,7 +67,7 @@ func (c *Channel) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	if header, ok := payload["header"].(map[string]interface{}); ok {
 		eventID := header["event_id"]
 		slog.Debug("feishu: received event", "event_id", eventID)
-		
+
 		// Map event to internal message
 		// Note: Feishu has complex event schemas, this is a simplified version
 		if event, ok := payload["event"].(map[string]interface{}); ok {
@@ -76,7 +76,7 @@ func (c *Channel) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 					var content map[string]string
 					json.Unmarshal([]byte(contentStr), &content)
 					text := content["text"]
-					
+
 					chatID := message["chat_id"].(string)
 					sender := event["sender"].(map[string]interface{})
 					senderID := sender["sender_id"].(map[string]interface{})["open_id"].(string)
@@ -92,7 +92,7 @@ func (c *Channel) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 func (c *Channel) processMessage(chatID, senderID, text string) {
 	sessionID := fmt.Sprintf("feishu_%s", senderID)
-	
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
@@ -102,12 +102,12 @@ func (c *Channel) processMessage(chatID, senderID, text string) {
 			Content:   text,
 			ChannelID: chatID,
 		})
-		
+
 		if err != nil {
 			slog.Error("feishu: failed to process message", "error", err)
 			return
 		}
-		
+
 		// In a real Feishu bot, we would call the Open Platform API to reply
 		// This requires an access token (tenant_access_token)
 		slog.Info("feishu: would reply to chat", "chat_id", chatID)

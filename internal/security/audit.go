@@ -21,8 +21,8 @@ type AuditEvent struct {
 
 // AuditLogger writes audit events to SQLite.
 type AuditLogger struct {
-	db     *sql.DB
-	key    []byte // optional encryption key
+	db  *sql.DB
+	key []byte // optional encryption key
 }
 
 // NewAuditLogger opens (or creates) the SQLite audit database.

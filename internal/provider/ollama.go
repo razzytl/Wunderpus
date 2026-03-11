@@ -152,6 +152,8 @@ func (o *Ollama) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	// Response body is closed by the goroutine below (defer resp.Body.Close())
+	//nolint:bodyclose
 	resp, err := o.client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("ollama: request failed: %w", err)
@@ -159,7 +161,6 @@ func (o *Ollama) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
 		return nil, fmt.Errorf("ollama: API error %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
@@ -199,13 +200,13 @@ func toOllamaMessages(msgs []Message) []map[string]any {
 	out := make([]map[string]any, len(msgs))
 	for i, m := range msgs {
 		msg := map[string]any{"role": m.Role, "content": m.Content}
-		
+
 		if len(m.ToolCalls) > 0 {
 			var ollamaToolCalls []map[string]any
 			for _, tc := range m.ToolCalls {
 				var arguments map[string]any
 				_ = json.Unmarshal([]byte(tc.Function.Arguments), &arguments)
-				
+
 				ollamaToolCalls = append(ollamaToolCalls, map[string]any{
 					"function": map[string]any{
 						"name":      tc.Function.Name,
@@ -215,7 +216,7 @@ func toOllamaMessages(msgs []Message) []map[string]any {
 			}
 			msg["tool_calls"] = ollamaToolCalls
 		}
-		
+
 		out[i] = msg
 	}
 	return out

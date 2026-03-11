@@ -16,9 +16,9 @@ type CacheEntry struct {
 
 // ResponseCache is an in-memory TTL cache for provider responses.
 type ResponseCache struct {
-	mu     sync.RWMutex
-	data   map[string]CacheEntry
-	ttl    time.Duration
+	mu   sync.RWMutex
+	data map[string]CacheEntry
+	ttl  time.Duration
 }
 
 // NewResponseCache creates a new response cache.

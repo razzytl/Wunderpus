@@ -10,10 +10,10 @@ import (
 type Channel interface {
 	// Start begins the channel's message loop or server.
 	Start(ctx context.Context) error
-	
+
 	// Stop gracefully shuts down the channel.
 	Stop() error
-	
+
 	// Name returns the identifier for this channel.
 	Name() string
 }

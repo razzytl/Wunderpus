@@ -8,12 +8,12 @@ import (
 type ErrorType string
 
 const (
-	ConfigError   ErrorType = "CONFIG"
-	ProviderError ErrorType = "PROVIDER"
-	SecurityError ErrorType = "SECURITY"
-	ToolError     ErrorType = "TOOL"
-	InternalError ErrorType = "INTERNAL"
-	ChannelError  ErrorType = "CHANNEL"
+	ConfigError    ErrorType = "CONFIG"
+	ProviderError  ErrorType = "PROVIDER"
+	SecurityError  ErrorType = "SECURITY"
+	ToolError      ErrorType = "TOOL"
+	InternalError  ErrorType = "INTERNAL"
+	ChannelError   ErrorType = "CHANNEL"
 	RateLimitError ErrorType = "RATE_LIMIT"
 	TimeoutError   ErrorType = "TIMEOUT"
 	MemoryError    ErrorType = "MEMORY"

@@ -3,10 +3,10 @@ package builtin
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/wunderpus/wunderpus/internal/tool"
+	"runtime"
 )
 
 // SystemInfo provides information about the host system.
@@ -17,17 +17,19 @@ func NewSystemInfo() *SystemInfo {
 	return &SystemInfo{}
 }
 
-func (s *SystemInfo) Name() string        { return "system_info" }
-func (s *SystemInfo) Description() string  { return "Get information about the system (OS, Arch, CPU, Memory)." }
-func (s *SystemInfo) Sensitive() bool      { return false }
-func (s *SystemInfo) Version() string      { return "1.0.0" }
-func (s *SystemInfo) Dependencies() []string { return nil }
+func (s *SystemInfo) Name() string { return "system_info" }
+func (s *SystemInfo) Description() string {
+	return "Get information about the system (OS, Arch, CPU, Memory)."
+}
+func (s *SystemInfo) Sensitive() bool                 { return false }
+func (s *SystemInfo) Version() string                 { return "1.0.0" }
+func (s *SystemInfo) Dependencies() []string          { return nil }
 func (s *SystemInfo) Parameters() []tool.ParameterDef { return nil }
 
 func (s *SystemInfo) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	v, _ := mem.VirtualMemoryWithContext(ctx)
 	c, _ := cpu.InfoWithContext(ctx)
-	
+
 	cpuModel := "Unknown"
 	if len(c) > 0 {
 		cpuModel = c[0].ModelName

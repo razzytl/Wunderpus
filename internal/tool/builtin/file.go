@@ -30,10 +30,12 @@ func NewFileReadSandboxed(sandbox *security.WorkspaceSandbox) *FileRead {
 	}
 }
 
-func (f *FileRead) Name() string        { return "file_read" }
-func (f *FileRead) Description() string  { return "Read the contents of a file. Only files within allowed directories can be read." }
-func (f *FileRead) Sensitive() bool      { return false }
-func (f *FileRead) Version() string      { return "1.0.0" }
+func (f *FileRead) Name() string { return "file_read" }
+func (f *FileRead) Description() string {
+	return "Read the contents of a file. Only files within allowed directories can be read."
+}
+func (f *FileRead) Sensitive() bool        { return false }
+func (f *FileRead) Version() string        { return "1.0.0" }
 func (f *FileRead) Dependencies() []string { return nil }
 func (f *FileRead) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
@@ -99,10 +101,12 @@ func NewFileWriteSandboxed(sandbox *security.WorkspaceSandbox) *FileWrite {
 	}
 }
 
-func (f *FileWrite) Name() string        { return "file_write" }
-func (f *FileWrite) Description() string  { return "Write content to a file. Only files within allowed directories can be written. Requires user approval." }
-func (f *FileWrite) Sensitive() bool      { return true }
-func (f *FileWrite) Version() string      { return "1.0.0" }
+func (f *FileWrite) Name() string { return "file_write" }
+func (f *FileWrite) Description() string {
+	return "Write content to a file. Only files within allowed directories can be written. Requires user approval."
+}
+func (f *FileWrite) Sensitive() bool        { return true }
+func (f *FileWrite) Version() string        { return "1.0.0" }
 func (f *FileWrite) Dependencies() []string { return nil }
 func (f *FileWrite) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
@@ -170,10 +174,12 @@ func NewFileListSandboxed(sandbox *security.WorkspaceSandbox) *FileList {
 	}
 }
 
-func (f *FileList) Name() string        { return "file_list" }
-func (f *FileList) Description() string  { return "List files and directories in a given path. Only allowed directories can be listed." }
-func (f *FileList) Sensitive() bool      { return false }
-func (f *FileList) Version() string      { return "1.0.0" }
+func (f *FileList) Name() string { return "file_list" }
+func (f *FileList) Description() string {
+	return "List files and directories in a given path. Only allowed directories can be listed."
+}
+func (f *FileList) Sensitive() bool        { return false }
+func (f *FileList) Version() string        { return "1.0.0" }
 func (f *FileList) Dependencies() []string { return nil }
 func (f *FileList) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
@@ -250,10 +256,12 @@ func NewFileGlobSandboxed(sandbox *security.WorkspaceSandbox) *FileGlob {
 	}
 }
 
-func (f *FileGlob) Name() string        { return "file_glob" }
-func (f *FileGlob) Description() string  { return "Find files using a glob pattern (e.g. 'internal/**/*.go'). Only allowed directories are searched." }
-func (f *FileGlob) Sensitive() bool      { return false }
-func (f *FileGlob) Version() string      { return "1.0.0" }
+func (f *FileGlob) Name() string { return "file_glob" }
+func (f *FileGlob) Description() string {
+	return "Find files using a glob pattern (e.g. 'internal/**/*.go'). Only allowed directories are searched."
+}
+func (f *FileGlob) Sensitive() bool        { return false }
+func (f *FileGlob) Version() string        { return "1.0.0" }
 func (f *FileGlob) Dependencies() []string { return nil }
 func (f *FileGlob) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{

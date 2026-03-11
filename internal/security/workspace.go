@@ -10,8 +10,8 @@ import (
 // WorkspaceSandbox enforces workspace directory restrictions.
 // When enabled, all file and command operations are restricted to the workspace directory.
 type WorkspaceSandbox struct {
-	workspace   string // Absolute path to workspace root
-	restricted  bool   // Whether restriction is active
+	workspace  string // Absolute path to workspace root
+	restricted bool   // Whether restriction is active
 }
 
 // NewWorkspaceSandbox creates a workspace sandbox.
@@ -120,7 +120,7 @@ func (ws *WorkspaceSandbox) ValidateCommand(command string) error {
 
 	// Block cd to outside workspace
 	lower := strings.ToLower(strings.TrimSpace(command))
-	
+
 	// Basic field splitting to get command and arguments
 	fields := strings.Fields(lower)
 	if len(fields) == 0 {
@@ -129,7 +129,7 @@ func (ws *WorkspaceSandbox) ValidateCommand(command string) error {
 
 	cmd := fields[0]
 	cdCommands := map[string]bool{"cd": true, "pushd": true, "chdir": true}
-	
+
 	if cdCommands[cmd] {
 		if len(fields) > 1 {
 			// Check the first argument as a path

@@ -26,10 +26,12 @@ func NewHTTPRequest(blocklist []string) *HTTPRequest {
 	}
 }
 
-func (h *HTTPRequest) Name() string        { return "http_request" }
-func (h *HTTPRequest) Description() string  { return "Make an HTTP request to a URL. POST/PUT/DELETE require user approval. Internal network addresses and metadata endpoints are strictly blocked to prevent SSRF." }
-func (h *HTTPRequest) Sensitive() bool      { return true }
-func (h *HTTPRequest) Version() string      { return "1.1.0" }
+func (h *HTTPRequest) Name() string { return "http_request" }
+func (h *HTTPRequest) Description() string {
+	return "Make an HTTP request to a URL. POST/PUT/DELETE require user approval. Internal network addresses and metadata endpoints are strictly blocked to prevent SSRF."
+}
+func (h *HTTPRequest) Sensitive() bool        { return true }
+func (h *HTTPRequest) Version() string        { return "1.1.0" }
 func (h *HTTPRequest) Dependencies() []string { return nil }
 func (h *HTTPRequest) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
@@ -117,7 +119,7 @@ func (h *HTTPRequest) isBlockedURL(rawURL string) (bool, string) {
 			return true, fmt.Sprintf("cloud metadata endpoint %q blocked", host)
 		}
 	}
-	
+
 	ips, err := net.LookupIP(host)
 	if err != nil {
 		// If DNS fails and it's already an IP, we handle it below. If it's a domain that doesn't resolve,
@@ -150,7 +152,7 @@ func (h *HTTPRequest) isBlockedURL(rawURL string) (bool, string) {
 		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 			return true, fmt.Sprintf("resolves to internal IP %s", ip.String())
 		}
-		
+
 		for _, network := range parsedCIDRs {
 			if network.Contains(ip) {
 				return true, fmt.Sprintf("resolves to blocked private IP range %s", ip.String())

@@ -6,10 +6,10 @@ import (
 
 // Message represents a single message in a conversation.
 type Message struct {
-	Role      string    `json:"role"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-	TokenCount int      `json:"token_count,omitempty"`
+	Role       string    `json:"role"`
+	Content    string    `json:"content"`
+	Timestamp  time.Time `json:"timestamp"`
+	TokenCount int       `json:"token_count,omitempty"`
 }
 
 // Session represents a chat session.

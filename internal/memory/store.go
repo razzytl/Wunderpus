@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/wunderpus/wunderpus/internal/provider"
 	"github.com/wunderpus/wunderpus/internal/security"
+	_ "modernc.org/sqlite"
 )
 
 // Store manages conversation history and user preferences using SQLite.

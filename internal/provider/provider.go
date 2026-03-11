@@ -70,9 +70,9 @@ type CompletionResponse struct {
 
 // ToolCallInfo holds a single tool invocation from the LLM.
 type ToolCallInfo struct {
-	ID       string         `json:"id"`
-	Type     string         `json:"type"` // "function"
-	Function ToolCallFunc   `json:"function"`
+	ID       string       `json:"id"`
+	Type     string       `json:"type"` // "function"
+	Function ToolCallFunc `json:"function"`
 }
 
 // ToolCallFunc is the function name + arguments.

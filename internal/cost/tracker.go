@@ -6,17 +6,17 @@ import (
 	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/wunderpus/wunderpus/internal/logging"
+	_ "modernc.org/sqlite"
 )
 
 // Tracker handles asynchronous cost tracking and budgeting.
 type Tracker struct {
-	db        *sql.DB
-	mu        sync.RWMutex
-	usage     map[string]float64 // sessionID -> total cost
-	budget    float64
-	prices    map[string]ModelPrice
+	db     *sql.DB
+	mu     sync.RWMutex
+	usage  map[string]float64 // sessionID -> total cost
+	budget float64
+	prices map[string]ModelPrice
 }
 
 // ModelPrice defines pricing per 1M tokens.
@@ -58,7 +58,7 @@ func NewTracker(dbPath string, budget float64) (*Tracker, error) {
 		usage:  make(map[string]float64),
 		budget: budget,
 		prices: map[string]ModelPrice{
-			"gpt-4o": {InputPrice: 2.50, OutputPrice: 10.00},
+			"gpt-4o":            {InputPrice: 2.50, OutputPrice: 10.00},
 			"claude-3-5-sonnet": {InputPrice: 3.00, OutputPrice: 15.00},
 			"gemini-2.0-flash":  {InputPrice: 0.10, OutputPrice: 0.40},
 		},

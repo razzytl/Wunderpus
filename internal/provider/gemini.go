@@ -96,7 +96,7 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		Candidates []struct {
 			Content struct {
 				Parts []struct {
-					Text         string         `json:"text"`
+					Text         string `json:"text"`
 					FunctionCall *struct {
 						Name string         `json:"name"`
 						Args map[string]any `json:"args"`
@@ -176,11 +176,12 @@ func (g *Gemini) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	// Response body is closed by the goroutine below (defer resp.Body.Close())
+	//nolint:bodyclose
 	resp, err := RetryDo(ctx, g.client, httpReq, DefaultRetryOptions)
 	if err != nil {
 		return nil, err
 	}
-	// Note: defer resp.Body.Close() is handled by the caller/stream reader
 
 	ch := make(chan StreamChunk, 64)
 	go func() {
@@ -234,7 +235,7 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 			systemInstruction = m.Content
 			continue
 		}
-		
+
 		if m.Role == RoleTool || m.ToolCallID != "" {
 			// Encode tool result
 			var resultObj any
@@ -274,7 +275,7 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 				})
 			}
 			contents = append(contents, map[string]any{
-				"role": "model",
+				"role":  "model",
 				"parts": parts,
 			})
 			continue
@@ -284,7 +285,7 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 		if m.Role == RoleAssistant {
 			role = "model"
 		}
-		
+
 		parts := make([]map[string]any, 0)
 		if len(m.MultiContent) > 0 {
 			for _, p := range m.MultiContent {

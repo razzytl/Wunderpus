@@ -152,6 +152,8 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		return nil, err
 	}
 
+	// Response body is closed by the goroutine below (defer resp.Body.Close())
+	//nolint:bodyclose
 	resp, err := RetryDo(ctx, o.client, httpReq, DefaultRetryOptions) // Stream still uses standard request, but RetryDo might need adjustment for live streams. For now, we only retry the connection.
 	if err != nil {
 		return nil, err

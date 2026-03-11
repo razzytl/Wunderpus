@@ -181,11 +181,12 @@ func (a *Anthropic) Stream(ctx context.Context, req *CompletionRequest) (<-chan 
 		return nil, err
 	}
 
+	// Response body is closed by the goroutine below (defer resp.Body.Close())
+	//nolint:bodyclose
 	resp, err := RetryDo(ctx, a.client, httpReq, DefaultRetryOptions)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	// Wrap body in size limit
 	resp.Body = LimitResponseReader(resp.Body)
@@ -248,8 +249,8 @@ func (a *Anthropic) createRequest(ctx context.Context, body map[string]any) (*ht
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", a.apiKey)
-	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	httpReq.Header.Set("X-Api-Key", a.apiKey)
+	httpReq.Header.Set("Anthropic-Version", "2023-06-01")
 
 	return httpReq, nil
 }
@@ -277,9 +278,9 @@ func toAnthropicMessages(msgs []Message) []map[string]any {
 				"role": "user",
 				"content": []map[string]any{
 					{
-						"type":         "tool_result",
-						"tool_use_id":  m.ToolCallID,
-						"content":      m.Content,
+						"type":        "tool_result",
+						"tool_use_id": m.ToolCallID,
+						"content":     m.Content,
 					},
 				},
 			})
@@ -373,8 +374,8 @@ func toAnthropicTools(tools []ToolSchema) []map[string]any {
 		var inputSchema map[string]any
 		_ = json.Unmarshal(t.Function.Parameters, &inputSchema)
 		out[i] = map[string]any{
-			"name":        t.Function.Name,
-			"description": t.Function.Description,
+			"name":         t.Function.Name,
+			"description":  t.Function.Description,
 			"input_schema": inputSchema,
 		}
 	}

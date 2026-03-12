@@ -43,7 +43,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          install-mode: from-source
+          install-mode: goinstall
 
   test:
     runs-on: ubuntu-latest

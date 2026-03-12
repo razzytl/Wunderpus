@@ -42,7 +42,7 @@ jobs:
       - name: Disable Go toolchain auto-download
         run: echo "GOTOOLCHAIN=local" >> $GITHUB_ENV
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
 

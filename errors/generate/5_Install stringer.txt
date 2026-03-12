@@ -1,0 +1,9 @@
+﻿2026-03-12T02:40:20.9533864Z ##[group]Run go install golang.org/x/tools/cmd/stringer@latest
+2026-03-12T02:40:20.9534377Z [36;1mgo install golang.org/x/tools/cmd/stringer@latest[0m
+2026-03-12T02:40:20.9588187Z shell: /usr/bin/bash -e {0}
+2026-03-12T02:40:20.9588539Z env:
+2026-03-12T02:40:20.9588750Z   GOTOOLCHAIN: local
+2026-03-12T02:40:20.9589004Z ##[endgroup]
+2026-03-12T02:40:21.0588808Z go: downloading golang.org/x/tools v0.42.0
+2026-03-12T02:40:21.9580844Z go: downloading golang.org/x/sync v0.19.0
+2026-03-12T02:40:22.1573732Z go: downloading golang.org/x/mod v0.33.0

@@ -1,0 +1,209 @@
+﻿2026-03-12T02:40:11.4115151Z Current runner version: '2.332.0'
+2026-03-12T02:40:11.4158640Z ##[group]Runner Image Provisioner
+2026-03-12T02:40:11.4160051Z Hosted Compute Agent
+2026-03-12T02:40:11.4161010Z Version: 20260213.493
+2026-03-12T02:40:11.4162096Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-03-12T02:40:11.4163460Z Build Date: 2026-02-13T00:28:41Z
+2026-03-12T02:40:11.4164550Z Worker ID: {6488d11c-f46c-4820-8ac2-77c3660790d6}
+2026-03-12T02:40:11.4165858Z Azure Region: northcentralus
+2026-03-12T02:40:11.4166854Z ##[endgroup]
+2026-03-12T02:40:11.4169431Z ##[group]Operating System
+2026-03-12T02:40:11.4170326Z Ubuntu
+2026-03-12T02:40:11.4171229Z 24.04.3
+2026-03-12T02:40:11.4171980Z LTS
+2026-03-12T02:40:11.4172699Z ##[endgroup]
+2026-03-12T02:40:11.4173770Z ##[group]Runner Image
+2026-03-12T02:40:11.4174703Z Image: ubuntu-24.04
+2026-03-12T02:40:11.4200026Z Version: 20260302.42.1
+2026-03-12T02:40:11.4202188Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260302.42/images/ubuntu/Ubuntu2404-Readme.md
+2026-03-12T02:40:11.4204674Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260302.42
+2026-03-12T02:40:11.4206410Z ##[endgroup]
+2026-03-12T02:40:11.4208832Z ##[group]GITHUB_TOKEN Permissions
+2026-03-12T02:40:11.4212194Z Contents: read
+2026-03-12T02:40:11.4213081Z Metadata: read
+2026-03-12T02:40:11.4214009Z Packages: read
+2026-03-12T02:40:11.4214914Z ##[endgroup]
+2026-03-12T02:40:11.4218528Z Secret source: Actions
+2026-03-12T02:40:11.4220002Z Prepare workflow directory
+2026-03-12T02:40:11.4886739Z Prepare all required actions
+2026-03-12T02:40:11.4943504Z Getting action download info
+2026-03-12T02:40:11.9512930Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-03-12T02:40:12.1088375Z Download action repository 'actions/setup-go@v5' (SHA:40f1582b2485089dde7abd97c1529aa768e1baff)
+2026-03-12T02:40:12.6794546Z Complete job name: generate
+2026-03-12T02:40:12.7494436Z ##[group]Run actions/checkout@v4
+2026-03-12T02:40:12.7495259Z with:
+2026-03-12T02:40:12.7495690Z   repository: razzytl/Wonderpus
+2026-03-12T02:40:12.7496329Z   token: ***
+2026-03-12T02:40:12.7496728Z   ssh-strict: true
+2026-03-12T02:40:12.7497120Z   ssh-user: git
+2026-03-12T02:40:12.7497528Z   persist-credentials: true
+2026-03-12T02:40:12.7498152Z   clean: true
+2026-03-12T02:40:12.7498562Z   sparse-checkout-cone-mode: true
+2026-03-12T02:40:12.7499038Z   fetch-depth: 1
+2026-03-12T02:40:12.7499428Z   fetch-tags: false
+2026-03-12T02:40:12.7499839Z   show-progress: true
+2026-03-12T02:40:12.7500246Z   lfs: false
+2026-03-12T02:40:12.7500626Z   submodules: false
+2026-03-12T02:40:12.7501039Z   set-safe-directory: true
+2026-03-12T02:40:12.7501734Z ##[endgroup]
+2026-03-12T02:40:12.8680487Z Syncing repository: razzytl/Wonderpus
+2026-03-12T02:40:12.8683235Z ##[group]Getting Git version info
+2026-03-12T02:40:12.8684684Z Working directory is '/home/runner/work/Wonderpus/Wonderpus'
+2026-03-12T02:40:12.8698846Z [command]/usr/bin/git version
+2026-03-12T02:40:12.8760267Z git version 2.53.0
+2026-03-12T02:40:12.8789519Z ##[endgroup]
+2026-03-12T02:40:12.8805965Z Temporarily overriding HOME='/home/runner/work/_temp/e38f7dd8-678f-434c-ace8-66f11922d867' before making global git config changes
+2026-03-12T02:40:12.8809898Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-12T02:40:12.8825940Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Wonderpus/Wonderpus
+2026-03-12T02:40:12.8869543Z Deleting the contents of '/home/runner/work/Wonderpus/Wonderpus'
+2026-03-12T02:40:12.8873593Z ##[group]Initializing the repository
+2026-03-12T02:40:12.8878463Z [command]/usr/bin/git init /home/runner/work/Wonderpus/Wonderpus
+2026-03-12T02:40:12.8991208Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-03-12T02:40:12.8995765Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-03-12T02:40:12.9000351Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-03-12T02:40:12.9002139Z hint: call:
+2026-03-12T02:40:12.9002822Z hint:
+2026-03-12T02:40:12.9003659Z hint: 	git config --global init.defaultBranch <name>
+2026-03-12T02:40:12.9005288Z hint:
+2026-03-12T02:40:12.9006257Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-03-12T02:40:12.9008055Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-03-12T02:40:12.9009294Z hint:
+2026-03-12T02:40:12.9009992Z hint: 	git branch -m <name>
+2026-03-12T02:40:12.9010777Z hint:
+2026-03-12T02:40:12.9011856Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-03-12T02:40:12.9013613Z Initialized empty Git repository in /home/runner/work/Wonderpus/Wonderpus/.git/
+2026-03-12T02:40:12.9017003Z [command]/usr/bin/git remote add origin https://github.com/razzytl/Wonderpus
+2026-03-12T02:40:12.9053149Z ##[endgroup]
+2026-03-12T02:40:12.9054402Z ##[group]Disabling automatic garbage collection
+2026-03-12T02:40:12.9058280Z [command]/usr/bin/git config --local gc.auto 0
+2026-03-12T02:40:12.9092269Z ##[endgroup]
+2026-03-12T02:40:12.9093447Z ##[group]Setting up auth
+2026-03-12T02:40:12.9099924Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-12T02:40:12.9135524Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-12T02:40:12.9508617Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-12T02:40:12.9544955Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-12T02:40:12.9813695Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-12T02:40:12.9849066Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-12T02:40:13.0124516Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-03-12T02:40:13.0166237Z ##[endgroup]
+2026-03-12T02:40:13.0168501Z ##[group]Fetching the repository
+2026-03-12T02:40:13.0176572Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +d84f69b25132083447001f0e2fdd329f079bfb8a:refs/remotes/origin/main
+2026-03-12T02:40:13.5472396Z From https://github.com/razzytl/Wonderpus
+2026-03-12T02:40:13.5488518Z  * [new ref]         d84f69b25132083447001f0e2fdd329f079bfb8a -> origin/main
+2026-03-12T02:40:13.5526489Z ##[endgroup]
+2026-03-12T02:40:13.5529614Z ##[group]Determining the checkout info
+2026-03-12T02:40:13.5531272Z ##[endgroup]
+2026-03-12T02:40:13.5532649Z [command]/usr/bin/git sparse-checkout disable
+2026-03-12T02:40:13.5619471Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-03-12T02:40:13.5671191Z ##[group]Checking out the ref
+2026-03-12T02:40:13.5673122Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-03-12T02:40:13.6384883Z Switched to a new branch 'main'
+2026-03-12T02:40:13.6417583Z branch 'main' set up to track 'origin/main'.
+2026-03-12T02:40:13.6420658Z ##[endgroup]
+2026-03-12T02:40:13.6463534Z [command]/usr/bin/git log -1 --format=%H
+2026-03-12T02:40:13.6486335Z d84f69b25132083447001f0e2fdd329f079bfb8a
+2026-03-12T02:40:13.6760596Z ##[group]Run actions/setup-go@v5
+2026-03-12T02:40:13.6761184Z with:
+2026-03-12T02:40:13.6761578Z   go-version: 1.24
+2026-03-12T02:40:13.6762004Z   check-latest: false
+2026-03-12T02:40:13.6762605Z   token: ***
+2026-03-12T02:40:13.6763006Z   cache: true
+2026-03-12T02:40:13.6763404Z ##[endgroup]
+2026-03-12T02:40:13.8587857Z Setup go version spec 1.24
+2026-03-12T02:40:13.8997388Z Found in cache @ /opt/hostedtoolcache/go/1.24.13/x64
+2026-03-12T02:40:13.9003800Z Added go to the path
+2026-03-12T02:40:13.9010160Z Successfully set up Go version 1.24
+2026-03-12T02:40:19.2781675Z go: downloading go1.25.0 (linux/amd64)
+2026-03-12T02:40:19.3005011Z [command]/opt/hostedtoolcache/go/1.24.13/x64/bin/go env GOMODCACHE
+2026-03-12T02:40:19.3057919Z [command]/opt/hostedtoolcache/go/1.24.13/x64/bin/go env GOCACHE
+2026-03-12T02:40:19.3165787Z /home/runner/go/pkg/mod
+2026-03-12T02:40:19.3204098Z /home/runner/.cache/go-build
+2026-03-12T02:40:19.5248587Z Cache is not found
+2026-03-12T02:40:19.5342904Z go version go1.25.0 linux/amd64
+2026-03-12T02:40:19.5343377Z 
+2026-03-12T02:40:19.5579026Z ##[group]go env
+2026-03-12T02:40:20.9124073Z AR='ar'
+2026-03-12T02:40:20.9146028Z CC='gcc'
+2026-03-12T02:40:20.9147181Z CGO_CFLAGS='-O2 -g'
+2026-03-12T02:40:20.9148716Z CGO_CPPFLAGS=''
+2026-03-12T02:40:20.9149416Z CGO_CXXFLAGS='-O2 -g'
+2026-03-12T02:40:20.9150138Z CGO_ENABLED='1'
+2026-03-12T02:40:20.9150860Z CGO_FFLAGS='-O2 -g'
+2026-03-12T02:40:20.9151554Z CGO_LDFLAGS='-O2 -g'
+2026-03-12T02:40:20.9152697Z CXX='g++'
+2026-03-12T02:40:20.9153515Z GCCGO='gccgo'
+2026-03-12T02:40:20.9154389Z GO111MODULE=''
+2026-03-12T02:40:20.9155279Z GOAMD64='v1'
+2026-03-12T02:40:20.9155880Z GOARCH='amd64'
+2026-03-12T02:40:20.9156506Z GOAUTH='netrc'
+2026-03-12T02:40:20.9157150Z GOBIN=''
+2026-03-12T02:40:20.9158240Z GOCACHE='/home/runner/.cache/go-build'
+2026-03-12T02:40:20.9159132Z GOCACHEPROG=''
+2026-03-12T02:40:20.9159826Z GODEBUG=''
+2026-03-12T02:40:20.9160876Z GOENV='/home/runner/.config/go/env'
+2026-03-12T02:40:20.9166459Z GOEXE=''
+2026-03-12T02:40:20.9169344Z GOEXPERIMENT=''
+2026-03-12T02:40:20.9169756Z GOFIPS140='off'
+2026-03-12T02:40:20.9170136Z GOFLAGS=''
+2026-03-12T02:40:20.9171457Z GOGCCFLAGS='-fPIC -m64 -pthread -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=/tmp/go-build3236195795=/tmp/go-build -gno-record-gcc-switches'
+2026-03-12T02:40:20.9172644Z GOHOSTARCH='amd64'
+2026-03-12T02:40:20.9172997Z GOHOSTOS='linux'
+2026-03-12T02:40:20.9173294Z GOINSECURE=''
+2026-03-12T02:40:20.9173762Z GOMOD='/home/runner/work/Wonderpus/Wonderpus/go.mod'
+2026-03-12T02:40:20.9174331Z GOMODCACHE='/home/runner/go/pkg/mod'
+2026-03-12T02:40:20.9174735Z GONOPROXY=''
+2026-03-12T02:40:20.9175021Z GONOSUMDB=''
+2026-03-12T02:40:20.9175293Z GOOS='linux'
+2026-03-12T02:40:20.9175602Z GOPATH='/home/runner/go'
+2026-03-12T02:40:20.9176039Z GOPRIVATE=''
+2026-03-12T02:40:20.9176552Z GOPROXY='https://proxy.golang.org,direct'
+2026-03-12T02:40:20.9177438Z GOROOT='/home/runner/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64'
+2026-03-12T02:40:20.9178371Z GOSUMDB='sum.golang.org'
+2026-03-12T02:40:20.9178716Z GOTELEMETRY='local'
+2026-03-12T02:40:20.9179203Z GOTELEMETRYDIR='/home/runner/.config/go/telemetry'
+2026-03-12T02:40:20.9179824Z GOTMPDIR=''
+2026-03-12T02:40:20.9180173Z GOTOOLCHAIN='auto'
+2026-03-12T02:40:20.9180945Z GOTOOLDIR='/home/runner/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-amd64/pkg/tool/linux_amd64'
+2026-03-12T02:40:20.9181764Z GOVCS=''
+2026-03-12T02:40:20.9182053Z GOVERSION='go1.25.0'
+2026-03-12T02:40:20.9182462Z GOWORK='/home/runner/work/Wonderpus/Wonderpus/go.work'
+2026-03-12T02:40:20.9183040Z PKG_CONFIG='pkg-config'
+2026-03-12T02:40:20.9183262Z 
+2026-03-12T02:40:20.9183910Z ##[endgroup]
+2026-03-12T02:40:20.9313226Z ##[group]Run echo "GOTOOLCHAIN=local" >> $GITHUB_ENV
+2026-03-12T02:40:20.9313958Z [36;1mecho "GOTOOLCHAIN=local" >> $GITHUB_ENV[0m
+2026-03-12T02:40:20.9378443Z shell: /usr/bin/bash -e {0}
+2026-03-12T02:40:20.9378776Z ##[endgroup]
+2026-03-12T02:40:20.9533891Z ##[group]Run go install golang.org/x/tools/cmd/stringer@latest
+2026-03-12T02:40:20.9534382Z [36;1mgo install golang.org/x/tools/cmd/stringer@latest[0m
+2026-03-12T02:40:20.9588219Z shell: /usr/bin/bash -e {0}
+2026-03-12T02:40:20.9588543Z env:
+2026-03-12T02:40:20.9588754Z   GOTOOLCHAIN: local
+2026-03-12T02:40:20.9589008Z ##[endgroup]
+2026-03-12T02:40:21.0588877Z go: downloading golang.org/x/tools v0.42.0
+2026-03-12T02:40:21.9580890Z go: downloading golang.org/x/sync v0.19.0
+2026-03-12T02:40:22.1573915Z go: downloading golang.org/x/mod v0.33.0
+2026-03-12T02:40:37.6627889Z ##[group]Run go generate ./...
+2026-03-12T02:40:37.6628447Z [36;1mgo generate ./...[0m
+2026-03-12T02:40:37.6680636Z shell: /usr/bin/bash -e {0}
+2026-03-12T02:40:37.6680868Z env:
+2026-03-12T02:40:37.6681036Z   GOTOOLCHAIN: local
+2026-03-12T02:40:37.6681226Z ##[endgroup]
+2026-03-12T02:40:37.6993472Z go: go.work requires go >= 1.25.0 (running go 1.24.13; GOTOOLCHAIN=local)
+2026-03-12T02:40:37.7014177Z ##[error]Process completed with exit code 1.
+2026-03-12T02:40:37.7140651Z Post job cleanup.
+2026-03-12T02:40:37.8179830Z [command]/usr/bin/git version
+2026-03-12T02:40:37.8224657Z git version 2.53.0
+2026-03-12T02:40:37.8276491Z Temporarily overriding HOME='/home/runner/work/_temp/b2bd4767-bb9a-4686-b4e9-6751892a6027' before making global git config changes
+2026-03-12T02:40:37.8278873Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-12T02:40:37.8284586Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Wonderpus/Wonderpus
+2026-03-12T02:40:37.8332471Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-12T02:40:37.8372763Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-12T02:40:37.8658276Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-12T02:40:37.8707083Z http.https://github.com/.extraheader
+2026-03-12T02:40:37.8740718Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-03-12T02:40:37.8820391Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-12T02:40:37.9243504Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-12T02:40:37.9303072Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-12T02:40:37.9861468Z Cleaning up orphan processes
+2026-03-12T02:40:38.0220480Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-go@v5. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

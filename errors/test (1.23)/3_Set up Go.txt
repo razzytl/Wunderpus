@@ -1,0 +1,17 @@
+﻿2026-03-12T02:40:14.2581705Z ##[group]Run actions/setup-go@v5
+2026-03-12T02:40:14.2582921Z with:
+2026-03-12T02:40:14.2583759Z   go-version: 1.23
+2026-03-12T02:40:14.2584677Z   cache: true
+2026-03-12T02:40:14.2585571Z   check-latest: false
+2026-03-12T02:40:14.2586860Z   token: ***
+2026-03-12T02:40:14.2587726Z ##[endgroup]
+2026-03-12T02:40:14.4525253Z Setup go version spec 1.23
+2026-03-12T02:40:14.4628455Z Found in cache @ /opt/hostedtoolcache/go/1.23.12/x64
+2026-03-12T02:40:14.4632811Z Added go to the path
+2026-03-12T02:40:14.4637121Z Successfully set up Go version 1.23
+2026-03-12T02:40:19.9909759Z go: downloading go1.25.0 (linux/amd64)
+2026-03-12T02:40:20.0093940Z [command]/opt/hostedtoolcache/go/1.23.12/x64/bin/go env GOMODCACHE
+2026-03-12T02:40:20.0139847Z [command]/opt/hostedtoolcache/go/1.23.12/x64/bin/go env GOCACHE
+2026-03-12T02:40:20.0210278Z /home/runner/go/pkg/mod
+2026-03-12T02:40:20.0258256Z /home/runner/.cache/go-build
+2026-03-12T02:40:20.2156061Z ##[error]The operation was canceled.

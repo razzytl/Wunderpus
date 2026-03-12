@@ -1,0 +1,72 @@
+﻿2026-03-12T02:40:12.7494405Z ##[group]Run actions/checkout@v4
+2026-03-12T02:40:12.7495250Z with:
+2026-03-12T02:40:12.7495686Z   repository: razzytl/Wonderpus
+2026-03-12T02:40:12.7496325Z   token: ***
+2026-03-12T02:40:12.7496725Z   ssh-strict: true
+2026-03-12T02:40:12.7497117Z   ssh-user: git
+2026-03-12T02:40:12.7497525Z   persist-credentials: true
+2026-03-12T02:40:12.7498148Z   clean: true
+2026-03-12T02:40:12.7498558Z   sparse-checkout-cone-mode: true
+2026-03-12T02:40:12.7499035Z   fetch-depth: 1
+2026-03-12T02:40:12.7499425Z   fetch-tags: false
+2026-03-12T02:40:12.7499830Z   show-progress: true
+2026-03-12T02:40:12.7500243Z   lfs: false
+2026-03-12T02:40:12.7500623Z   submodules: false
+2026-03-12T02:40:12.7501036Z   set-safe-directory: true
+2026-03-12T02:40:12.7501726Z ##[endgroup]
+2026-03-12T02:40:12.8680426Z Syncing repository: razzytl/Wonderpus
+2026-03-12T02:40:12.8683212Z ##[group]Getting Git version info
+2026-03-12T02:40:12.8684668Z Working directory is '/home/runner/work/Wonderpus/Wonderpus'
+2026-03-12T02:40:12.8698733Z [command]/usr/bin/git version
+2026-03-12T02:40:12.8760241Z git version 2.53.0
+2026-03-12T02:40:12.8789493Z ##[endgroup]
+2026-03-12T02:40:12.8805936Z Temporarily overriding HOME='/home/runner/work/_temp/e38f7dd8-678f-434c-ace8-66f11922d867' before making global git config changes
+2026-03-12T02:40:12.8809874Z Adding repository directory to the temporary git global config as a safe directory
+2026-03-12T02:40:12.8825913Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Wonderpus/Wonderpus
+2026-03-12T02:40:12.8869513Z Deleting the contents of '/home/runner/work/Wonderpus/Wonderpus'
+2026-03-12T02:40:12.8873568Z ##[group]Initializing the repository
+2026-03-12T02:40:12.8878438Z [command]/usr/bin/git init /home/runner/work/Wonderpus/Wonderpus
+2026-03-12T02:40:12.8991185Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-03-12T02:40:12.8995740Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-03-12T02:40:12.9000291Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-03-12T02:40:12.9002119Z hint: call:
+2026-03-12T02:40:12.9002814Z hint:
+2026-03-12T02:40:12.9003643Z hint: 	git config --global init.defaultBranch <name>
+2026-03-12T02:40:12.9005262Z hint:
+2026-03-12T02:40:12.9006249Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-03-12T02:40:12.9008044Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-03-12T02:40:12.9009278Z hint:
+2026-03-12T02:40:12.9009980Z hint: 	git branch -m <name>
+2026-03-12T02:40:12.9010767Z hint:
+2026-03-12T02:40:12.9011836Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-03-12T02:40:12.9013594Z Initialized empty Git repository in /home/runner/work/Wonderpus/Wonderpus/.git/
+2026-03-12T02:40:12.9016986Z [command]/usr/bin/git remote add origin https://github.com/razzytl/Wonderpus
+2026-03-12T02:40:12.9053126Z ##[endgroup]
+2026-03-12T02:40:12.9054372Z ##[group]Disabling automatic garbage collection
+2026-03-12T02:40:12.9058253Z [command]/usr/bin/git config --local gc.auto 0
+2026-03-12T02:40:12.9092243Z ##[endgroup]
+2026-03-12T02:40:12.9093425Z ##[group]Setting up auth
+2026-03-12T02:40:12.9099898Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-03-12T02:40:12.9135490Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-03-12T02:40:12.9508518Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-03-12T02:40:12.9544919Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-03-12T02:40:12.9813104Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-03-12T02:40:12.9849036Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-03-12T02:40:13.0124443Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-03-12T02:40:13.0166194Z ##[endgroup]
+2026-03-12T02:40:13.0168476Z ##[group]Fetching the repository
+2026-03-12T02:40:13.0176542Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +d84f69b25132083447001f0e2fdd329f079bfb8a:refs/remotes/origin/main
+2026-03-12T02:40:13.5472088Z From https://github.com/razzytl/Wonderpus
+2026-03-12T02:40:13.5488486Z  * [new ref]         d84f69b25132083447001f0e2fdd329f079bfb8a -> origin/main
+2026-03-12T02:40:13.5526462Z ##[endgroup]
+2026-03-12T02:40:13.5529584Z ##[group]Determining the checkout info
+2026-03-12T02:40:13.5531252Z ##[endgroup]
+2026-03-12T02:40:13.5532622Z [command]/usr/bin/git sparse-checkout disable
+2026-03-12T02:40:13.5619389Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-03-12T02:40:13.5671159Z ##[group]Checking out the ref
+2026-03-12T02:40:13.5673102Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-03-12T02:40:13.6384768Z Switched to a new branch 'main'
+2026-03-12T02:40:13.6417498Z branch 'main' set up to track 'origin/main'.
+2026-03-12T02:40:13.6420640Z ##[endgroup]
+2026-03-12T02:40:13.6463485Z [command]/usr/bin/git log -1 --format=%H
+2026-03-12T02:40:13.6486301Z d84f69b25132083447001f0e2fdd329f079bfb8a

@@ -1,8 +1,0 @@
-﻿2026-03-12T02:40:37.6627873Z ##[group]Run go generate ./...
-2026-03-12T02:40:37.6628443Z [36;1mgo generate ./...[0m
-2026-03-12T02:40:37.6680630Z shell: /usr/bin/bash -e {0}
-2026-03-12T02:40:37.6680866Z env:
-2026-03-12T02:40:37.6681027Z   GOTOOLCHAIN: local
-2026-03-12T02:40:37.6681223Z ##[endgroup]
-2026-03-12T02:40:37.6993441Z go: go.work requires go >= 1.25.0 (running go 1.24.13; GOTOOLCHAIN=local)
-2026-03-12T02:40:37.7014158Z ##[error]Process completed with exit code 1.

@@ -1,8 +1,0 @@
-﻿2026-03-12T02:40:17.5320910Z ##[group]Run go test -v -coverprofile=coverage.out ./...
-2026-03-12T02:40:17.5321332Z [36;1mgo test -v -coverprofile=coverage.out ./...[0m
-2026-03-12T02:40:17.5366022Z shell: /usr/bin/bash -e {0}
-2026-03-12T02:40:17.5366274Z env:
-2026-03-12T02:40:17.5366441Z   GOTOOLCHAIN: local
-2026-03-12T02:40:17.5366644Z ##[endgroup]
-2026-03-12T02:40:17.5468135Z go: go.work requires go >= 1.25.0 (running go 1.24.13; GOTOOLCHAIN=local)
-2026-03-12T02:40:17.5492140Z ##[error]Process completed with exit code 1.

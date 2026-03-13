@@ -67,6 +67,10 @@ var defaultDenyPatterns = []*regexp.Regexp{
 	// Pipe curl/wget to shell (common attack vector)
 	regexp.MustCompile(`\bcurl\b.*\|\s*(sh|bash)`),
 	regexp.MustCompile(`\bwget\b.*\|\s*(sh|bash)`),
+	// Sensitive file reads (direct file reads, not just command substitution)
+	regexp.MustCompile(`\bcat\b\s+/etc/(passwd|shadow|group|sudoers|gshadow)`),
+	regexp.MustCompile(`\bcat\b\s+/Windows/System32/(config|SAM|system)`),
+	regexp.MustCompile(`\btype\b\s+C:\\Windows\\System32\\(config|SAM|system)`),
 	// Package managers
 	regexp.MustCompile(`\bnpm\s+install\s+-g\b`),
 	regexp.MustCompile(`\bpip\s+install\s+--user\b`),

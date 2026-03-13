@@ -1,0 +1,441 @@
+ Running [/home/runner/go/bin/golangci-lint config path] in [/home/runner/work/Wonderpus/Wonderpus] ...
+  Running [/home/runner/go/bin/golangci-lint config verify] in [/home/runner/work/Wonderpus/Wonderpus] ...
+  Running [/home/runner/go/bin/golangci-lint run] in [/home/runner/work/Wonderpus/Wonderpus] ...
+  Error: internal/tui/markdown.go:9:2: var `mdWidth` is unused (unused)
+  	mdWidth int
+  	^
+  Error: internal/tui/tui.go:67:2: field `suggestion` is unused (unused)
+  	suggestion      string
+  	^
+  Error: internal/channel/whatsapp/whatsapp.go:25:2: field `qrChan` is unused (unused)
+  	qrChan      <-chan whatsmeow.QRChannelItem
+  	^
+  Error: internal/channel/discord/discord.go:10:1: File is not properly formatted (gci)
+  	"github.com/bwmarrin/discordgo"
+  ^
+  Error: internal/channel/slack/slack.go:11:1: File is not properly formatted (gci)
+  	"github.com/slack-go/slack/socketmode"
+  ^
+  Error: internal/channel/telegram/telegram.go:12:1: File is not properly formatted (gci)
+  	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+  ^
+  Error: internal/channel/websocket/server.go:12:1: File is not properly formatted (gci)
+  	"github.com/gorilla/websocket"
+  ^
+  Error: internal/channel/whatsapp/whatsapp.go:10:1: File is not properly formatted (gci)
+  	"github.com/wunderpus/wunderpus/internal/agent"
+  ^
+  Error: internal/app/onboard.go:9:1: File is not properly formatted (gci)
+  	"github.com/wunderpus/wunderpus/internal/config"
+  ^
+  Error: internal/tui/tui.go:12:1: File is not properly formatted (gci)
+  	"github.com/charmbracelet/lipgloss"
+  ^
+  Error: cmd/wunderpus/main.go:12:1: File is not properly formatted (gci)
+  	"github.com/spf13/cobra"
+  ^
+  Error: internal/agent/context.go:6:1: File is not properly formatted (gci)
+  	"github.com/pkoukk/tiktoken-go"
+  ^
+  Error: internal/cost/tracker.go:9:1: File is not properly formatted (gci)
+  	"github.com/wunderpus/wunderpus/internal/logging"
+  ^
+  Error: internal/memory/store.go:8:1: File is not properly formatted (gci)
+  
+  ^
+  Error: internal/subagent/manager.go:10:1: File is not properly formatted (gci)
+  	"github.com/google/uuid"
+  ^
+  Error: internal/channel/feishu/feishu.go:51:1: File is not properly formatted (gofmt)
+  	var payload map[string]interface{}
+  ^
+  Error: internal/channel/whatsapp/whatsapp.go:97:1: File is not properly formatted (gofmt)
+  func (c *Channel) eventHandler(evt interface{}) {
+  ^
+  Error: internal/channel/feishu/feishu.go:105:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/tui/markdown.go:8:1: File is not properly formatted (gofumpt)
+  var (
+  ^
+  Error: cmd/wunderpus/main.go:189:1: File is not properly formatted (gofumpt)
+  		f, err := os.OpenFile(heartbeatPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+  ^
+  Error: internal/channel/dingtalk/dingtalk.go:150:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/channel/onebot/onebot.go:124:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/channel/qq/qq.go:150:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/channel/wecom/wecom.go:199:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/agent/orchestrator.go:89:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/agent/orchestrator.go:101:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/channel/channel.go:22:1: File is not properly formatted (gofumpt)
+  type UserMessage = types.UserMessage
+  ^
+  Error: internal/config/config.go:478:1: File is not properly formatted (gofumpt)
+  		if err := os.MkdirAll(dir, 0755); err != nil {
+  ^
+  Error: internal/config/config.go:483:1: File is not properly formatted (gofumpt)
+  	if err := os.WriteFile(path, data, 0644); err != nil {
+  ^
+  Error: internal/heartbeat/parser_test.go:26:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:65:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte("# Empty"), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:97:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:131:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:157:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte("# Test"), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:186:1: File is not properly formatted (gofumpt)
+  	err := os.MkdirAll(wunderpusDir, 0755)
+  ^
+  Error: internal/heartbeat/parser_test.go:192:1: File is not properly formatted (gofumpt)
+  	err = os.WriteFile(heartbeatFile, []byte("# Test"), 0644)
+  ^
+  Error: internal/heartbeat/parser_test.go:272:1: File is not properly formatted (gofumpt)
+  	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+  ^
+  Error: internal/provider/router_test.go:181:1: File is not properly formatted (gofumpt)
+  
+  ^
+  Error: internal/security/workspace.go:35:1: File is not properly formatted (gofumpt)
+  		if err := os.MkdirAll(ws.workspace, 0755); err != nil {
+  ^
+  Error: internal/skills/clawhub_registry.go:365:1: File is not properly formatted (gofumpt)
+  			if err := os.MkdirAll(targetPath, 0755); err != nil {
+  ^
+  Error: internal/skills/clawhub_registry.go:372:1: File is not properly formatted (gofumpt)
+  		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+  ^
+  Error: internal/skills/installer_test.go:32:1: File is not properly formatted (gofumpt)
+  	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
+  ^
+  Error: internal/skills/installer_test.go:73:1: File is not properly formatted (gofumpt)
+  	if err := os.MkdirAll(skillDir, 0755); err != nil {
+  ^
+  Error: internal/skills/installer_test.go:109:1: File is not properly formatted (gofumpt)
+  	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
+  ^
+  Error: internal/subagent/manager.go:266:1: File is not properly formatted (gofumpt)
+  }
+  ^
+  Error: internal/channel/websocket/server.go:116:3: S1000: should use for range instead of for { select {} } (gosimple)
+  		for {
+  		^
+  Error: internal/skills/loader.go:245:25: S1039: unnecessary use of fmt.Sprintf (gosimple)
+  		lines = append(lines, fmt.Sprintf("  <skill>"))
+  		                      ^
+  Error: internal/tool/executor_ext_test.go:12:15: nilness: impossible condition: non-nil == nil (govet)
+  	if analytics == nil {
+  	             ^
+  Error: internal/channel/telegram/telegram.go:103:7: shadow: declaration of "ctx" shadows declaration at line 41 (govet)
+  						ctx := logging.ContextWithCorrelation(context.Background(), cid)
+  						^
+  Error: internal/config/config.go:333:18: shadow: declaration of "err" shadows declaration at line 319 (govet)
+  					if altData, err := os.ReadFile(altPath); err == nil {
+  					            ^
+  Error: internal/skills/installer.go:104:9: shadow: declaration of "err" shadows declaration at line 92 (govet)
+  		if _, err := os.Stat(skillFile); err == nil {
+  		      ^
+  Error: internal/skills/installer.go:125:9: shadow: declaration of "err" shadows declaration at line 92 (govet)
+  		if _, err := os.Stat(skillDir); err == nil {
+  		      ^
+  Error: internal/skills/installer.go:131:5: shadow: declaration of "err" shadows declaration at line 92 (govet)
+  	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+  	   ^
+  Error: internal/skills/installer.go:144:5: shadow: declaration of "err" shadows declaration at line 92 (govet)
+  	if err := os.WriteFile(destSkillFile, skillContent, 0o600); err != nil {
+  	   ^
+  Error: internal/skills/installer.go:186:5: shadow: declaration of "err" shadows declaration at line 181 (govet)
+  	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+  	   ^
+  Error: internal/skills/installer_test.go:47:8: shadow: declaration of "err" shadows declaration at line 12 (govet)
+  	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
+  	      ^
+  Error: internal/skills/installer_test.go:76:5: shadow: declaration of "err" shadows declaration at line 63 (govet)
+  	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
+  	   ^
+  Error: internal/tui/log.go:160:4: unusedwrite: unused write to field Entries (govet)
+  	l.Entries = make([]LogEntry, 0)
+  	  ^
+  Error: internal/agent/agent_test.go:13:6: unusedwrite: unused write to field ctx (govet)
+  		ctx:       NewContextManager(4096, nil, "test", nil),
+  		   ^
+  Error: internal/channel/channel_test.go:31:35: unusedwrite: unused write to field name (govet)
+  	var _ Channel = &mockChannel{name: "test"}
+  	                                 ^
+  Error: internal/heartbeat/parser_test.go:245:32: unusedwrite: unused write to field QuickTasks (govet)
+  		QuickTasks:   []HeartbeatTask{},
+  		                             ^
+  Error: internal/heartbeat/parser_test.go:246:32: unusedwrite: unused write to field LongTasks (govet)
+  		LongTasks:    []HeartbeatTask{},
+  		                             ^
+  Error: internal/memory/memory_test.go:34:12: unusedwrite: unused write to field CreatedAt (govet)
+  		CreatedAt: time.Now(),
+  		         ^
+  Error: internal/memory/memory_test.go:35:12: unusedwrite: unused write to field UpdatedAt (govet)
+  		UpdatedAt: time.Now(),
+  		         ^
+  Error: internal/provider/completion_test.go:11:22: unusedwrite: unused write to field Messages (govet)
+  		Messages: []Message{},
+  		                   ^
+  Error: internal/provider/completion_test.go:22:8: unusedwrite: unused write to field Model (govet)
+  		Model:   "gpt-4",
+  		     ^
+  Error: internal/provider/completion_test.go:48:7: unusedwrite: unused write to field Type (govet)
+  		Type: "function",
+  		    ^
+  Error: internal/provider/cooldown_test.go:70:8: unusedwrite: unused write to field Model (govet)
+  		Model:    "gpt-4",
+  		     ^
+  Error: internal/provider/cooldown_test.go:71:8: unusedwrite: unused write to field Error (govet)
+  		Error:    nil,
+  		     ^
+  Error: internal/provider/cooldown_test.go:72:9: unusedwrite: unused write to field Reason (govet)
+  		Reason:   FailoverReasonTimeout,
+  		      ^
+  Error: internal/provider/cooldown_test.go:74:10: unusedwrite: unused write to field Skipped (govet)
+  		Skipped:  false,
+  		       ^
+  Error: internal/provider/cooldown_test.go:89:8: unusedwrite: unused write to field Model (govet)
+  		Model:    "gpt-4",
+  		     ^
+  Error: internal/provider/cooldown_test.go:90:30: unusedwrite: unused write to field Attempts (govet)
+  		Attempts: []FallbackAttempt{},
+  		                           ^
+  Error: internal/subagent/config_test.go:12:12: unusedwrite: unused write to field SessionID (govet)
+  		SessionID: "session-1",
+  		         ^
+  Error: internal/subagent/config_test.go:13:7: unusedwrite: unused write to field Task (govet)
+  		Task:      "test task",
+  		    ^
+  Error: internal/subagent/config_test.go:15:12: unusedwrite: unused write to field CreatedAt (govet)
+  		CreatedAt: now,
+  		         ^
+  Error: internal/subagent/config_test.go:16:12: unusedwrite: unused write to field StartedAt (govet)
+  		StartedAt: &now,
+  		         ^
+  Error: internal/types/conversation_test.go:11:10: unusedwrite: unused write to field Content (govet)
+  		Content: "Hello",
+  		       ^
+  Error: internal/types/conversation_test.go:21:7: unusedwrite: unused write to field Role (govet)
+  		Role:    "assistant",
+  		    ^
+  Error: internal/types/conversation_test.go:33:7: unusedwrite: unused write to field Role (govet)
+  		Role:      "user",
+  		    ^
+  Error: internal/types/conversation_test.go:34:10: unusedwrite: unused write to field Content (govet)
+  		Content:   "Hello",
+  		       ^
+  Error: internal/types/conversation_test.go:49:23: unusedwrite: unused write to field Messages (govet)
+  		Messages:  []Message{},
+  		                    ^
+  Error: internal/types/conversation_test.go:50:12: unusedwrite: unused write to field UpdatedAt (govet)
+  		UpdatedAt: now,
+  		         ^
+  Error: internal/types/conversation_test.go:68:5: unusedwrite: unused write to field ID (govet)
+  		ID:       "session-1",
+  		  ^
+  Error: internal/types/conversation_test.go:93:12: unusedwrite: unused write to field ChannelID (govet)
+  		ChannelID: "channel-456",
+  		         ^
+  Error: internal/types/types_test.go:12:12: unusedwrite: unused write to field Timestamp (govet)
+  		Timestamp: time.Now(),
+  		         ^
+  Error: internal/types/types_test.go:28:22: unusedwrite: unused write to field Messages (govet)
+  		Messages: []Message{},
+  		                   ^
+  Error: internal/types/types_test.go:44:5: unusedwrite: unused write to field ID (govet)
+  		ID:       "session-123",
+  		  ^
+  Error: internal/types/types_test.go:45:11: unusedwrite: unused write to field Provider (govet)
+  		Provider: "openai",
+  		        ^
+  Error: internal/types/types_test.go:46:8: unusedwrite: unused write to field Model (govet)
+  		Model:    "gpt-4",
+  		     ^
+  Error: internal/tui/tui.go:223:50: `cancelled` is a misspelling of `canceled` (misspell)
+  				m.appendChat(DimStyle.Render("  ↳ Response cancelled"))
+  				                                             ^
+  Error: internal/subagent/manager.go:23:28: `cancelled` is a misspelling of `canceled` (misspell)
+  	StatusCancelled Status = "cancelled"
+  	                          ^
+  Error: internal/subagent/manager.go:217:41: `cancelled` is a misspelling of `canceled` (misspell)
+  		return fmt.Errorf("subagent cannot be cancelled (status: %s)", sub.Status)
+  		                                      ^
+  Error: internal/subagent/manager.go:224:22: `cancelled` is a misspelling of `canceled` (misspell)
+  	slog.Info("subagent cancelled", "id", id[:8])
+  	                    ^
+  Error: internal/subagent/manager.go:295:4: `cancelled` is a misspelling of `canceled` (misspell)
+  		"cancelled": 0,
+  		 ^
+  Error: internal/subagent/manager.go:309:11: `cancelled` is a misspelling of `canceled` (misspell)
+  			stats["cancelled"]++
+  			       ^
+  Error: internal/subagent/config_test.go:37:22: `cancelled` is a misspelling of `canceled` (misspell)
+  		{StatusCancelled, "cancelled"},
+  		                   ^
+  Error: internal/subagent/manager_test.go:61:22: `cancelled` is a misspelling of `canceled` (misspell)
+  		{StatusCancelled, "cancelled"},
+  		                   ^
+  Error: internal/channel/wecom/wecom.go:137:43: the given struct should be annotated with the `json` tag (musttag)
+  	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+  	                                         ^
+  Error: internal/provider/cache.go:63:23: the given struct should be annotated with the `json` tag (musttag)
+  	b, _ := json.Marshal(req)
+  	                     ^
+  Error: internal/tui/forms.go:98:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/keybindings.go:45:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/keybindings.go:129:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/log.go:96:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/menu.go:63:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/notifications.go:93:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/progress.go:111:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/table.go:44:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/tui/table.go:57:2: Consider pre-allocating `cells` (prealloc)
+  	var cells []string
+  	^
+  Error: internal/tui/table.go:74:2: Consider pre-allocating `parts` (prealloc)
+  	var parts []string
+  	^
+  Error: internal/tui/table.go:86:2: Consider pre-allocating `cells` (prealloc)
+  	var cells []string
+  	^
+  Error: internal/tui/table.go:141:2: Consider pre-allocating `rows` (prealloc)
+  	var rows [][]string
+  	^
+  Error: internal/tool/mcp/server.go:22:2: Consider pre-allocating `response` (prealloc)
+  	var response []map[string]any
+  	^
+  Error: internal/provider/gemini.go:230:2: Consider pre-allocating `contents` (prealloc)
+  	var contents []map[string]any
+  	^
+  Error: internal/provider/ollama.go:105:2: Consider pre-allocating `toolCalls` (prealloc)
+  	var toolCalls []ToolCallInfo
+  	^
+  Error: internal/skills/loader.go:237:2: Consider pre-allocating `lines` (prealloc)
+  	var lines []string
+  	^
+  Error: internal/skills/registry.go:162:2: Consider pre-allocating `all` (prealloc)
+  	var all []SkillInfo
+  	^
+  Error: internal/security/sanitizer.go:119:47: param max has same name as predeclared identifier (predeclared)
+  func (s *Sanitizer) LimitLength(input string, max int) (string, bool) {
+                                                ^
+  Error: internal/skills/loader.go:341:6: function cap has same name as predeclared identifier (predeclared)
+  func cap(k string, v any) slog.Attr {
+       ^
+  Error: internal/tui/keybindings.go:15:6: the methods of "KeybindingsHelp" use pointer receiver and non-pointer receiver. (recvcheck)
+  type KeybindingsHelp struct {
+       ^
+  Error: internal/tui/progress.go:84:6: the methods of "MultiProgressModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type MultiProgressModel struct {
+       ^
+  Error: internal/tui/tree.go:39:6: the methods of "TreeModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type TreeModel struct {
+       ^
+  Error: internal/tui/boxes.go:19:6: the methods of "BoxModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type BoxModel struct {
+       ^
+  Error: internal/tui/notifications.go:31:6: the methods of "NotificationManager" use pointer receiver and non-pointer receiver. (recvcheck)
+  type NotificationManager struct {
+       ^
+  Error: internal/tui/tui.go:47:6: the methods of "Model" use pointer receiver and non-pointer receiver. (recvcheck)
+  type Model struct {
+       ^
+  Error: internal/tui/forms.go:16:6: the methods of "FormModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type FormModel struct {
+       ^
+  Error: internal/tui/log.go:29:6: the methods of "LogModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type LogModel struct {
+       ^
+  Error: internal/tui/menu.go:13:6: the methods of "MenuModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type MenuModel struct {
+       ^
+  Error: internal/tui/progress.go:11:6: the methods of "ProgressBarModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type ProgressBarModel struct {
+       ^
+  Error: internal/tui/table.go:18:6: the methods of "TableModel" use pointer receiver and non-pointer receiver. (recvcheck)
+  type TableModel struct {
+       ^
+  Error: internal/memory/vector.go:18:32: rows.Err must be checked (rowserrcheck)
+  	rows, err := s.db.QueryContext(ctx, `
+  	                              ^
+  Error: internal/provider/gemini.go:129:4: ST1003: var argsJson should be argsJSON (stylecheck)
+  			argsJson, _ := json.Marshal(p.FunctionCall.Args)
+  			^
+  Error: internal/provider/ollama.go:107:3: ST1003: var argsJson should be argsJSON (stylecheck)
+  		argsJson, _ := json.Marshal(tc.Function.Arguments)
+  		^
+  Error: internal/config/config_test.go:21:2: os.Setenv() can be replaced by `t.Setenv()` in TestApplyEnv (tenv)
+  	os.Setenv("WUNDERPUS_OPENAI_API_KEY", "test-key")
+  	^
+  Error: internal/config/config_test.go:180:2: os.Setenv() can be replaced by `t.Setenv()` in TestApplyEnvMultiple (tenv)
+  	os.Setenv("WUNDERPUS_OPENAI_API_KEY", "key1")
+  	^
+  Error: internal/config/config_test.go:181:2: os.Setenv() can be replaced by `t.Setenv()` in TestApplyEnvMultiple (tenv)
+  	os.Setenv("WUNDERPUS_ANTHROPIC_API_KEY", "key2")
+  	^
+  Error: internal/config/config_test.go:182:2: os.Setenv() can be replaced by `t.Setenv()` in TestApplyEnvMultiple (tenv)
+  	os.Setenv("WUNDERPUS_LOG_LEVEL", "debug")
+  	^
+  Error: internal/config/config_test.go:183:2: os.Setenv() can be replaced by `t.Setenv()` in TestApplyEnvMultiple (tenv)
+  	os.Setenv("WUNDERPUS_DEFAULT_PROVIDER", "anthropic")
+  	^
+  Error: internal/tui/tui.go:320:3: assigned to friendlyMsg, but reassigned without using the value (wastedassign)
+  		friendlyMsg := ""
+  		^
+  Error: internal/tui/tui.go:321:3: assigned to suggestion, but reassigned without using the value (wastedassign)
+  		suggestion := ""
+  		^
+  Error: internal/config/config.go:335:7: assigned to path, but never used afterwards (wastedassign)
+  						path = altPath
+  						^
+  Error: internal/security/workspace.go:60:2: assigned to absPath, but reassigned without using the value (wastedassign)
+  	absPath := path
+  	^
+  Error: internal/tui/tui.go:153:28: unnecessary leading newline (whitespace)
+  	switch msg := msg.(type) {
+  	                          ^
+  Error: internal/agent/orchestrator.go:102:5: unnecessary trailing newline (whitespace)
+  				}(t)
+  				^
+  
+  level=warning msg="The linter 'tenv' is deprecated (since v1.64.0) due to: Duplicate feature in another linter. Replaced by usetesting."
+  level=error msg="Timeout exceeded: try increasing it by passing --timeout option"
+  
+  Error: golangci-lint exit with code 4
+  Ran golangci-lint in 83854ms

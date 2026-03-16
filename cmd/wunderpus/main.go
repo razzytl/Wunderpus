@@ -13,11 +13,14 @@ import (
 	"github.com/wunderpus/wunderpus/internal/app"
 	"github.com/wunderpus/wunderpus/internal/skills"
 	"github.com/wunderpus/wunderpus/internal/tui"
+	"github.com/wunderpus/wunderpus/ui"
+	"github.com/wunderpus/wunderpus/web"
 )
 
 var (
 	configPath string
 	verbose    bool
+	runUI      bool
 )
 
 func main() {
@@ -45,6 +48,7 @@ func init() {
 	}
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", configPath, "path to config file (or set WUNDERPUS_CONFIG env var)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable debug logging")
+	rootCmd.PersistentFlags().BoolVar(&runUI, "ui", false, "Start the web UI server")
 
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(agentCmd)
@@ -307,6 +311,32 @@ func runAgent(cmd *cobra.Command, args []string) {
 	// Launch TUI
 	sessionID := "default_cli_session"
 	ag := application.Manager.GetAgent(sessionID)
+
+	if runUI {
+		fmt.Printf("[Wunderpus] Web UI starting on port 8080...\n")
+		appServer, err := web.NewServer(ui.DistFS, "dist", 8080, application.Manager)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error starting UI: %v\n", err)
+			os.Exit(1)
+		}
+		
+		go func() {
+			if err := appServer.Start(); err != nil {
+				fmt.Fprintf(os.Stderr, "Web server error: %v\n", err)
+			}
+		}()
+		
+		fmt.Printf("[Wunderpus] Web UI running at http://localhost:8080\n")
+		
+		// Wait for interrupt
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+		<-sigCh
+		
+		fmt.Println("Shutting down UI server...")
+		appServer.Stop()
+		return
+	}
 
 	if err := tui.Run(ag, application.MemoryStore); err != nil {
 		fmt.Fprintf(os.Stderr, "TUI Error: %v\n", err)

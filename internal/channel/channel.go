@@ -18,6 +18,12 @@ type Channel interface {
 	Name() string
 }
 
+// FileSender defines the interface for sending files back to users
+type FileSender interface {
+	// SendFile sends a file to a session
+	SendFile(sessionID, filePath, caption string) error
+}
+
 // Reusing types from Internal package
 type UserMessage = types.UserMessage
 type AgentResponse = types.AgentResponse

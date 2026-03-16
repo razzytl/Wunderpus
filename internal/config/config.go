@@ -109,14 +109,15 @@ type AgentConfig struct {
 
 // ToolsConfig holds tool execution, sandbox, and allowlist settings.
 type ToolsConfig struct {
-	Enabled        bool         `yaml:"enabled"`
-	TimeoutSeconds int          `yaml:"timeout_seconds"`
-	AllowedPaths   []string     `yaml:"allowed_paths"`
-	ShellWhitelist []string     `yaml:"shell_whitelist"`
-	SSRFBlocklist  []string     `yaml:"ssrf_blocklist"`
-	Skills         SkillsConfig `yaml:"skills"`
-	Search         SearchConfig `yaml:"search"`
-	MCP            MCPConfig    `yaml:"mcp"`
+	Enabled        bool           `yaml:"enabled"`
+	TimeoutSeconds int            `yaml:"timeout_seconds"`
+	AllowedPaths   []string       `yaml:"allowed_paths"`
+	ShellWhitelist []string       `yaml:"shell_whitelist"`
+	SSRFBlocklist  []string       `yaml:"ssrf_blocklist"`
+	Skills         SkillsConfig   `yaml:"skills"`
+	Search         SearchConfig   `yaml:"search"`
+	MCP            MCPConfig      `yaml:"mcp"`
+	SendFile       SendFileConfig `yaml:"send_file"`
 }
 
 // SearchConfig holds search provider configuration.
@@ -126,6 +127,11 @@ type SearchConfig struct {
 	TavilyBaseURL string `yaml:"tavily_base_url"`
 	PerplexityKey string `yaml:"perplexity_key"`
 	Proxy         string `yaml:"proxy"`
+}
+
+// SendFileConfig holds configuration for the send_file tool.
+type SendFileConfig struct {
+	Enabled bool `yaml:"enabled"`
 }
 
 // MCPConfig holds MCP (Model Context Protocol) server configuration.
@@ -540,6 +546,7 @@ func applyDefaults(cfg *Config) {
 	cfg.Tools.Enabled = true
 	cfg.Tools.TimeoutSeconds = 30
 	cfg.Tools.AllowedPaths = []string{"."}
+	cfg.Tools.SendFile.Enabled = true
 	cfg.Tools.ShellWhitelist = []string{
 		"ls", "dir", "cat", "type", "echo", "head", "tail",
 		"wc", "grep", "find", "pwd", "date", "whoami",

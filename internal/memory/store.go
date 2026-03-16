@@ -129,6 +129,38 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKe
 	return err
 }
 
+// GetSessions retrieves a list of all chat sessions ordered by updated_at descending.
+func (s *Store) GetSessions() ([]Session, error) {
+	rows, err := s.db.Query(`
+		SELECT id, created_at, updated_at, title
+		FROM sessions 
+		ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []Session
+	for rows.Next() {
+		var id, createdStr, updatedStr, title string
+		if err := rows.Scan(&id, &createdStr, &updatedStr, &title); err != nil {
+			return nil, err
+		}
+		
+		created, _ := time.Parse(time.RFC3339, createdStr)
+		updated, _ := time.Parse(time.RFC3339, updatedStr)
+		
+		sessions = append(sessions, Session{
+			ID:        id,
+			CreatedAt: created,
+			UpdatedAt: updated,
+			Title:     title,
+		})
+	}
+
+	return sessions, rows.Err()
+}
+
 // LoadSession retrieves all messages for a given session.
 // encryptionKey is required to decrypt encrypted messages.
 func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.Message, error) {

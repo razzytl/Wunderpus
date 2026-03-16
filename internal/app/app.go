@@ -172,6 +172,14 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		channels = append(channels, feishu.NewChannel(cfg.Channels.Feishu.AppID, cfg.Channels.Feishu.AppSecret, cfg.Channels.Feishu.VerificationToken, manager))
 	}
 
+	// Create channel aggregator for file sending
+	channelAggregator := channel.NewChannelAggregator(channels)
+
+	// Register send_file tool if enabled
+	if cfg.Tools.Enabled && cfg.Tools.SendFile.Enabled {
+		registry.Register(builtin.NewSendFileTool(channelAggregator, sandbox))
+	}
+
 	return &App{
 		Config:             cfg,
 		Manager:            manager,

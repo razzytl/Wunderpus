@@ -21,3 +21,7 @@ bin/
 
 # Dependencies
 vendor/
+
+# Frontend
+ui/node_modules/
+ui/dist/

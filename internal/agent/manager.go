@@ -121,6 +121,16 @@ func (m *Manager) GetSkillsLoader() *skills.SkillsLoader {
 	return m.loader
 }
 
+// Config returns the configuration.
+func (m *Manager) Config() *config.Config {
+	return m.cfg
+}
+
+// Store returns the memory store.
+func (m *Manager) Store() *memory.Store {
+	return m.store
+}
+
 // ProcessRequest processes a full UserMessage request.
 func (m *Manager) ProcessRequest(ctx context.Context, req types.UserMessage) (types.AgentResponse, error) {
 	resp, err := m.ProcessMessage(ctx, req.SessionID, req.Content)

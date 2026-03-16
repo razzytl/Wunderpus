@@ -204,10 +204,11 @@ func TestBuiltin_ShellWhitelist(t *testing.T) {
 		t.Errorf("unexpected error on valid command: %s", res.Error)
 	}
 
-	// Not whitelisted
+	// Not whitelisted - but also caught by dangerous pattern check first
+	// The dangerous pattern check catches sensitive file access (/etc/passwd) before whitelist
 	res, _ = se.Execute(context.Background(), map[string]any{"command": "cat /etc/passwd"})
-	if !strings.Contains(res.Error, "not whitelisted") {
-		t.Errorf("expected not whitelisted error, got: %v", res.Error)
+	if !strings.Contains(res.Error, "blocked") {
+		t.Errorf("expected blocked error (dangerous pattern), got: %v", res.Error)
 	}
 
 	// Dangerous even if tool whitelisted (e.g., if somehow a dangerous command is passed)

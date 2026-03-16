@@ -41,6 +41,7 @@ type App struct {
 	HealthServer       *health.Server
 	Channels           []channel.Channel
 	Registry           *tool.Registry
+	Browser            *builtin.BrowserTool
 }
 
 // Bootstrap initializes the application with the given config path.
@@ -103,6 +104,9 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		registry.Register(builtin.NewHTTPRequest(cfg.Tools.SSRFBlocklist))
 		registry.Register(builtin.NewCalculator())
 		registry.Register(builtin.NewSystemInfo())
+
+		browserTool := builtin.NewBrowserTool()
+		registry.Register(browserTool)
 
 		timeout := time.Duration(cfg.Tools.TimeoutSeconds) * time.Second
 		approvalFn := func(toolName string, args map[string]any) (bool, error) {
@@ -190,11 +194,15 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		HealthServer:       healthSrv,
 		Channels:           channels,
 		Registry:           registry,
+		Browser:            browserTool,
 	}, nil
 }
 
 // Close gracefully shuts down all application components.
 func (a *App) Close() {
+	if a.Browser != nil {
+		a.Browser.Close()
+	}
 	if a.HeartbeatScheduler != nil {
 		a.HeartbeatScheduler.Stop()
 	}

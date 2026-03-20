@@ -26,6 +26,7 @@ Welcome to the Wunderpus documentation. This documentation provides comprehensiv
 ### Operations
 
 - [CLI Reference](cli.md) - Complete command-line interface documentation
+- [Verification](verification.md) - Verification guidelines before claiming completion
 - [Deployment](deployment.md) - Production deployment guide
 - [Monitoring](monitoring.md) - Prometheus metrics and health checks
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions

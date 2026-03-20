@@ -31,6 +31,25 @@ type Config struct {
 	Server          ServerConfig    `yaml:"server"`
 	Channels        ChannelsConfig  `yaml:"channels"`
 	Heartbeat       HeartbeatConfig `yaml:"heartbeat"`
+	Genesis         GenesisConfig   `yaml:"genesis"`
+}
+
+// GenesisConfig holds all genesis plan feature flags and parameters.
+type GenesisConfig struct {
+	RSIEnabled            bool     `yaml:"rsi_enabled"`             // Enable Recursive Self-Improvement
+	AGSEnabled            bool     `yaml:"ags_enabled"`             // Enable Autonomous Goal Synthesis
+	UAAEnabled            bool     `yaml:"uaa_enabled"`             // Enable Unbounded Autonomous Action
+	RAEnabled             bool     `yaml:"ra_enabled"`              // Enable Resource Acquisition
+	RSIFirewallEnabled    bool     `yaml:"rsi_firewall_enabled"`    // RSI can only modify internal/ (default: true)
+	MaxDailySpendUSD      float64  `yaml:"max_daily_spend_usd"`     // Hard cap on cloud spend (default: 10.0)
+	TrustBudgetMax        int      `yaml:"trust_budget_max"`        // Maximum trust points (default: 1000)
+	TrustRegenPerHour     int      `yaml:"trust_regen_per_hour"`    // Trust regeneration rate (default: 10)
+	AuditLogDBPath        string   `yaml:"audit_log_db_path"`       // Genesis audit log DB path
+	ProfilerDBPath        string   `yaml:"profiler_db_path"`        // Profiler telemetry DB path
+	ProfilerPPROFPort     int      `yaml:"profiler_pprof_port"`     // pprof endpoint port (default: 6060, 0 = disabled)
+	TrustBudgetDBPath     string   `yaml:"trust_budget_db_path"`    // Trust budget DB path
+	JWTSecretEnv          string   `yaml:"jwt_secret_env"`          // Env var name holding JWT secret (default: WUNDERPUS_JWT_SECRET)
+	ExternalHostAllowlist []string `yaml:"external_host_allowlist"` // Known-safe external hosts for Tier 4
 }
 
 const CurrentConfigVersion = 3
@@ -387,6 +406,11 @@ func (c *Config) resolvePaths() {
 	c.Agent.CostDBPath = resolveDBPath(c.Agent.CostDBPath, c.Home, "wonderpus_cost.db")
 	c.Security.AuditDBPath = resolveDBPath(c.Security.AuditDBPath, c.Home, "wunderpus_audit.db")
 	c.Tools.Skills.GlobalSkillsPath = resolveDBPath(c.Tools.Skills.GlobalSkillsPath, c.Home, "skills")
+
+	// Genesis paths
+	c.Genesis.AuditLogDBPath = resolveDBPath(c.Genesis.AuditLogDBPath, c.Home, "wunderpus_genesis_audit.db")
+	c.Genesis.ProfilerDBPath = resolveDBPath(c.Genesis.ProfilerDBPath, c.Home, "wunderpus_profiler.db")
+	c.Genesis.TrustBudgetDBPath = resolveDBPath(c.Genesis.TrustBudgetDBPath, c.Home, "wunderpus_trust.db")
 }
 
 func resolveDBPath(path, home, defaultFile string) string {
@@ -593,6 +617,21 @@ func applyDefaults(cfg *Config) {
 	cfg.Agents.Defaults.Workspace = "."
 	cfg.Agents.Defaults.RestrictToWorkspace = true
 
+	// Genesis defaults
+	cfg.Genesis.RSIEnabled = false
+	cfg.Genesis.AGSEnabled = false
+	cfg.Genesis.UAAEnabled = false
+	cfg.Genesis.RAEnabled = false
+	cfg.Genesis.RSIFirewallEnabled = true
+	cfg.Genesis.MaxDailySpendUSD = 10.0
+	cfg.Genesis.TrustBudgetMax = 1000
+	cfg.Genesis.TrustRegenPerHour = 10
+	cfg.Genesis.AuditLogDBPath = filepath.Join(cfg.Home, "wunderpus_genesis_audit.db")
+	cfg.Genesis.ProfilerDBPath = filepath.Join(cfg.Home, "wunderpus_profiler.db")
+	cfg.Genesis.ProfilerPPROFPort = 0 // disabled by default
+	cfg.Genesis.TrustBudgetDBPath = filepath.Join(cfg.Home, "wunderpus_trust.db")
+	cfg.Genesis.JWTSecretEnv = "WUNDERPUS_JWT_SECRET"
+
 	cfg.Providers.OpenAI.Model = "gpt-4o"
 	cfg.Providers.OpenAI.MaxTokens = 4096
 	cfg.Providers.Anthropic.Model = "claude-sonnet-4-20250514"
@@ -665,6 +704,31 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WUNDERPUS_WHATSAPP_ENABLED"); v != "" {
 		cfg.Channels.WhatsApp.Enabled = strings.ToLower(v) == "true" || v == "1"
+	}
+
+	// Genesis env overrides
+	if v := os.Getenv("WUNDERPUS_GENESIS_RSI"); v != "" {
+		cfg.Genesis.RSIEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_AGS"); v != "" {
+		cfg.Genesis.AGSEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_UAA"); v != "" {
+		cfg.Genesis.UAAEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_RA"); v != "" {
+		cfg.Genesis.RAEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_FIREWALL"); v != "" {
+		cfg.Genesis.RSIFirewallEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_MAX_DAILY_SPEND"); v != "" {
+		if spend, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.Genesis.MaxDailySpendUSD = spend
+		}
+	}
+	if v := os.Getenv("WUNDERPUS_JWT_SECRET"); v != "" {
+		cfg.Genesis.JWTSecretEnv = "WUNDERPUS_JWT_SECRET"
 	}
 }
 

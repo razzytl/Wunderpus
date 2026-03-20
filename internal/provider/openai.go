@@ -250,3 +250,69 @@ func toOpenAIMessages(msgs []Message) []map[string]any {
 	}
 	return out
 }
+
+// EmbeddingModel is the default model for text embeddings.
+const EmbeddingModel = "text-embedding-3-small"
+
+// Embed generates embeddings for the given texts using OpenAI's embedding API.
+func (o *OpenAI) Embed(ctx context.Context, texts []string) ([][]float64, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+
+	body := map[string]any{
+		"model": EmbeddingModel,
+		"input": texts,
+	}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, errors.Wrap(errors.InternalError, "marshal embedding request", err)
+	}
+
+	url := o.baseURL + "/embeddings"
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
+	if err != nil {
+		return nil, errors.Wrap(errors.InternalError, "create embedding request", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+o.apiKey)
+
+	resp, err := RetryDo(ctx, o.client, httpReq, DefaultRetryOptions)
+	if err != nil {
+		return nil, errors.Wrap(errors.InternalError, "embedding request failed", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []struct {
+			Embedding []float64 `json:"embedding"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, errors.Wrap(errors.InternalError, "decode embedding response", err)
+	}
+
+	embeddings := make([][]float64, len(result.Data))
+	for i, d := range result.Data {
+		embeddings[i] = d.Embedding
+	}
+
+	return embeddings, nil
+}
+
+// EmbedSingle generates embedding for a single text.
+func (o *OpenAI) EmbedSingle(ctx context.Context, text string) ([]float64, error) {
+	embs, err := o.Embed(ctx, []string{text})
+	if err != nil || len(embs) == 0 {
+		return nil, err
+	}
+	return embs[0], nil
+}
+
+// Dimension returns the embedding dimension for the default model.
+func (o *OpenAI) Dimension() int {
+	return 1536 // text-embedding-3-small
+}

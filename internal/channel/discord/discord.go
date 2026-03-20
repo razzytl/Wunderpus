@@ -9,6 +9,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/wunderpus/wunderpus/internal/agent"
+	"github.com/wunderpus/wunderpus/internal/tool/builtin"
 	"github.com/wunderpus/wunderpus/internal/types"
 )
 
@@ -17,6 +18,7 @@ type Channel struct {
 	token   string
 	manager *agent.Manager
 	session *discordgo.Session
+	hitl    *builtin.HumanInTheLoop
 }
 
 // NewChannel creates a new Discord channel.
@@ -24,6 +26,15 @@ func NewChannel(token string, manager *agent.Manager) *Channel {
 	return &Channel{
 		token:   token,
 		manager: manager,
+	}
+}
+
+// NewChannelWithHITL creates a new Discord channel with Human-in-the-Loop support.
+func NewChannelWithHITL(token string, manager *agent.Manager, hitl *builtin.HumanInTheLoop) *Channel {
+	return &Channel{
+		token:   token,
+		manager: manager,
+		hitl:    hitl,
 	}
 }
 
@@ -76,6 +87,12 @@ func (c *Channel) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate
 	text := m.Content
 
 	if text == "" {
+		return
+	}
+
+	// Handle HITL responses first - check if this is a response to a pending request
+	if c.hitl != nil && strings.HasPrefix(text, "!respond ") {
+		c.handleHITLResponse(s, m, text)
 		return
 	}
 
@@ -139,6 +156,61 @@ func (c *Channel) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate
 	}(sessionID, text, m.ChannelID)
 }
 
+// handleHITLResponse processes a human response to a pending HITL request
+func (c *Channel) handleHITLResponse(s *discordgo.Session, m *discordgo.MessageCreate, text string) {
+	// Format: !respond <index> <response>
+	parts := strings.Fields(text)
+	if len(parts) < 3 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `!respond <index> <your response>`\nUse `!pending` to see pending requests.")
+		return
+	}
+
+	// Parse index
+	var index int
+	_, err := fmt.Sscanf(parts[1], "%d", &index)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Invalid index. Use `!pending` to see pending requests.")
+		return
+	}
+
+	// Get response text
+	response := strings.Join(parts[2:], " ")
+
+	// Send response through HITL
+	err = c.hitl.SendResponseByIndex(index, response)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error: %v", err))
+		return
+	}
+
+	s.ChannelMessageSend(m.ChannelID, "✓ Response sent to agent!")
+}
+
+// HandlePendingCommand shows pending HITL requests
+func (c *Channel) HandlePendingCommand(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if c.hitl == nil {
+		s.ChannelMessageSend(m.ChannelID, "Human-in-the-loop not enabled.")
+		return
+	}
+
+	pending := c.hitl.ListPending()
+	if len(pending) == 0 {
+		s.ChannelMessageSend(m.ChannelID, "No pending human requests.")
+		return
+	}
+
+	msg := "📋 **Pending Human Requests:**\n"
+	for i, req := range pending {
+		msg += fmt.Sprintf("%d. %s\n", i, req.Question)
+		if len(req.ImageData) > 0 {
+			msg += "   (📎 Includes screenshot)\n"
+		}
+	}
+	msg += "\nTo respond: `!respond <index> <your response>`"
+
+	s.ChannelMessageSend(m.ChannelID, msg)
+}
+
 func (c *Channel) handleCommand(s *discordgo.Session, m *discordgo.MessageCreate, cmd string) {
 	parts := strings.Fields(cmd)
 	command := strings.ToLower(parts[0])
@@ -174,5 +246,11 @@ func (c *Channel) handleCommand(s *discordgo.Session, m *discordgo.MessageCreate
 		ag := c.manager.GetAgent(sessionID)
 		ag.ClearContext()
 		s.ChannelMessageSend(m.ChannelID, "Conversation history cleared. ✓")
+	case "!pending":
+		if c.hitl != nil {
+			c.HandlePendingCommand(s, m)
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Human-in-the-loop not enabled.")
+		}
 	}
 }

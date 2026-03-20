@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -297,8 +298,10 @@ func toAnthropicMessages(msgs []Message) []map[string]any {
 				})
 			}
 			for _, tc := range m.ToolCalls {
-				var input map[string]any
-				_ = json.Unmarshal([]byte(tc.Function.Arguments), &input)
+				input := make(map[string]any)
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &input); err != nil {
+					slog.Warn("failed to parse tool arguments", "error", err)
+				}
 				contentBlocks = append(contentBlocks, map[string]any{
 					"type":  "tool_use",
 					"id":    tc.ID,
@@ -371,8 +374,10 @@ func parseAnthropicImage(dataURL string) map[string]any {
 func toAnthropicTools(tools []ToolSchema) []map[string]any {
 	out := make([]map[string]any, len(tools))
 	for i, t := range tools {
-		var inputSchema map[string]any
-		_ = json.Unmarshal(t.Function.Parameters, &inputSchema)
+		inputSchema := make(map[string]any)
+		if err := json.Unmarshal(t.Function.Parameters, &inputSchema); err != nil {
+			slog.Warn("failed to parse function parameters", "error", err)
+		}
 		out[i] = map[string]any{
 			"name":         t.Function.Name,
 			"description":  t.Function.Description,

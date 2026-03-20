@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
@@ -204,8 +205,10 @@ func toOllamaMessages(msgs []Message) []map[string]any {
 		if len(m.ToolCalls) > 0 {
 			var ollamaToolCalls []map[string]any
 			for _, tc := range m.ToolCalls {
-				var arguments map[string]any
-				_ = json.Unmarshal([]byte(tc.Function.Arguments), &arguments)
+				arguments := make(map[string]any)
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &arguments); err != nil {
+					slog.Warn("failed to parse tool arguments", "error", err)
+				}
 
 				ollamaToolCalls = append(ollamaToolCalls, map[string]any{
 					"function": map[string]any{

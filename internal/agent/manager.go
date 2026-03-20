@@ -17,14 +17,15 @@ import (
 
 // Manager handles multiple agent instances, one per session.
 type Manager struct {
-	cfg       *config.Config
-	router    *provider.Router
-	sanitizer *security.Sanitizer
-	audit     *security.AuditLogger
-	store     *memory.Store
-	registry  *tool.Registry
-	executor  *tool.Executor
-	loader    *skills.SkillsLoader
+	cfg           *config.Config
+	router        *provider.Router
+	sanitizer     *security.Sanitizer
+	audit         *security.AuditLogger
+	store         *memory.Store
+	registry      *tool.Registry
+	executor      *tool.Executor
+	loader        *skills.SkillsLoader
+	enhancedStore *memory.EnhancedStore // For RAG
 
 	mu      sync.RWMutex
 	agents  map[string]*Agent
@@ -102,6 +103,11 @@ func (m *Manager) GetAgent(sessionID string) *Agent {
 		ag.SetRateLimiter(m.limiter)
 	}
 
+	// Set RAG SOP getter if enhanced store is available
+	if m.enhancedStore != nil {
+		ag.SetSOPGetter(m.GetRelevantSOPs)
+	}
+
 	m.agents[sessionID] = ag
 	return ag
 }
@@ -129,6 +135,28 @@ func (m *Manager) Config() *config.Config {
 // Store returns the memory store.
 func (m *Manager) Store() *memory.Store {
 	return m.store
+}
+
+// SetEnhancedStore sets the enhanced memory store for RAG support.
+func (m *Manager) SetEnhancedStore(enhanced *memory.EnhancedStore) {
+	m.enhancedStore = enhanced
+}
+
+// GetRelevantSOPs retrieves relevant SOPs for a task using RAG.
+func (m *Manager) GetRelevantSOPs(ctx context.Context, taskDescription string, topK int) ([]string, error) {
+	if m.enhancedStore == nil {
+		return nil, nil
+	}
+	return m.enhancedStore.GetRelevantSOPs(ctx, taskDescription, topK)
+}
+
+// StoreSOP stores a Standard Operating Procedure for future retrieval.
+func (m *Manager) StoreSOP(ctx context.Context, title, content string) error {
+	if m.enhancedStore == nil {
+		return nil // No-op if no enhanced store
+	}
+	_, err := m.enhancedStore.StoreSOP(ctx, title, content)
+	return err
 }
 
 // ProcessRequest processes a full UserMessage request.

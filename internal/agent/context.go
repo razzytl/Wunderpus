@@ -52,7 +52,9 @@ func (c *ContextManager) AddMessage(role, content string) {
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+			slog.Error("failed to save message", "error", err)
+		}
 	}
 	c.truncate()
 }
@@ -66,7 +68,9 @@ func (c *ContextManager) AddToolCallMessage(content string, toolCalls []provider
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+			slog.Error("failed to save message", "error", err)
+		}
 	}
 	c.truncate()
 }
@@ -80,7 +84,9 @@ func (c *ContextManager) AddToolResultMessage(toolCallID string, content string)
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		_ = c.store.SaveMessage(c.sessionID, msg, c.encKey)
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+			slog.Error("failed to save message", "error", err)
+		}
 	}
 	c.truncate()
 }

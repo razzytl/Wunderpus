@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -178,15 +179,25 @@ func (c *Channel) sendMessage(userID, content string) {
 		},
 	}
 
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("dingtalk: JSON marshal failed", "error", err)
+		return
+	}
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		slog.Error("dingtalk: request creation failed", "error", err)
+		return
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Acs-Dingtalk-Access-Token", token)
 
 	resp, err := http.DefaultClient.Do(req)
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		slog.Error("dingtalk: request failed", "error", err)
+		return
 	}
+	resp.Body.Close()
 }
 
 func (c *Channel) VerifySignature(timestamp, signature string) bool {

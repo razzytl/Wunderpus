@@ -6,12 +6,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/tool/builtin"
 	"github.com/wunderpus/wunderpus/internal/types"
 )
 
@@ -21,6 +23,7 @@ type Channel struct {
 	manager *agent.Manager
 	bot     *tgbotapi.BotAPI
 	stopCh  chan struct{}
+	hitl    *builtin.HumanInTheLoop
 }
 
 // NewChannel creates a new Telegram channel.
@@ -29,6 +32,16 @@ func NewChannel(token string, manager *agent.Manager) *Channel {
 		token:   token,
 		manager: manager,
 		stopCh:  make(chan struct{}),
+	}
+}
+
+// NewChannelWithHITL creates a new Telegram channel with Human-in-the-Loop support.
+func NewChannelWithHITL(token string, manager *agent.Manager, hitl *builtin.HumanInTheLoop) *Channel {
+	return &Channel{
+		token:   token,
+		manager: manager,
+		stopCh:  make(chan struct{}),
+		hitl:    hitl,
 	}
 }
 
@@ -84,6 +97,12 @@ func (c *Channel) Start(ctx context.Context) error {
 					// Handle commands
 					if strings.HasPrefix(text, "/") {
 						c.handleCommand(chatID, text)
+						continue
+					}
+
+					// Handle HITL responses
+					if c.hitl != nil && strings.HasPrefix(text, "/respond ") {
+						c.handleHITLResponse(chatID, text)
 						continue
 					}
 
@@ -188,8 +207,77 @@ func (c *Channel) handleCommand(chatID int64, cmd string) {
 		ag.ClearContext()
 		msg := tgbotapi.NewMessage(chatID, "Conversation history cleared. ✓")
 		c.bot.Send(msg)
+	case "/pending":
+		if c.hitl != nil {
+			c.handlePendingCommand(chatID)
+		} else {
+			msg := tgbotapi.NewMessage(chatID, "Human-in-the-loop not enabled.")
+			c.bot.Send(msg)
+		}
 	default:
 		msg := tgbotapi.NewMessage(chatID, "Unknown command: "+command)
 		c.bot.Send(msg)
 	}
+}
+
+// handleHITLResponse processes a human response to a pending HITL request
+func (c *Channel) handleHITLResponse(chatID int64, text string) {
+	// Format: /respond <index> <response>
+	parts := strings.Fields(text)
+	if len(parts) < 3 {
+		msg := tgbotapi.NewMessage(chatID, "Usage: /respond <index> <your response>\nUse /pending to see pending requests.")
+		c.bot.Send(msg)
+		return
+	}
+
+	// Parse index
+	index, err := strconv.Atoi(parts[1])
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, "Invalid index. Use /pending to see pending requests.")
+		c.bot.Send(msg)
+		return
+	}
+
+	// Get response text
+	response := strings.Join(parts[2:], " ")
+
+	// Send response through HITL
+	err = c.hitl.SendResponseByIndex(index, response)
+	if err != nil {
+		msg := tgbotapi.NewMessage(chatID, fmt.Sprintf("Error: %v", err))
+		c.bot.Send(msg)
+		return
+	}
+
+	msg := tgbotapi.NewMessage(chatID, "✓ Response sent to agent!")
+	c.bot.Send(msg)
+}
+
+// handlePendingCommand shows pending HITL requests
+func (c *Channel) handlePendingCommand(chatID int64) {
+	if c.hitl == nil {
+		msg := tgbotapi.NewMessage(chatID, "Human-in-the-loop not enabled.")
+		c.bot.Send(msg)
+		return
+	}
+
+	pending := c.hitl.ListPending()
+	if len(pending) == 0 {
+		msg := tgbotapi.NewMessage(chatID, "No pending human requests.")
+		c.bot.Send(msg)
+		return
+	}
+
+	response := "📋 *Pending Human Requests:*\n"
+	for i, req := range pending {
+		response += fmt.Sprintf("%d. %s\n", i, req.Question)
+		if len(req.ImageData) > 0 {
+			response += "   (📎 Includes screenshot)\n"
+		}
+	}
+	response += "\nTo respond: /respond <index> <your response>"
+
+	msg := tgbotapi.NewMessage(chatID, response)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	c.bot.Send(msg)
 }

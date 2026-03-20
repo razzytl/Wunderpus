@@ -7,40 +7,40 @@ As a software engineer and AI architect, this is exactly how I would structure t
 
 ### 📋 Phase 1: Visual Web Browsing ("Eyes & Hands")
 **Goal:** Allow the agent to visually navigate SPAs and bypass API limits.
-*[ ] **Add `playwright-go` dependency.**
-* [ ] **Create a `skills/browser` module:**
+*[x] **Add `playwright-go` dependency.**
+* [x] **Create a `skills/browser` module:**
   * Implement functions: `Navigate(url)`, `TakeScreenshot()`, `Click(x, y)`, `Type(text)`.
-* [ ] **Implement Vision-Action Loop:**
+* [x] **Implement Vision-Action Loop:**
   * *Exactly How:* When the agent gets a web task, use Playwright to load the page and take a screenshot. Send this image to a Vision model (Claude 3.5 / GPT-4o) using your Provider system. The model returns a JSON payload with X/Y coordinates to click or text to type. Execute the action via Playwright, take a new screenshot, and loop until the task is complete.
 
 ### 📋 Phase 2: Secure Code Execution (Docker Sandbox)
 **Goal:** Let the agent write, run, and test code safely.
-* [ ] **Integrate Docker Go SDK (`github.com/docker/docker/client`).**
-* [ ] **Create a `skills/sandbox` module:**
+*[x] **Integrate Docker Go SDK (`github.com/docker/docker/client`).**
+*[x] **Create a `skills/sandbox` module:**
   * Implement a `RunCode(language, code_string)` tool for the LLM.
-* [ ] **Implement Ephemeral Containers:**
+*[x] **Implement Ephemeral Containers:**
   * *Exactly How:* When the agent outputs code, the Go backend dynamically spins up a lightweight Docker container (e.g., `alpine`, `python:3-slim`). It mounts a temporary directory, writes the code to a file, executes it, captures `stdout`/`stderr`, returns the output to the agent's context, and immediately destroys the container using a `defer` statement to prevent resource leaks.
 
 ### 📋 Phase 3: Multi-Agent Concurrency (The Brain)
 **Goal:** Break down complex jobs into smaller tasks handled by specialized agents.
-* [ ] **Refactor `Agent Manager` for Hierarchical Routing.**
-* [ ] **Implement Directed Acyclic Graph (DAG) Task Planning.**
-* [ ] **Build Go-Channel Message Bus:**
+*[x] **Refactor `Agent Manager` for Hierarchical Routing.**
+*[x] **Implement Directed Acyclic Graph (DAG) Task Planning.**
+*[x] **Build Go-Channel Message Bus:**
   * *Exactly How:* Define `Manager` and `Worker` interfaces. The Manager receives a user prompt, breaks it into a DAG array of tasks, and spawns native Go `goroutines` for each Worker (e.g., a Scraper Agent and a Writer Agent). Use `sync.WaitGroup` to wait for completion and pass JSON messages between them using buffered Go channels (`taskCh <- Task`, `resultCh <- Result`).
 
 ### 📋 Phase 4: Long-Term Memory (Vector State)
 **Goal:** Prevent the agent from relearning how to do the same job.
-* [ ] **Add an embedded Vector DB (`sqlite-vss` or a Go client for Chroma/Milvus).**
-* [ ] **Create a `memory/` package:**
-* [ ] **Implement RAG (Retrieval-Augmented Generation):**
-  * *Exactly How:* Create an `Embedder` interface in your Provider System. When a worker agent successfully finishes a multi-step job, it writes a "Standard Operating Procedure (SOP)" summary. Convert this SOP to embeddings and save it to the Vector DB. On future runs, perform a cosine similarity search against the user’s prompt and inject the retrieved SOP directly into the LLM's system prompt before execution starts.
+*[x] **Add an embedded Vector DB (`sqlite-vss` or a Go client for Chroma/Milvus).**
+*[x] **Create a `memory/` package:**
+*[x] **Implement RAG (Retrieval-Augmented Generation):**
+  * *Exactly How:* Create an `Embedder` interface in your Provider System. When a worker agent successfully finishes a multi-step job, it writes a "Standard Operating Procedure (SOP)" summary. Convert this SOP to embeddings and save it to the Vector DB. On future runs, perform a cosine similarity search against the user's prompt and inject the retrieved SOP directly into the LLM's system prompt before execution starts.
 
 ### 📋 Phase 5: Async Work & Human-in-the-Loop (HITL)
 **Goal:** Run background jobs for days and ask for help only when stuck.
-* [ ] **Decouple the CLI/Channel session from the execution loop.**
-* [ ] **Add an `AskHuman(question, image_byte_array)` tool to the LLM.**
-* [ ] **Implement Asynchronous Pausing:**
+*[x] **Decouple the CLI/Channel session from the execution loop.**
+*[x] **Add an `AskHuman(question, image_byte_array)` tool to the LLM.**
+*[x] **Implement Asynchronous Pausing:**
   * *Exactly How:* Run the main agent loop in a detached goroutine. If the agent hits a blocker (like a Captcha or a credit card prompt), it calls the `AskHuman` tool. This tool sends an alert to your Discord/Telegram channel integration and immediately halts the specific goroutine on a blocking channel (`<-responseCh`). Once the user replies in Discord, the webhook pushes the string into `responseCh`, unblocking the goroutine so the agent can resume.
 
 ### Architecture Summary:
-By doing this, **Wunderpus** stops being a synchronous script and becomes an **Asynchronous Distributed System**. You leverage Go’s biggest strength (concurrency) alongside cutting-edge LLM vision capabilities. This is how you build a million-dollar open-source framework. Execute the checklist sequentially.
+By doing this, **Wunderpus** stops being a synchronous script and becomes an **Asynchronous Distributed System**. You leverage Go's biggest strength (concurrency) alongside cutting-edge LLM vision capabilities. This is how you build a million-dollar open-source framework. Execute the checklist sequentially.

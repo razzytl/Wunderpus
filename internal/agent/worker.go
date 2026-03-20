@@ -122,8 +122,10 @@ Think step by step and execute any tools required to achieve this objective. Out
 		})
 
 		for _, tc := range resp.ToolCalls {
-			var args map[string]any
-			_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+			args := make(map[string]any)
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+				return "", fmt.Errorf("invalid tool arguments JSON: %w", err)
+			}
 
 			toolCall := tool.ToolCall{
 				ID:   tc.ID,

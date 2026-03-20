@@ -33,6 +33,7 @@ type Agent struct {
 	limiter       *security.RateLimiter
 	sessionID     string
 	encryptionKey []byte
+	getSOPsFunc   func(ctx context.Context, task string, topK int) ([]string, error) // For RAG
 }
 
 // NewAgent creates a new agent instance.
@@ -93,6 +94,11 @@ func (a *Agent) SetEncryptionKey(key string) {
 		}
 		a.encryptionKey = decoded
 	}
+}
+
+// SetSOPGetter sets the function to retrieve relevant SOPs for RAG.
+func (a *Agent) SetSOPGetter(fn func(ctx context.Context, task string, topK int) ([]string, error)) {
+	a.getSOPsFunc = fn
 }
 
 // HandleMessage processes a user message and returns the agent response.
@@ -221,8 +227,16 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 					}
 				}()
 
-				var args map[string]any
-				_ = json.Unmarshal([]byte(t.Function.Arguments), &args)
+				args := make(map[string]any)
+				if err := json.Unmarshal([]byte(t.Function.Arguments), &args); err != nil {
+					mu.Lock()
+					results[i] = struct {
+						id     string
+						output string
+					}{id: t.ID, output: fmt.Sprintf("Error: failed to parse tool arguments: %v", err)}
+					mu.Unlock()
+					return
+				}
 
 				toolCall := tool.ToolCall{
 					ID:   t.ID,
@@ -446,8 +460,36 @@ func (a *Agent) StreamMessage(ctx context.Context, input string) (<-chan provide
 }
 
 func (a *Agent) buildMessages() []provider.Message {
+	systemPrompt := a.sysPrompt
+
+	// Inject relevant SOPs if RAG is enabled
+	if a.getSOPsFunc != nil {
+		ctx := context.Background()
+		// Get the last user message to find relevant SOPs
+		userMsgs := a.ctx.GetMessages()
+		var lastUserInput string
+		for i := len(userMsgs) - 1; i >= 0; i-- {
+			if userMsgs[i].Role == provider.RoleUser {
+				lastUserInput = userMsgs[i].Content
+				break
+			}
+		}
+
+		if lastUserInput != "" {
+			sops, err := a.getSOPsFunc(ctx, lastUserInput, 3)
+			if err == nil && len(sops) > 0 {
+				sopContext := "\n\n## Relevant Past Procedures (SOPs):\n"
+				for _, sop := range sops {
+					sopContext += sop + "\n---\n"
+				}
+				sopContext += "Use these past procedures when relevant to the user's request."
+				systemPrompt += sopContext
+			}
+		}
+	}
+
 	msgs := []provider.Message{
-		{Role: provider.RoleSystem, Content: a.sysPrompt},
+		{Role: provider.RoleSystem, Content: systemPrompt},
 	}
 	msgs = append(msgs, a.ctx.GetMessages()...)
 	return msgs

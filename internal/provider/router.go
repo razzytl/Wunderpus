@@ -116,6 +116,20 @@ func (r *Router) Active() Provider {
 	return r.activeProvider
 }
 
+// GetEmbedder returns an Embedder if the active provider supports embeddings.
+func (r *Router) GetEmbedder() Embedder {
+	if r.activeProvider == nil {
+		return nil
+	}
+	// Try type assertion on common providers
+	if emb, ok := r.activeProvider.(Embedder); ok {
+		return emb
+	}
+	// Check if it's an OpenAI-compatible provider that has embedding support
+	// by looking for common embedding patterns
+	return nil
+}
+
 // ActiveName returns the name of the active provider.
 func (r *Router) ActiveName() string {
 	return r.activeName

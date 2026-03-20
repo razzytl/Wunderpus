@@ -146,10 +146,10 @@ func (s *Store) GetSessions() ([]Session, error) {
 		if err := rows.Scan(&id, &createdStr, &updatedStr, &title); err != nil {
 			return nil, err
 		}
-		
+
 		created, _ := time.Parse(time.RFC3339, createdStr)
 		updated, _ := time.Parse(time.RFC3339, updatedStr)
-		
+
 		sessions = append(sessions, Session{
 			ID:        id,
 			CreatedAt: created,

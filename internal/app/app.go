@@ -32,16 +32,18 @@ import (
 
 // App encapsulates the Wunderpus application state and dependencies.
 type App struct {
-	Config             *config.Config
-	Manager            *agent.Manager
-	SubAgentMgr        *subagent.Manager
-	MemoryStore        *memory.Store
-	AuditLogger        *security.AuditLogger
-	HeartbeatScheduler *heartbeat.Scheduler
-	HealthServer       *health.Server
-	Channels           []channel.Channel
-	Registry           *tool.Registry
-	Browser            *builtin.BrowserTool
+	Config              *config.Config
+	Manager             *agent.Manager
+	SubAgentMgr         *subagent.Manager
+	MemoryStore         *memory.Store
+	EnhancedMemoryStore *memory.EnhancedStore // For RAG
+	AuditLogger         *security.AuditLogger
+	HeartbeatScheduler  *heartbeat.Scheduler
+	HealthServer        *health.Server
+	Channels            []channel.Channel
+	Registry            *tool.Registry
+	Browser             *builtin.BrowserTool
+	HumanInTheLoop      *builtin.HumanInTheLoop
 }
 
 // Bootstrap initializes the application with the given config path.
@@ -94,6 +96,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	}
 
 	var executor *tool.Executor
+	var browserTool *builtin.BrowserTool
 	if cfg.Tools.Enabled {
 		registry.Register(builtin.NewFileReadSandboxed(sandbox))
 		registry.Register(builtin.NewFileWriteSandboxed(sandbox))
@@ -105,7 +108,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		registry.Register(builtin.NewCalculator())
 		registry.Register(builtin.NewSystemInfo())
 
-		browserTool := builtin.NewBrowserTool()
+		browserTool = builtin.NewBrowserTool()
 		registry.Register(browserTool)
 
 		timeout := time.Duration(cfg.Tools.TimeoutSeconds) * time.Second
@@ -116,7 +119,21 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		executor = tool.NewExecutor(registry, audit, approvalFn, timeout)
 	}
 
-	// 6. Init memory store
+	// 6. Init memory store with vector search capabilities
+	var enhancedMemStore *memory.EnhancedStore
+	embedder := router.GetEmbedder()
+	if embedder != nil {
+		// Use enhanced store with embeddings for RAG
+		enhancedStore, err := memory.NewEnhancedStore(cfg.Agent.MemoryDBPath, embedder)
+		if err != nil {
+			audit.Close()
+			return nil, fmt.Errorf("failed to init enhanced memory store: %w", err)
+		}
+		enhancedMemStore = enhancedStore
+		slog.Info("Memory store initialized with vector search (RAG enabled)")
+	}
+
+	// Also create basic store for manager (needed for message history)
 	memStore, err := memory.NewStore(cfg.Agent.MemoryDBPath)
 	if err != nil {
 		audit.Close()
@@ -132,13 +149,22 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	// 8. Init agent manager
 	manager := agent.NewManager(cfg, router, sanitizer, audit, memStore, registry, executor, skillsLoader)
 
+	// Set enhanced store for RAG if available
+	if enhancedMemStore != nil {
+		manager.SetEnhancedStore(enhancedMemStore)
+	}
+
 	// 9. Init sub-agent manager
 	subAgentMgr := subagent.NewManager(manager, router)
 
-	// Register spawn and message tools
+	// 9b. Init Human-in-the-Loop manager
+	hitl := builtin.NewHumanInTheLoop()
+
+	// Register spawn, message, and ask_human tools
 	if cfg.Tools.Enabled {
 		registry.Register(builtin.NewSpawnTool(subAgentMgr))
 		registry.Register(builtin.NewMessageTool(subAgentMgr))
+		registry.Register(builtin.NewAskHumanTool(hitl))
 	}
 
 	// 10. Init heartbeat scheduler
@@ -158,10 +184,10 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	var channels []channel.Channel
 
 	if cfg.Channels.Telegram.Enabled {
-		channels = append(channels, telegram.NewChannel(cfg.Channels.Telegram.Token, manager))
+		channels = append(channels, telegram.NewChannelWithHITL(cfg.Channels.Telegram.Token, manager, hitl))
 	}
 	if cfg.Channels.Discord.Enabled {
-		channels = append(channels, discord.NewChannel(cfg.Channels.Discord.Token, manager))
+		channels = append(channels, discord.NewChannelWithHITL(cfg.Channels.Discord.Token, manager, hitl))
 	}
 	if cfg.Channels.WebSocket.Enabled {
 		channels = append(channels, websocket.NewServer(cfg.Channels.WebSocket.Port, manager))
@@ -185,16 +211,18 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	}
 
 	return &App{
-		Config:             cfg,
-		Manager:            manager,
-		SubAgentMgr:        subAgentMgr,
-		MemoryStore:        memStore,
-		AuditLogger:        audit,
-		HeartbeatScheduler: heartbeatScheduler,
-		HealthServer:       healthSrv,
-		Channels:           channels,
-		Registry:           registry,
-		Browser:            browserTool,
+		Config:              cfg,
+		Manager:             manager,
+		SubAgentMgr:         subAgentMgr,
+		MemoryStore:         memStore,
+		EnhancedMemoryStore: enhancedMemStore,
+		AuditLogger:         audit,
+		HeartbeatScheduler:  heartbeatScheduler,
+		HealthServer:        healthSrv,
+		Channels:            channels,
+		Registry:            registry,
+		Browser:             browserTool,
+		HumanInTheLoop:      hitl,
 	}, nil
 }
 

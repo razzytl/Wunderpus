@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -265,8 +266,10 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 				parts = append(parts, map[string]any{"text": m.Content})
 			}
 			for _, tc := range m.ToolCalls {
-				var args map[string]any
-				_ = json.Unmarshal([]byte(tc.Function.Arguments), &args)
+				args := make(map[string]any)
+				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+					slog.Warn("failed to parse tool arguments", "error", err)
+				}
 				parts = append(parts, map[string]any{
 					"functionCall": map[string]any{
 						"name": tc.Function.Name,
@@ -325,8 +328,10 @@ func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[stri
 	if len(tools) > 0 {
 		var functionDeclarations []map[string]any
 		for _, t := range tools {
-			var params map[string]any
-			_ = json.Unmarshal(t.Function.Parameters, &params)
+			params := make(map[string]any)
+			if err := json.Unmarshal(t.Function.Parameters, &params); err != nil {
+				slog.Warn("failed to parse function parameters", "error", err)
+			}
 			functionDeclarations = append(functionDeclarations, map[string]any{
 				"name":        t.Function.Name,
 				"description": t.Function.Description,

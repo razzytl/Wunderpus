@@ -121,10 +121,8 @@ func (si *SkillInstaller) InstallFromLocalPath(ctx context.Context, sourcePath s
 	skillDir := filepath.Join(si.workspace, "skills", skillName)
 
 	// Check if skill already exists
-	if !os.IsNotExist(err) {
-		if _, err := os.Stat(skillDir); err == nil {
-			return fmt.Errorf("skill '%s' already exists (use --force to overwrite)", skillName)
-		}
+	if _, err := os.Stat(skillDir); err == nil {
+		return fmt.Errorf("skill '%s' already exists (use --force to overwrite)", skillName)
 	}
 
 	// Create destination directory

@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Migration represents a single database schema change.
@@ -26,6 +27,19 @@ var migrations = []Migration{
 			ALTER TABLE messages ADD COLUMN encrypted INTEGER DEFAULT 0;
 		`,
 	},
+	{
+		Version: 3,
+		SQL: `
+			CREATE TABLE IF NOT EXISTS sop_store (
+				id TEXT PRIMARY KEY,
+				title TEXT NOT NULL,
+				content TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				success_count INTEGER DEFAULT 1
+			);
+			CREATE INDEX IF NOT EXISTS idx_sop_title ON sop_store(title);
+		`,
+	},
 }
 
 // Migrate runs all pending migrations.
@@ -46,6 +60,14 @@ func (s *Store) Migrate() error {
 
 			if _, err := tx.Exec(m.SQL); err != nil {
 				tx.Rollback()
+				// Ignore "duplicate column" errors for ALTER TABLE ADD COLUMN
+				// This handles the case where new installs have the column in CREATE TABLE
+				// and upgrades already have the column from a previous migration run
+				if m.Version == 2 && strings.Contains(err.Error(), "duplicate column name") {
+					// Column already exists, skip this migration
+					currentVersion = m.Version
+					continue
+				}
 				return fmt.Errorf("migration version %d failed: %w", m.Version, err)
 			}
 

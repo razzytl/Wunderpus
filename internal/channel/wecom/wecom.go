@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -225,14 +226,24 @@ func (c *Channel) sendMessage(userID, content string) {
 		},
 	}
 
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	body, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("wecom: JSON marshal failed", "error", err)
+		return
+	}
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(body)))
+	if err != nil {
+		slog.Error("wecom: request creation failed", "error", err)
+		return
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
-	if err == nil {
-		resp.Body.Close()
+	if err != nil {
+		slog.Error("wecom: request failed", "error", err)
+		return
 	}
+	resp.Body.Close()
 }
 
 // decrypt decrypts an encrypted string using AES-CFB

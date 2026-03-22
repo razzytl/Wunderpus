@@ -531,3 +531,45 @@ HTTP health endpoint at `/health`:
 - Provider connectivity
 - Channel status
 - Database connectivity
+
+---
+
+## Genesis Plan — Autonomous Architecture
+
+The Wunderpus Genesis Plan adds four autonomous capabilities to the existing agent framework:
+
+### Overview
+
+| Pillar | Package | Purpose |
+|--------|---------|---------|
+| **RSI** (Recursive Self-Improvement) | `internal/rsi/` | Agent rewrites and upgrades its own code via AST analysis, LLM proposals, sandboxed testing, and fitness-gated deployment |
+| **AGS** (Autonomous Goal Synthesis) | `internal/ags/` | Agent sets its own goals from episodic memory patterns, prioritizes them, executes them, and adjusts its own goal-scoring weights |
+| **UAA** (Unbounded Autonomous Action) | `internal/uaa/` | Agent acts autonomously through a trust budget system with 4-tier action classification and shadow mode simulation |
+| **RA** (Resource Acquisition) | `internal/ra/` | Agent provisions its own compute, manages API keys, routes LLM requests, and forecasts resource needs |
+
+### Shared Infrastructure
+
+All pillars share:
+- **Audit Log** (`internal/audit/`) — SHA-256 hash-chained, append-only, SQLite-backed
+- **Event Bus** (`internal/events/`) — Typed pub/sub with dead-letter queue
+- **Profiler** (`internal/rsi/profiler.go`) — Ring-buffer P99 latency tracking
+
+### Key Files
+
+| File | Description |
+|------|-------------|
+| `WUNDERPUS_GENESIS_PLAN.md` | Architectural blueprint — approach comparisons, design decisions, implementation roadmaps |
+| `WUNDERPUS_CHECKLIST.md` | 187-item implementation checklist with code/test/infra gates per phase |
+| `WUNDERPUS_IMPLEMENTATION_SUMMARY.md` | What was built — deliverables, design decisions, test results, quality audit |
+
+### Phase Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 0 | Foundations (audit, events, profiler, trust, classifier) | ✅ Complete |
+| 1 | RSI (code mapper, weakness report, proposal engine, sandbox, fitness, deployer) | ✅ Complete |
+| 2 | AGS (goal model, scorer, synthesizer, executor, metacognition) | ✅ Complete |
+| 3 | UAA+RA (shadow mode, executor, resource registry, key manager, cloud adapter, forecaster) | ✅ Complete |
+| 4 | Sovereignty (WASM sandbox, self-referential RSI, multi-agent, financial, bootstrap) | ✅ Complete |
+
+For detailed implementation notes, see `WUNDERPUS_IMPLEMENTATION_SUMMARY.md`.

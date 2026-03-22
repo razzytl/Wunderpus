@@ -24,12 +24,14 @@ type Bus struct {
 	mu          sync.RWMutex
 	dlq         []Event // dead-letter queue for panicking handlers
 	dlqMu       sync.Mutex
+	dlqMaxSize  int // max DLQ entries (oldest evicted first)
 }
 
-// NewBus creates and returns a new event bus.
+// NewBus creates and returns a new event bus with a DLQ max size of 1000.
 func NewBus() *Bus {
 	return &Bus{
 		subscribers: make(map[EventType][]HandlerFunc),
+		dlqMaxSize:  1000,
 	}
 }
 
@@ -132,6 +134,10 @@ func (b *Bus) ClearDLQ() {
 func (b *Bus) sendToDLQ(e Event) {
 	b.dlqMu.Lock()
 	defer b.dlqMu.Unlock()
+	// Evict oldest if at max capacity
+	if len(b.dlq) >= b.dlqMaxSize {
+		b.dlq = b.dlq[1:]
+	}
 	b.dlq = append(b.dlq, e)
 }
 

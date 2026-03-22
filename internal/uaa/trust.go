@@ -169,23 +169,48 @@ func (tb *TrustBudget) RecordOutcome(actionID string, cost int, success bool) {
 		if refund > 0 {
 			tb.Credit(refund, fmt.Sprintf("success refund for %s", actionID))
 		}
-	} else {
-		penalty := cost * 3
-		tb.mu.Lock()
-		tb.current -= penalty
-		if tb.current < 0 {
-			tb.current = 0
-		}
-		tb.persist()
-		tb.recordHistory(actionID, -penalty, "failure penalty")
-		tb.mu.Unlock()
+		return
+	}
 
-		if tb.current <= 0 {
-			tb.mu.Lock()
-			tb.enterLockdown()
-			tb.mu.Unlock()
+	// Failure path — hold lock through the entire operation to prevent TOCTOU race
+	tb.mu.Lock()
+	penalty := cost * 3
+	tb.current -= penalty
+	if tb.current < 0 {
+		tb.current = 0
+	}
+	depleted := tb.current <= 0
+	tb.persist()
+	tb.recordHistory(actionID, -penalty, "failure penalty")
+
+	// If depleted, enter lockdown UNDER THE SAME LOCK to prevent Credit from slipping in
+	if depleted {
+		tb.current = 0
+		tb.persist()
+		tb.recordHistory("", 0, "lockdown engaged")
+
+		slog.Warn("trust: LOCKDOWN ENGAGED — all Tier 2+ actions blocked")
+
+		if tb.audit != nil {
+			_ = tb.audit.Write(audit.AuditEntry{
+				Subsystem: "uaa",
+				EventType: audit.EventTrustLockdown,
+				ActorID:   "system",
+				Payload:   []byte(`{"reason":"trust budget depleted"}`),
+			})
+		}
+
+		if tb.events != nil {
+			tb.events.Publish(events.Event{
+				Type:   audit.EventTrustLockdown,
+				Source: "trust_budget",
+				Payload: map[string]interface{}{
+					"reason": "trust budget depleted",
+				},
+			})
 		}
 	}
+	tb.mu.Unlock()
 }
 
 // EnterLockdown forces the system into lockdown. Only Tier 1 actions are permitted.

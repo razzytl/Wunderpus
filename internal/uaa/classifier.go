@@ -1,6 +1,7 @@
 package uaa
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -155,7 +156,7 @@ func isTempPath(params map[string]interface{}) bool {
 
 // osTempDir returns the OS temp directory with forward slashes.
 func osTempDir() string {
-	return filepath.ToSlash(filepath.Clean(filepath.Join("C:", "Temp")))
+	return filepath.ToSlash(filepath.Clean(os.TempDir()))
 }
 
 // isSafeShellCommand checks if a shell command is in the safe whitelist.

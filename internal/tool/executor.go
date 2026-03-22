@@ -20,6 +20,9 @@ type Analytics struct {
 	stats map[string]*ToolStats
 }
 
+// ProfilerFn wraps a function with telemetry. Matches rsi.Profiler.Track signature.
+type ProfilerFn func(name string, fn func() error) error
+
 // ToolStats holds metrics for a single tool.
 type ToolStats struct {
 	CallCount    int
@@ -34,6 +37,7 @@ type Executor struct {
 	approvalFn ApprovalFunc
 	timeout    time.Duration
 	analytics  *Analytics
+	profiler   ProfilerFn // optional: wraps tool calls with telemetry
 }
 
 // NewExecutor creates a new tool executor.
@@ -52,6 +56,11 @@ func NewExecutor(
 			stats: make(map[string]*ToolStats),
 		},
 	}
+}
+
+// SetProfiler sets the profiler function that wraps tool calls with telemetry.
+func (e *Executor) SetProfiler(fn ProfilerFn) {
+	e.profiler = fn
 }
 
 // Execute runs a tool call with sandbox, approval, and audit.
@@ -85,10 +94,21 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 	execCtx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
 
-	// 4. Execute
+	// 4. Execute (with optional profiler wrapping)
 	slog.Info("tool executing", "tool", call.Name, "args", call.Args)
 
-	result, err := t.Execute(execCtx, call.Args)
+	var result *Result
+	var execErr error
+
+	if e.profiler != nil {
+		_ = e.profiler(call.Name, func() error {
+			result, execErr = t.Execute(execCtx, call.Args)
+			return execErr
+		})
+	} else {
+		result, execErr = t.Execute(execCtx, call.Args)
+	}
+	err := execErr
 	elapsed := time.Since(start)
 
 	if err != nil {

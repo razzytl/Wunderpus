@@ -2,10 +2,12 @@ package rsi
 
 import (
 	"testing"
+
+	"github.com/wunderpus/wunderpus/internal/config"
 )
 
 func TestFitnessEvaluator_Score(t *testing.T) {
-	fe := NewFitnessEvaluator(0.05)
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.05}}, nil)
 
 	// Case 1: P99 improved from 1000ms to 800ms, no errors, tests pass
 	before := SpanStats{
@@ -33,7 +35,7 @@ func TestFitnessEvaluator_Score(t *testing.T) {
 }
 
 func TestFitnessEvaluator_TestFailure(t *testing.T) {
-	fe := NewFitnessEvaluator(0.05)
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.05}}, nil)
 
 	before := SpanStats{P99LatencyNs: 1_000_000_000}
 	after := SpanStats{P99LatencyNs: 500_000_000}
@@ -49,7 +51,7 @@ func TestFitnessEvaluator_TestFailure(t *testing.T) {
 }
 
 func TestFitnessEvaluator_RaceDetected(t *testing.T) {
-	fe := NewFitnessEvaluator(0.05)
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.05}}, nil)
 
 	before := SpanStats{P99LatencyNs: 1_000_000_000}
 	after := SpanStats{P99LatencyNs: 500_000_000}
@@ -65,7 +67,7 @@ func TestFitnessEvaluator_RaceDetected(t *testing.T) {
 }
 
 func TestFitnessEvaluator_ErrorImprovement(t *testing.T) {
-	fe := NewFitnessEvaluator(0.05)
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.05}}, nil)
 
 	before := SpanStats{
 		P99LatencyNs: 1_000_000_000,
@@ -89,7 +91,7 @@ func TestFitnessEvaluator_ErrorImprovement(t *testing.T) {
 }
 
 func TestFitnessEvaluator_SelectWinner(t *testing.T) {
-	fe := NewFitnessEvaluator(0.05)
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.05}}, nil)
 
 	before := SpanStats{P99LatencyNs: 1_000_000_000}
 
@@ -125,7 +127,7 @@ func TestFitnessEvaluator_SelectWinner(t *testing.T) {
 }
 
 func TestFitnessEvaluator_NoWinnerBelowThreshold(t *testing.T) {
-	fe := NewFitnessEvaluator(0.5) // high threshold
+	fe := NewFitnessEvaluator(&config.Config{Genesis: config.GenesisConfig{RSIFitnessThreshold: 0.5}}, nil) // high threshold
 
 	before := SpanStats{P99LatencyNs: 1_000_000_000}
 

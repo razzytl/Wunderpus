@@ -46,6 +46,9 @@ const (
 	EventTrustLockdown EventType = "trust.lockdown"
 	EventTrustReset    EventType = "trust.reset"
 	EventTrustRegen    EventType = "trust.regen"
+
+	// EventLockdownEngaged is an alias for EventTrustLockdown (checklist naming).
+	EventLockdownEngaged = EventTrustLockdown
 )
 
 // System events

@@ -49,7 +49,9 @@ type GenesisConfig struct {
 	ProfilerPPROFPort     int      `yaml:"profiler_pprof_port"`     // pprof endpoint port (default: 6060, 0 = disabled)
 	TrustBudgetDBPath     string   `yaml:"trust_budget_db_path"`    // Trust budget DB path
 	JWTSecretEnv          string   `yaml:"jwt_secret_env"`          // Env var name holding JWT secret (default: WUNDERPUS_JWT_SECRET)
-	ExternalHostAllowlist []string `yaml:"external_host_allowlist"` // Known-safe external hosts for Tier 4
+	ExternalHostAllowlist        []string `yaml:"external_host_allowlist"`          // Known-safe external hosts for Tier 4
+	RSIFitnessThreshold          float64  `yaml:"rsi_fitness_threshold"`            // Minimum fitness score to deploy an RSI proposal (default: 0.05)
+	RSISelfReferentialEnabled    bool     `yaml:"rsi_self_referential_enabled"`     // Allow RSI to modify internal/rsi/ (default: false, Phase 4 unlock)
 }
 
 const CurrentConfigVersion = 3
@@ -631,6 +633,8 @@ func applyDefaults(cfg *Config) {
 	cfg.Genesis.ProfilerPPROFPort = 0 // disabled by default
 	cfg.Genesis.TrustBudgetDBPath = filepath.Join(cfg.Home, "wunderpus_trust.db")
 	cfg.Genesis.JWTSecretEnv = "WUNDERPUS_JWT_SECRET"
+	cfg.Genesis.RSIFitnessThreshold = 0.05
+	cfg.Genesis.RSISelfReferentialEnabled = false
 
 	cfg.Providers.OpenAI.Model = "gpt-4o"
 	cfg.Providers.OpenAI.MaxTokens = 4096

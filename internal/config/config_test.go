@@ -256,3 +256,32 @@ func TestAvailableProviders(t *testing.T) {
 		t.Errorf("Expected at least 2 providers, got %d", len(providers))
 	}
 }
+
+// TestGenesisConfig_NewFields verifies the two checklist-required genesis fields
+// are present in the struct and receive correct default values.
+func TestGenesisConfig_NewFields(t *testing.T) {
+	cfg := &Config{}
+	applyDefaults(cfg)
+
+	// RSIFitnessThreshold: default 0.05 per checklist
+	if cfg.Genesis.RSIFitnessThreshold != 0.05 {
+		t.Errorf("RSIFitnessThreshold default = %v, want 0.05", cfg.Genesis.RSIFitnessThreshold)
+	}
+
+	// RSISelfReferentialEnabled: default false per checklist
+	if cfg.Genesis.RSISelfReferentialEnabled != false {
+		t.Errorf("RSISelfReferentialEnabled default = %v, want false", cfg.Genesis.RSISelfReferentialEnabled)
+	}
+
+	// Sanity: trust budget defaults still correct
+	if cfg.Genesis.TrustBudgetMax != 1000 {
+		t.Errorf("TrustBudgetMax default = %v, want 1000", cfg.Genesis.TrustBudgetMax)
+	}
+	if cfg.Genesis.TrustRegenPerHour != 10 {
+		t.Errorf("TrustRegenPerHour default = %v, want 10", cfg.Genesis.TrustRegenPerHour)
+	}
+	if cfg.Genesis.MaxDailySpendUSD != 10.0 {
+		t.Errorf("MaxDailySpendUSD default = %v, want 10.0", cfg.Genesis.MaxDailySpendUSD)
+	}
+}
+

@@ -1,20 +1,32 @@
 package rsi
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
+
+	"github.com/wunderpus/wunderpus/internal/audit"
+	"github.com/wunderpus/wunderpus/internal/config"
 )
 
 // FitnessEvaluator computes fitness scores for RSI proposals based on
 // before/after metrics and sandbox test results.
 type FitnessEvaluator struct {
-	threshold float64 // minimum fitness to consider (default 0.05 = 5%)
+	threshold float64 // minimum fitness to consider
+	audit     *audit.AuditLog
 }
 
-// NewFitnessEvaluator creates a fitness evaluator with the given threshold.
-func NewFitnessEvaluator(threshold float64) *FitnessEvaluator {
-	return &FitnessEvaluator{threshold: threshold}
+// NewFitnessEvaluator creates a fitness evaluator using config threshold and audit log.
+func NewFitnessEvaluator(cfg *config.Config, auditLog *audit.AuditLog) *FitnessEvaluator {
+	threshold := 0.05
+	if cfg != nil && cfg.Genesis.RSIFitnessThreshold > 0 {
+		threshold = cfg.Genesis.RSIFitnessThreshold
+	}
+	return &FitnessEvaluator{
+		threshold: threshold,
+		audit:     auditLog,
+	}
 }
 
 // Score computes the fitness of a proposal relative to the original function.
@@ -80,6 +92,30 @@ func (f *FitnessEvaluator) SelectWinner(
 		}
 
 		score := f.Score(before, afterMetrics[i], reports[i])
+
+		if f.audit != nil {
+			status := "REJECTED"
+			if score >= f.threshold {
+				status = "QUALIFIED"
+			}
+			payloadBytes, _ := json.Marshal(map[string]interface{}{
+				"proposal_id":   proposals[i].ID,
+				"target_func":   before.FunctionName,
+				"score":         score,
+				"status":        status,
+				"tests_passed":  reports[i].TestsPassed,
+				"race_clean":    reports[i].RaceClean,
+				"latency_delta": before.P99LatencyNs - afterMetrics[i].P99LatencyNs,
+				"error_delta":   before.ErrorCount - afterMetrics[i].ErrorCount,
+			})
+
+			f.audit.Write(audit.AuditEntry{
+				Subsystem: "rsi",
+				EventType: audit.EventRSIFitnessEvaluated,
+				ActorID:   "wunderpus",
+				Payload:   payloadBytes,
+			})
+		}
 
 		if score > bestScore {
 			bestScore = score

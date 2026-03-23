@@ -284,3 +284,44 @@ heartbeat:
   enabled: true           # Set to false to disable heartbeat
   interval: 30            # Interval in minutes (minimum: 5)
 
+# ═══════════════════════════════════════════════════════════════════
+# GENESIS — Autonomous Economic Agent feature flags
+# All disabled by default. Enable progressively after Phase gate tests pass.
+# ═══════════════════════════════════════════════════════════════════
+genesis:
+  # Phase 1 — Recursive Self-Improvement (RSI)
+  rsi_enabled: false                    # Enable the RSI Ouroboros loop
+  rsi_firewall_enabled: true            # RSI can only modify internal/ (NEVER disable in production)
+  rsi_self_referential_enabled: false   # Allow RSI to modify internal/rsi/ (Phase 4 unlock only)
+  rsi_fitness_threshold: 0.05           # Minimum fitness delta to accept an RSI proposal (0.0–1.0)
+
+  # Phase 2 — Autonomous Goal Synthesis (AGS)
+  ags_enabled: false                    # Enable self-generated goal synthesis
+
+  # Phase 3 — Unbounded Autonomous Action (UAA)
+  uaa_enabled: false                    # Enable full UAA gate (classify → trust → shadow → execute)
+
+  # Phase 3 — Resource Acquisition (RA)
+  ra_enabled: false                     # Enable cloud provisioning via RA module
+
+  # Trust budget
+  trust_budget_max: 1000                # Maximum trust points (resets on human JWT)
+  trust_regen_per_hour: 10             # Passive regen (1 point per 360 seconds)
+
+  # Spend cap — hard limit, checked before any cloud provision call
+  max_daily_spend_usd: 10.0            # Maximum allowed cloud spend per day in USD
+
+  # JWT reset secret must live in this env var ONLY (agent cannot read it)
+  jwt_secret_env: "WUNDERPUS_JWT_SECRET"
+
+  # External host allowlist — hosts classified as Tier 3 instead of Tier 4
+  external_host_allowlist: []
+    # - "api.example.com"
+
+  # Database paths (resolved relative to home if empty/relative)
+  audit_log_db_path: ""      # Default: ~/.wunderpus/wunderpus_genesis_audit.db
+  profiler_db_path: ""       # Default: ~/.wunderpus/wunderpus_profiler.db
+  trust_budget_db_path: ""   # Default: ~/.wunderpus/wunderpus_trust.db
+  profiler_pprof_port: 0     # pprof port (0 = disabled, recommended for production)
+
+

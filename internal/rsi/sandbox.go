@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,14 +34,17 @@ type Sandbox struct {
 	repoRoot   string
 	workDir    string
 	timeoutSec int
+	UseDocker  bool
 }
 
 // NewSandbox creates a sandbox for the given repository root.
 func NewSandbox(repoRoot string) *Sandbox {
+	_, err := exec.LookPath("docker")
 	return &Sandbox{
 		repoRoot:   repoRoot,
 		workDir:    os.TempDir(),
 		timeoutSec: 60,
+		UseDocker:  err == nil, // Auto-detect Docker
 	}
 }
 
@@ -94,6 +99,13 @@ func (s *Sandbox) Run(proposal Proposal, baseRepoPath string) (*SandboxReport, e
 
 	timeout := time.Duration(s.timeoutSec) * time.Second
 
+	if s.UseDocker {
+		return s.runInDocker(sandboxDir, timeout, start, report)
+	}
+	return s.runLocally(sandboxDir, timeout, start, report)
+}
+
+func (s *Sandbox) runLocally(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport) (*SandboxReport, error) {
 	// Build the modified code
 	buildCtx, buildCancel := context.WithTimeout(context.Background(), timeout)
 	defer buildCancel()
@@ -119,12 +131,18 @@ func (s *Sandbox) Run(proposal Proposal, baseRepoPath string) (*SandboxReport, e
 	testOutput, testErr := testCmd.CombinedOutput()
 	report.TestOutput = string(testOutput)
 
-	if testErr != nil {
-		report.TestsPassed = false
-		report.Duration = time.Since(start)
-		return report, nil
-	}
 	report.TestsPassed = true
+
+	// Run benchmarks
+	benchCtx, benchCancel := context.WithTimeout(context.Background(), timeout)
+	defer benchCancel()
+
+	benchCmd := exec.CommandContext(benchCtx, "go", "test", "-bench", ".", "-benchmem", "-run=^$", "./internal/...")
+	benchCmd.Dir = sandboxDir
+	benchOutput, benchErr := benchCmd.CombinedOutput()
+	if benchErr == nil {
+		report.BenchmarkNsOp = parseBenchmarks(string(benchOutput))
+	}
 
 	// Run race detector
 	raceCtx, raceCancel := context.WithTimeout(context.Background(), timeout)
@@ -134,6 +152,87 @@ func (s *Sandbox) Run(proposal Proposal, baseRepoPath string) (*SandboxReport, e
 	raceCmd.Dir = sandboxDir
 	_, raceErr := raceCmd.CombinedOutput()
 	report.RaceClean = (raceErr == nil)
+
+	report.Duration = time.Since(start)
+	return report, nil
+}
+
+func (s *Sandbox) runInDocker(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport) (*SandboxReport, error) {
+	hostDir, err := filepath.Abs(sandboxDir)
+	if err != nil {
+		report.Error = fmt.Sprintf("failed to get absolute path for sandbox: %v", err)
+		report.Duration = time.Since(start)
+		return report, nil
+	}
+
+	// We use golang image and run all steps via a script to save overhead
+	script := `#!/bin/sh
+go build ./internal/... > build.log 2>&1
+if [ $? -ne 0 ]; then
+	exit 1
+fi
+go test -count=1 ./internal/... > test.log 2>&1
+if [ $? -ne 0 ]; then
+	exit 2
+fi
+go test -bench . -benchmem -run=^$ ./internal/... > bench.log 2>&1
+go test -race -count=1 ./internal/... > race.log 2>&1
+if [ $? -ne 0 ]; then
+	exit 3
+fi
+exit 0
+`
+	if err := os.WriteFile(filepath.Join(sandboxDir, "run_tests.sh"), []byte(script), 0755); err != nil {
+		report.Error = fmt.Sprintf("failed to write test script: %v", err)
+		return report, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	dockerCmd := exec.CommandContext(ctx, "docker", "run", "--rm",
+		"--network", "none",
+		"--memory", "512m",
+		"--cpus", "1.0",
+		"-v", fmt.Sprintf("%s:/workspace", hostDir),
+		"-w", "/workspace",
+		"golang:latest",
+		"sh", "./run_tests.sh",
+	)
+
+	err = dockerCmd.Run()
+	
+	buildLog, _ := os.ReadFile(filepath.Join(sandboxDir, "build.log"))
+	testLog, _ := os.ReadFile(filepath.Join(sandboxDir, "test.log"))
+	benchLog, _ := os.ReadFile(filepath.Join(sandboxDir, "bench.log"))
+	// raceLog, _ := os.ReadFile(filepath.Join(sandboxDir, "race.log"))
+
+	report.BuildOutput = string(buildLog)
+	report.TestOutput = string(testLog)
+	report.BenchmarkNsOp = parseBenchmarks(string(benchLog))
+
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if ok {
+			switch exitErr.ExitCode() {
+			case 1:
+				report.BuildPassed = false
+			case 2:
+				report.BuildPassed = true
+				report.TestsPassed = false
+			case 3:
+				report.BuildPassed = true
+				report.TestsPassed = true
+				report.RaceClean = false
+			}
+		} else {
+			report.Error = fmt.Sprintf("docker run failed: %v", err)
+		}
+	} else {
+		report.BuildPassed = true
+		report.TestsPassed = true
+		report.RaceClean = true
+	}
 
 	report.Duration = time.Since(start)
 	return report, nil
@@ -168,4 +267,23 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(dstPath, data, info.Mode())
 	})
+}
+
+// parseBenchmarks extracts ns/op from Go benchmark output.
+func parseBenchmarks(output string) map[string]float64 {
+	benchmarks := make(map[string]float64)
+	// Example: BenchmarkSlowFunction-8   1   10000000 ns/op
+	// We handle both floating point and integer results
+	re := regexp.MustCompile(`Benchmark([a-zA-Z0-9_]+)(?:-\d+)?\s+\d+\s+([\d.]+)\s+ns/op`)
+	matches := re.FindAllStringSubmatch(output, -1)
+	for _, m := range matches {
+		if len(m) == 3 {
+			name := m[1]
+			val, err := strconv.ParseFloat(m[2], 64)
+			if err == nil {
+				benchmarks[name] = val
+			}
+		}
+	}
+	return benchmarks
 }

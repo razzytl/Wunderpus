@@ -2,7 +2,9 @@ package rsi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/wunderpus/wunderpus/internal/audit"
 	"log/slog"
 	"strings"
 	"sync"
@@ -34,7 +36,7 @@ type ProposalEngine struct {
 
 // AuditWriter is a minimal interface for writing to the audit log.
 type AuditWriter interface {
-	Write(entry interface{}) error
+	Write(entry audit.AuditEntry) error
 }
 
 // NewProposalEngine creates a proposal engine with the given LLM completion function.
@@ -43,6 +45,11 @@ func NewProposalEngine(completeFn CompletionFn, modelName string) *ProposalEngin
 		completeFn: completeFn,
 		modelName:  modelName,
 	}
+}
+
+// SetAuditLog sets the audit log writer.
+func (p *ProposalEngine) SetAuditLog(writer AuditWriter) {
+	p.auditLog = writer
 }
 
 // Propose generates 3 candidate diffs for improving the given weak function.
@@ -151,8 +158,35 @@ Generate a diff that improves this function.`, entry.FunctionNode.QualifiedName,
 		}
 	}
 	if validCount == 0 {
+		if p.auditLog != nil {
+			_ = p.auditLog.Write(audit.AuditEntry{
+				Timestamp: time.Now().UTC(),
+				Subsystem: "rsi",
+				EventType: audit.EventActionFailed,
+				Payload:   []byte(`{"reason":"all 3 proposals failed validation"}`),
+			})
+		}
 		return proposals, fmt.Errorf("rsi proposer: all 3 proposals failed validation for %s",
 			entry.FunctionNode.QualifiedName)
+	}
+
+	if p.auditLog != nil {
+		for _, prop := range proposals {
+			if prop.Diff == "" {
+				continue
+			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"proposal_id": prop.ID,
+				"target":      prop.TargetFunction,
+				"temperature": prop.Temperature,
+			})
+			_ = p.auditLog.Write(audit.AuditEntry{
+				Timestamp: prop.GeneratedAt,
+				Subsystem: "rsi",
+				EventType: audit.EventRSIProposalGenerated,
+				Payload:   payload,
+			})
+		}
 	}
 
 	return proposals, nil

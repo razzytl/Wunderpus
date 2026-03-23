@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/wunderpus/wunderpus/internal/audit"
 	"log/slog"
 	"math"
 	"sort"
@@ -34,6 +35,7 @@ type WeaknessReporter struct {
 	profiler *Profiler
 	mapper   *CodeMapper
 	db       *sql.DB
+	auditLog *audit.AuditLog
 	mu       sync.Mutex
 	reports  []WeaknessReport // keep last 30
 }
@@ -56,6 +58,11 @@ func (w *WeaknessReporter) SetDB(db *sql.DB) {
 			data         TEXT NOT NULL
 		)
 	`)
+}
+
+// SetAuditLog sets the audit log for publishing events.
+func (w *WeaknessReporter) SetAuditLog(l *audit.AuditLog) {
+	w.auditLog = l
 }
 
 // StartScheduler runs Generate() on a background goroutine.
@@ -238,6 +245,19 @@ func (w *WeaknessReporter) Generate(codeMap *CodeMap) *WeaknessReport {
 		w.reports = w.reports[len(w.reports)-30:]
 	}
 	w.mu.Unlock()
+
+	if w.auditLog != nil {
+		payload, _ := json.Marshal(map[string]interface{}{
+			"functions_analyzed": report.TotalFunctionsAnalyzed,
+			"top_candidates":     len(report.TopCandidates),
+		})
+		_ = w.auditLog.Write(audit.AuditEntry{
+			Timestamp: report.GeneratedAt,
+			Subsystem: "rsi",
+			EventType: audit.EventRSICycleStarted,
+			Payload:   payload,
+		})
+	}
 
 	return report
 }

@@ -132,6 +132,13 @@ func VeryComplex(x, y, z int) int {
 	if x > 0 || y > 0 {
 		return 2
 	}
+	if x < 0 && y < 0 {
+		for k := 0; k < 5; k++ {
+			if k%2 == 0 {
+				return 3
+			}
+		}
+	}
 	for j := 0; j < 10; j++ {
 		_ = j
 	}
@@ -151,9 +158,9 @@ func VeryComplex(x, y, z int) int {
 		t.Fatal("VeryComplex not found")
 	}
 
-	// Count expected: 1(base) + 4(if) + 1(for) + 3(case) + 1(LAND) + 1(LOR) + 1(for) = 12
-	if fn.CyclomaticComp < 10 {
-		t.Fatalf("VeryComplex expected complexity >= 10, got %d", fn.CyclomaticComp)
+	// Count expected: 1(base) + 6(if) + 2(for) + 3(case) + 2(LAND) + 1(LOR) + 1(for) = 16
+	if fn.CyclomaticComp < 15 {
+		t.Fatalf("VeryComplex expected complexity >= 15, got %d", fn.CyclomaticComp)
 	}
 	t.Logf("VeryComplex cyclomatic complexity: %d", fn.CyclomaticComp)
 }

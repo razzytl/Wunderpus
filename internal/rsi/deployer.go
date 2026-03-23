@@ -1,25 +1,34 @@
 package rsi
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
 // Deployer applies winning RSI proposals to the live codebase via git.
 type Deployer struct {
 	repoRoot        string
 	firewallEnabled bool
+	audit           *audit.AuditLog
+	
+	monitorInterval time.Duration
+	monitorDuration time.Duration
 }
 
 // NewDeployer creates a deployer for the given repository root.
-func NewDeployer(repoRoot string, firewallEnabled bool) *Deployer {
+func NewDeployer(repoRoot string, firewallEnabled bool, auditLog *audit.AuditLog) *Deployer {
 	return &Deployer{
 		repoRoot:        repoRoot,
 		firewallEnabled: firewallEnabled,
+		audit:           auditLog,
+		monitorInterval: 30 * time.Second,
+		monitorDuration: 10 * time.Minute,
 	}
 }
 
@@ -95,6 +104,22 @@ func (d *Deployer) Deploy(proposal Proposal, fitness float64) error {
 		return fmt.Errorf("rsi deployer: post-deploy build failed, rolled back to %s", prevTag)
 	}
 
+	if d.audit != nil {
+		payloadBytes, _ := json.Marshal(map[string]interface{}{
+			"proposal_id":     proposal.ID,
+			"target_function": proposal.TargetFunction,
+			"fitness":         fitness,
+			"rollback_tag":    prevTag,
+			"branch":          branchName,
+		})
+		d.audit.Write(audit.AuditEntry{
+			Subsystem: "rsi",
+			EventType: audit.EventRSIDeployed,
+			ActorID:   "wunderpus",
+			Payload:   payloadBytes,
+		})
+	}
+
 	slog.Info("rsi deployer: deployment complete",
 		"branch", branchName,
 		"fitness", fitness,
@@ -110,11 +135,11 @@ func (d *Deployer) Deploy(proposal Proposal, fitness float64) error {
 // auto-rollback is triggered.
 func (d *Deployer) MonitorPostDeploy(profiler *Profiler, baseline SpanStats, rollbackTag string) {
 	go func() {
-		slog.Info("rsi deployer: starting post-deploy monitoring", "duration", "10m", "tag", rollbackTag)
+		slog.Info("rsi deployer: starting post-deploy monitoring", "duration", d.monitorDuration, "tag", rollbackTag)
 
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(d.monitorInterval)
 		defer ticker.Stop()
-		deadline := time.Now().Add(10 * time.Minute)
+		deadline := time.Now().Add(d.monitorDuration)
 
 		for time.Now().Before(deadline) {
 			<-ticker.C
@@ -130,8 +155,8 @@ func (d *Deployer) MonitorPostDeploy(profiler *Profiler, baseline SpanStats, rol
 				baselineErrorRate = float64(baseline.ErrorCount) / float64(baseline.CallCount)
 			}
 
-			// If error rate increased by >20% relative to baseline
-			if baselineErrorRate > 0 && currentErrorRate > baselineErrorRate*1.2 {
+			// If error rate increased by >20% (absolute +0.20 or relative * 1.2)
+			if (currentErrorRate > baselineErrorRate+0.20) || (baselineErrorRate > 0 && currentErrorRate > baselineErrorRate*1.2) {
 				slog.Error("rsi deployer: regression detected, auto-rolling back",
 					"baseline_error_rate", baselineErrorRate,
 					"current_error_rate", currentErrorRate,
@@ -171,6 +196,18 @@ func (d *Deployer) Rollback(tag string) error {
 	buildOutput, buildErr := buildCmd.CombinedOutput()
 	if buildErr != nil {
 		return fmt.Errorf("rsi deployer: rollback build failed: %s", string(buildOutput))
+	}
+
+	if d.audit != nil {
+		payloadBytes, _ := json.Marshal(map[string]interface{}{
+			"rollback_tag": tag,
+		})
+		d.audit.Write(audit.AuditEntry{
+			Subsystem: "rsi",
+			EventType: audit.EventRSIRolledBack,
+			ActorID:   "wunderpus",
+			Payload:   payloadBytes,
+		})
 	}
 
 	slog.Info("rsi deployer: rollback complete", "tag", tag)

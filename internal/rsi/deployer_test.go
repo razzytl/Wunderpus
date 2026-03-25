@@ -28,6 +28,10 @@ func setupTestRepo(t *testing.T) string {
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = repoDir
 	_ = cmd.Run()
+	// Prevent CRLF conversion on Windows — patches must match exactly
+	cmd = exec.Command("git", "config", "core.autocrlf", "false")
+	cmd.Dir = repoDir
+	_ = cmd.Run()
 
 	// Need a go.mod
 	err := os.WriteFile(filepath.Join(repoDir, "go.mod"), []byte("module testmod\n\ngo 1.21\n"), 0644)
@@ -137,7 +141,7 @@ func TestDeployer_Rollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	cmd = exec.Command("git", "add", "internal/testpkg/test.go")
 	cmd.Dir = repoRoot
 	_ = cmd.Run()
@@ -160,23 +164,23 @@ func TestDeployer_Rollback(t *testing.T) {
 
 func TestDeployer_MonitorPostDeploy(t *testing.T) {
 	profiler, _ := NewProfiler("")
-	
+
 	// Track once to establish a baseline error count of 0 out of 1
 	profiler.Track("target_func", func() error { return nil })
-	
+
 	baseline, ok := profiler.GetStats("target_func")
 	if !ok {
 		t.Fatalf("failed to get baseline")
 	}
 
 	repoRoot := setupTestRepo(t)
-	
+
 	dbPath := filepath.Join(t.TempDir(), "audit.db")
 	auditLog, _ := audit.NewAuditLog(dbPath)
 	defer auditLog.Close()
-	
+
 	d := NewDeployer(repoRoot, true, auditLog)
-	
+
 	d.monitorInterval = 50 * time.Millisecond
 	d.monitorDuration = 500 * time.Millisecond
 
@@ -218,7 +222,7 @@ func TestDeployer_MonitorPostDeploy(t *testing.T) {
 	if strings.Contains(string(content), "return a + b + 1") {
 		t.Errorf("Rollback was not triggered by MonitorPostDeploy! File content: %s", string(content))
 	}
-	
+
 	if len(entries) != 1 {
 		t.Errorf("Expected 1 audit entry for rollback, got %d", len(entries))
 	}

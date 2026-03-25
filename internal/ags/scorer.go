@@ -2,7 +2,11 @@ package ags
 
 import (
 	"math"
+	"sync"
 	"time"
+
+	"github.com/wunderpus/wunderpus/internal/ra"
+	"github.com/wunderpus/wunderpus/internal/uaa"
 )
 
 // ScorerWeights holds the configurable weights for the priority scoring formula.
@@ -55,44 +59,57 @@ func (w ScorerWeights) Clamp(target ScorerWeights, maxDelta float64) ScorerWeigh
 
 // PriorityScorer computes composite priority scores for goals.
 type PriorityScorer struct {
+	mu      sync.RWMutex
 	weights ScorerWeights
+	trust   *uaa.TrustBudget
+	ra      *ra.ResourceRegistry
 }
 
-// NewPriorityScorer creates a scorer with default weights.
-func NewPriorityScorer() *PriorityScorer {
+// NewPriorityScorer creates a scorer with default weights and dependencies.
+func NewPriorityScorer(trust *uaa.TrustBudget, resourceReg *ra.ResourceRegistry) *PriorityScorer {
 	return &PriorityScorer{
 		weights: DefaultScorerWeights(),
+		trust:   trust,
+		ra:      resourceReg,
 	}
 }
 
 // Weights returns a copy of the current scoring weights.
 func (s *PriorityScorer) Weights() ScorerWeights {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.weights
 }
 
 // SetWeights updates the scoring weights. Caller must ensure they are valid.
 func (s *PriorityScorer) SetWeights(w ScorerWeights) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.weights = w
 }
 
 // Score computes a composite priority score for the given goal.
 func (s *PriorityScorer) Score(g Goal) float64 {
+	s.mu.RLock()
+	w := s.weights
+	s.mu.RUnlock()
+
 	urgency := computeUrgency(g)
 	impact := g.ExpectedValue
-	feasibility := computeFeasibility(g)
+	feasibility := s.computeFeasibility(g)
 	novelty := computeNovelty(g)
 	alignment := computeAlignment(g)
 
-	result := (urgency * s.weights.Urgency) +
-		(impact * s.weights.Impact) +
-		(feasibility * s.weights.Feasibility) +
-		(novelty * s.weights.Novelty) +
-		(alignment * s.weights.Alignment)
+	result := (urgency * w.Urgency) +
+		(impact * w.Impact) +
+		(feasibility * w.Feasibility) +
+		(novelty * w.Novelty) +
+		(alignment * w.Alignment)
 
 	return result
 }
 
-// computeUrgency: base 0.5, +0.3 if deferred often, -0.1 per day since creation.
+// computeUrgency: base 0.5, +0.3 if deferred often, −0.1 per day since creation.
 func computeUrgency(g Goal) float64 {
 	urgency := 0.5
 
@@ -101,17 +118,43 @@ func computeUrgency(g Goal) float64 {
 	}
 
 	daysSinceCreation := time.Since(g.CreatedAt).Hours() / 24.0
-	urgency -= daysSinceCreation * 0.1
+	urgency -= daysSinceCreation * 0.1 // Decay over time — old goals lose urgency
 
 	return clamp01(urgency)
 }
 
-// computeFeasibility estimates whether the goal can be completed with available resources.
-// For now, returns 0.7 (optimistic default). Full implementation checks tool registry
-// and trust budget when integrated with the rest of the system.
-func computeFeasibility(g Goal) float64 {
-	// Optimistic default — will be refined when integrated with UAA/RA
-	return 0.7
+func (s *PriorityScorer) computeFeasibility(g Goal) float64 {
+	feasibility := 0.7 // base default
+
+	// 1. Trust impact: Higher budget = higher feasibility for autonomy
+	if s.trust != nil {
+		balance := float64(s.trust.Current())
+		// Assuming max trust is around 1000 for normalization
+		trustFactor := balance / 1000.0
+		if trustFactor > 1.0 {
+			trustFactor = 1.0
+		}
+		feasibility *= (0.5 + 0.5*trustFactor)
+	}
+
+	// 2. Resource impact: Check for active compute resources
+	if s.ra != nil {
+		active, err := s.ra.ListActive()
+		if err == nil {
+			hasCompute := false
+			for _, res := range active {
+				if res.Type == ra.ResourceCompute {
+					hasCompute = true
+					break
+				}
+			}
+			if !hasCompute {
+				feasibility *= 0.2 // severely penalized if no compute
+			}
+		}
+	}
+
+	return clamp01(feasibility)
 }
 
 // computeNovelty: 1.0 / (1.0 + AttemptCount)

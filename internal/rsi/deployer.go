@@ -3,12 +3,12 @@ package rsi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/wunderpus/wunderpus/internal/audit"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
 // Deployer applies winning RSI proposals to the live codebase via git.
@@ -16,7 +16,7 @@ type Deployer struct {
 	repoRoot        string
 	firewallEnabled bool
 	audit           *audit.AuditLog
-	
+
 	monitorInterval time.Duration
 	monitorDuration time.Duration
 }
@@ -47,7 +47,7 @@ func (d *Deployer) Deploy(proposal Proposal, fitness float64) error {
 	tagCmd := exec.Command("git", "tag", prevTag, "HEAD")
 	tagCmd.Dir = d.repoRoot
 	if tagOutput, tagErr := tagCmd.CombinedOutput(); tagErr != nil {
-		slog.Warn("rsi deployer: failed to tag rollback", "error", string(tagOutput))
+		return fmt.Errorf("rsi deployer: failed to tag rollback point: %s", string(tagOutput))
 	}
 
 	// Create a new branch for the improvement BEFORE applying
@@ -55,12 +55,11 @@ func (d *Deployer) Deploy(proposal Proposal, fitness float64) error {
 	branchCmd := exec.Command("git", "checkout", "-b", branchName)
 	branchCmd.Dir = d.repoRoot
 	if branchOutput, branchErr := branchCmd.CombinedOutput(); branchErr != nil {
-		slog.Warn("rsi deployer: branch creation failed (may already be on branch)",
-			"error", string(branchOutput))
+		return fmt.Errorf("rsi deployer: branch creation failed: %s", string(branchOutput))
 	}
 
 	// Apply the diff to the live source tree
-	applyCmd := exec.Command("git", "apply")
+	applyCmd := exec.Command("git", "apply", "--ignore-whitespace")
 	applyCmd.Dir = d.repoRoot
 	applyCmd.Stdin = strings.NewReader(proposal.Diff)
 	output, err := applyCmd.CombinedOutput()

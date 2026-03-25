@@ -103,17 +103,10 @@ func SlowFunction() {
 
 	evaluator := NewFitnessEvaluator(nil, auditLog)
 
-	afterStats := SpanStats{
-		FunctionName: target.FunctionNode.QualifiedName,
-		P99LatencyNs: 1 * time.Millisecond.Nanoseconds(),
-		ErrorCount:   0,
-	}
-
 	beforeStats, _ := profiler.GetStats(target.FunctionNode.QualifiedName)
 	t.Logf("Before stats: name=%s, P99=%d", beforeStats.FunctionName, beforeStats.P99LatencyNs)
-	t.Logf("After stats: name=%s, P99=%d", afterStats.FunctionName, afterStats.P99LatencyNs)
 
-	fitness := evaluator.Score(beforeStats, afterStats, *mockReport)
+	fitness := evaluator.Score(beforeStats, *mockReport)
 	if fitness <= 0.05 {
 		t.Fatalf("Expected fitness > 0.05, got %v", fitness)
 	}

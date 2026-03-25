@@ -21,6 +21,11 @@ type ActionResult struct {
 // ToolRunnerFn executes the actual tool operation.
 type ToolRunnerFn func(ctx context.Context, action Action) (*ActionResult, error)
 
+// Profiler is the interface for telemetry tracking. Matches rsi.Profiler.Track signature.
+type Profiler interface {
+	Track(name string, fn func() error) error
+}
+
 // UAA is the Unbounded Autonomous Action executor. It gates every action
 // through classification, trust budget, and shadow mode before execution.
 type UAA struct {
@@ -30,6 +35,7 @@ type UAA struct {
 	audit      *audit.AuditLog
 	events     *events.Bus
 	toolRunner ToolRunnerFn
+	profiler   Profiler // optional — tracks tool execution telemetry for RSI
 }
 
 // NewUAA creates a new UAA executor.
@@ -51,6 +57,12 @@ func NewUAA(
 	}
 }
 
+// SetProfiler attaches a profiler for telemetry tracking.
+// When set, every tool execution is wrapped with profiler.Track().
+func (u *UAA) SetProfiler(p Profiler) {
+	u.profiler = p
+}
+
 // Execute gates and executes an action through the full UAA pipeline:
 // classify → trust check → shadow → deduct → execute → record outcome.
 func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error) {
@@ -58,7 +70,7 @@ func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error)
 	action.Tier = u.classifier.Classify(action)
 	action.TrustCost = TrustCostForTier(action.Tier)
 
-	// 2. Check trust budget
+	// 2. Check trust budget (non-binding pre-check; atomic TryDeduct happens after shadow)
 	ok, reason := u.trust.CanExecute(action.TrustCost)
 	if !ok {
 		u.writeAudit(audit.EventActionRejected, action, reason)
@@ -80,11 +92,28 @@ func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error)
 		}
 	}
 
-	// 4. Deduct trust cost
-	u.trust.Deduct(action.TrustCost, action.ID)
+	// 4. Atomically check + deduct trust (eliminates TOCTOU race)
+	deducted, deductReason := u.trust.TryDeduct(action.TrustCost, action.ID)
+	if !deducted {
+		u.writeAudit(audit.EventActionRejected, action, deductReason)
+		u.publishEvent(audit.EventActionRejected, action, deductReason)
+		return nil, fmt.Errorf("uaa: trust deduction failed — %s", deductReason)
+	}
 
-	// 5. Execute
-	result, err := u.toolRunner(ctx, action)
+	// 5. Execute — optionally wrapped with profiler telemetry
+	var result *ActionResult
+	var err error
+	if u.profiler != nil {
+		trackErr := u.profiler.Track(action.Tool, func() error {
+			result, err = u.toolRunner(ctx, action)
+			return err
+		})
+		if trackErr != nil && err == nil {
+			err = trackErr
+		}
+	} else {
+		result, err = u.toolRunner(ctx, action)
+	}
 
 	// 6. Record outcome
 	success := err == nil

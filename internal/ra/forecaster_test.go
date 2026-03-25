@@ -77,10 +77,10 @@ func TestResourceForecaster_AutoProvision_OverBudget(t *testing.T) {
 
 	f := NewResourceForecaster(reg)
 	needs := []ResourceNeed{
-		{Type: ResourceCompute, MaxCostHr: 5.0},
+		{Type: ResourceCompute, MaxCostHr: 5.0, Duration: 1 * time.Hour}, // total = $5
 	}
 
-	adapter := &mockAdapter{costToDate: 9.0} // close to cap
+	adapter := &mockAdapter{costToDate: 9.0} // close to cap ($9 + $5 = $14 > $10)
 
 	err := f.AutoProvision(needs, adapter, 10.0)
 	if err == nil {

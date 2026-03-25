@@ -96,20 +96,21 @@ Generate a diff that improves this function.`, entry.FunctionNode.QualifiedName,
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
-	defer cancel()
-
 	for i, temp := range temperatures {
 		wg.Add(1)
 		go func(idx int, temperature float64) {
 			defer wg.Done()
+
+			// Each goroutine gets its own independent 120-second timeout
+			propCtx, propCancel := context.WithTimeout(ctx, 120*time.Second)
+			defer propCancel()
 
 			slog.Debug("rsi proposer: generating candidate",
 				"function", entry.FunctionNode.QualifiedName,
 				"temperature", temperature,
 			)
 
-			response, err := p.completeFn(ctx, systemPrompt, userPrompt, temperature)
+			response, err := p.completeFn(propCtx, systemPrompt, userPrompt, temperature)
 			if err != nil {
 				slog.Warn("rsi proposer: LLM call failed",
 					"temperature", temperature,

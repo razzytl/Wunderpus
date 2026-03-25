@@ -1,15 +1,9 @@
 package ags
 
 import (
-	"path/filepath"
 	"testing"
 	"time"
 )
-
-func tempGoalDB(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(t.TempDir(), "test_goals.db")
-}
 
 func TestGoalStore_SaveAndRetrieve(t *testing.T) {
 	store, err := NewGoalStore(tempGoalDB(t))

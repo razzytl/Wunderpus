@@ -135,7 +135,11 @@ func (l *AuditLog) Verify() error {
 		}
 
 		entry.Payload = json.RawMessage(payloadStr)
-		entry.Timestamp, _ = time.Parse(time.RFC3339Nano, tsStr)
+		if ts, tsErr := time.Parse(time.RFC3339Nano, tsStr); tsErr != nil {
+			return fmt.Errorf("audit: corrupt timestamp at entry %d: %w (raw=%s)", rowID, tsErr, tsStr)
+		} else {
+			entry.Timestamp = ts
+		}
 
 		// Check prev hash linkage
 		if entry.PrevHash != prevHash {

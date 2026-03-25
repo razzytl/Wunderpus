@@ -113,7 +113,6 @@ func TestAuditLog_CorruptedHash(t *testing.T) {
 	log.Close()
 
 	// Corrupt the hash of entry 3 directly in SQLite
-	log.Close()
 
 	rawDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {

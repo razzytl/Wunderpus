@@ -44,6 +44,7 @@ func TestAdd(t *testing.T) {
 	}
 	execCommand(t, dir, "git", "config", "user.email", "test@test.com")
 	execCommand(t, dir, "git", "config", "user.name", "Test")
+	execCommand(t, dir, "git", "config", "core.autocrlf", "false") // prevent CRLF on Windows
 	execCommand(t, dir, "git", "add", "-A")
 	execCommand(t, dir, "git", "commit", "-m", "init")
 
@@ -139,8 +140,18 @@ func TestSandbox_RunSyntaxErrorDiff(t *testing.T) {
 func TestSandbox_Cleanup(t *testing.T) {
 	repoDir := createSandboxTestRepo(t)
 	sandbox := NewSandbox(repoDir)
+	sandbox.UseDocker = false // force local — Docker volume mounts can prevent cleanup on Windows
 
 	tmpDir := os.TempDir()
+
+	// Snapshot sandbox directories before test
+	beforeEntries, _ := os.ReadDir(tmpDir)
+	beforeSet := make(map[string]bool)
+	for _, e := range beforeEntries {
+		if strings.HasPrefix(e.Name(), "wunderpus-sandbox-") {
+			beforeSet[e.Name()] = true
+		}
+	}
 
 	validDiff := `--- a/internal/testpkg/test.go
 +++ b/internal/testpkg/test.go
@@ -151,14 +162,14 @@ func TestSandbox_Cleanup(t *testing.T) {
 -	return a + b
 +	return a + b // unchanged
  }
-`
+ `
 	proposal := Proposal{ID: "cleanup-test", Diff: validDiff}
 	sandbox.Run(proposal, repoDir)
 
-	// Check no wunderpus-sandbox-* directories remain
-	entries, _ := os.ReadDir(tmpDir)
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "wunderpus-sandbox-") {
+	// Check only NEW sandbox directories were cleaned up
+	afterEntries, _ := os.ReadDir(tmpDir)
+	for _, e := range afterEntries {
+		if strings.HasPrefix(e.Name(), "wunderpus-sandbox-") && !beforeSet[e.Name()] {
 			t.Fatalf("sandbox directory not cleaned up: %s", e.Name())
 		}
 	}

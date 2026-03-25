@@ -2,10 +2,14 @@ package rsi
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
 	"sync"
+
+	_ "modernc.org/sqlite"
 )
 
 // Embedder is the interface for generating text embeddings.
@@ -16,9 +20,11 @@ type Embedder interface {
 }
 
 // VectorStore stores and retrieves function embeddings with metadata.
+// Optionally backed by SQLite for persistence across restarts.
 type VectorStore struct {
 	vectors map[string]*VectorEntry // keyed by QualifiedName
 	mu      sync.RWMutex
+	db      *sql.DB // optional SQLite persistence
 }
 
 // VectorEntry holds an embedding vector and associated metadata.
@@ -37,11 +43,87 @@ func NewVectorStore() *VectorStore {
 	}
 }
 
-// Store saves a function embedding.
+// NewVectorStoreWithDB creates a vector store backed by SQLite.
+// Loads existing embeddings on startup.
+func NewVectorStoreWithDB(dbPath string) (*VectorStore, error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("vector store: opening db: %w", err)
+	}
+
+	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS vector_entries (
+			function_name TEXT PRIMARY KEY,
+			file          TEXT NOT NULL,
+			package       TEXT NOT NULL,
+			complexity    INTEGER NOT NULL DEFAULT 0,
+			embedding     TEXT NOT NULL DEFAULT '[]'
+		);
+	`)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("vector store: creating schema: %w", err)
+	}
+
+	vs := &VectorStore{
+		vectors: make(map[string]*VectorEntry),
+		db:      db,
+	}
+
+	// Load existing entries
+	if err := vs.loadFromDB(); err != nil {
+		slog.Warn("vector store: failed to load existing entries", "error", err)
+	}
+
+	return vs, nil
+}
+
+// loadFromDB loads all vector entries from SQLite into memory.
+func (vs *VectorStore) loadFromDB() error {
+	if vs.db == nil {
+		return nil
+	}
+
+	rows, err := vs.db.Query(`SELECT function_name, file, package, complexity, embedding FROM vector_entries`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var entry VectorEntry
+		var embeddingJSON string
+		if err := rows.Scan(&entry.FunctionName, &entry.File, &entry.Package, &entry.Complexity, &embeddingJSON); err != nil {
+			return err
+		}
+		if err := json.Unmarshal([]byte(embeddingJSON), &entry.Embedding); err != nil {
+			slog.Warn("vector store: corrupt embedding for " + entry.FunctionName)
+			continue
+		}
+		vs.vectors[entry.FunctionName] = &entry
+	}
+
+	slog.Info("vector store: loaded embeddings from DB", "count", len(vs.vectors))
+	return rows.Err()
+}
+
+// Store saves a function embedding. Persists to SQLite if backed by a DB.
 func (vs *VectorStore) Store(entry VectorEntry) {
 	vs.mu.Lock()
-	defer vs.mu.Unlock()
 	vs.vectors[entry.FunctionName] = &entry
+	vs.mu.Unlock()
+
+	// Persist to SQLite if available
+	if vs.db != nil {
+		embeddingJSON, _ := json.Marshal(entry.Embedding)
+		_, _ = vs.db.Exec(`
+			INSERT OR REPLACE INTO vector_entries (function_name, file, package, complexity, embedding)
+			VALUES (?, ?, ?, ?, ?)`,
+			entry.FunctionName, entry.File, entry.Package, entry.Complexity, string(embeddingJSON),
+		)
+	}
 }
 
 // Get retrieves a vector entry by function name.
@@ -68,6 +150,14 @@ func (vs *VectorStore) Count() int {
 	vs.mu.RLock()
 	defer vs.mu.RUnlock()
 	return len(vs.vectors)
+}
+
+// Close shuts down the vector store and its database connection.
+func (vs *VectorStore) Close() error {
+	if vs.db != nil {
+		return vs.db.Close()
+	}
+	return nil
 }
 
 // CodeEmbedder generates and manages vector embeddings for Go source code functions.

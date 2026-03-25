@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/ra"
@@ -9,10 +10,12 @@ import (
 
 // DigitalOceanAdapter implements ra.CloudAdapter for DigitalOcean.
 type DigitalOceanAdapter struct {
+	mu             sync.Mutex
 	apiToken       string
 	maxDailySpend  float64
 	registry       *ra.ResourceRegistry
 	costToDate     float64
+	costResetDate  time.Time // date when costToDate was last reset
 	provisionedIDs []string
 }
 
@@ -22,14 +25,29 @@ func NewDigitalOceanAdapter(apiToken string, maxDailySpend float64, registry *ra
 		apiToken:      apiToken,
 		maxDailySpend: maxDailySpend,
 		registry:      registry,
+		costResetDate: time.Now().UTC(),
+	}
+}
+
+// resetDailyCostIfNewDay resets the cost counter if the calendar day has changed.
+func (d *DigitalOceanAdapter) resetDailyCostIfNewDay() {
+	now := time.Now().UTC()
+	if now.YearDay() != d.costResetDate.YearDay() || now.Year() != d.costResetDate.Year() {
+		d.costToDate = 0
+		d.costResetDate = now
 	}
 }
 
 // ProvisionCompute creates a DigitalOcean Droplet.
 func (d *DigitalOceanAdapter) ProvisionCompute(spec ra.ResourceSpec) (ra.Resource, error) {
-	cost, _ := d.GetCostToDate()
-	if cost >= d.maxDailySpend {
-		return ra.Resource{}, fmt.Errorf("ra cloud: daily spend cap reached ($%.2f >= $%.2f)", cost, d.maxDailySpend)
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.resetDailyCostIfNewDay()
+
+	costPerHour := 0.008 // $6/mo ≈ $0.008/hr for s-1vcpu-1gb
+
+	if d.costToDate+costPerHour > d.maxDailySpend {
+		return ra.Resource{}, fmt.Errorf("ra cloud: daily spend cap would be exceeded ($%.4f + $%.4f > $%.2f)", d.costToDate, costPerHour, d.maxDailySpend)
 	}
 
 	res := ra.Resource{
@@ -43,7 +61,7 @@ func (d *DigitalOceanAdapter) ProvisionCompute(spec ra.ResourceSpec) (ra.Resourc
 			"region":    spec.Region,
 			"size":      "s-1vcpu-1gb",
 		},
-		CostPerHour: 0.008, // $6/mo ≈ $0.008/hr
+		CostPerHour: costPerHour,
 		AcquiredAt:  time.Now().UTC(),
 		Status:      ra.ResourceStatusActive,
 	}
@@ -60,9 +78,14 @@ func (d *DigitalOceanAdapter) ProvisionCompute(spec ra.ResourceSpec) (ra.Resourc
 
 // ProvisionStorage creates a DigitalOcean Space.
 func (d *DigitalOceanAdapter) ProvisionStorage(spec ra.ResourceSpec) (ra.Resource, error) {
-	cost, _ := d.GetCostToDate()
-	if cost >= d.maxDailySpend {
-		return ra.Resource{}, fmt.Errorf("ra cloud: daily spend cap reached")
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.resetDailyCostIfNewDay()
+
+	costPerHour := 0.005
+
+	if d.costToDate+costPerHour > d.maxDailySpend {
+		return ra.Resource{}, fmt.Errorf("ra cloud: daily spend cap would be exceeded ($%.4f + $%.4f > $%.2f)", d.costToDate, costPerHour, d.maxDailySpend)
 	}
 
 	res := ra.Resource{
@@ -74,7 +97,7 @@ func (d *DigitalOceanAdapter) ProvisionStorage(spec ra.ResourceSpec) (ra.Resourc
 			"type":    "s3-compatible",
 			"size_gb": spec.MinDiskGB,
 		},
-		CostPerHour: 0.005,
+		CostPerHour: costPerHour,
 		AcquiredAt:  time.Now().UTC(),
 		Status:      ra.ResourceStatusActive,
 	}
@@ -91,6 +114,9 @@ func (d *DigitalOceanAdapter) ProvisionStorage(spec ra.ResourceSpec) (ra.Resourc
 
 // Deprovision destroys a resource.
 func (d *DigitalOceanAdapter) Deprovision(resourceID string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if d.registry != nil {
 		_ = d.registry.UpdateStatus(resourceID, ra.ResourceStatusReleased)
 	}
@@ -105,6 +131,9 @@ func (d *DigitalOceanAdapter) Deprovision(resourceID string) error {
 
 // ListProvisioned returns all provisioned resources.
 func (d *DigitalOceanAdapter) ListProvisioned() ([]ra.Resource, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	// Return from tracked IDs
 	var results []ra.Resource
 	if d.registry != nil {
@@ -119,5 +148,8 @@ func (d *DigitalOceanAdapter) ListProvisioned() ([]ra.Resource, error) {
 
 // GetCostToDate returns the estimated cost for the current day.
 func (d *DigitalOceanAdapter) GetCostToDate() (float64, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.resetDailyCostIfNewDay()
 	return d.costToDate, nil
 }

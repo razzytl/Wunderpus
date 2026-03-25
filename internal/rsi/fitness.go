@@ -3,7 +3,6 @@ package rsi
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math"
 
 	"github.com/wunderpus/wunderpus/internal/audit"
@@ -31,37 +30,34 @@ func NewFitnessEvaluator(cfg *config.Config, auditLog *audit.AuditLog) *FitnessE
 
 // Score computes the fitness of a proposal relative to the original function.
 // Returns -1.0 if tests failed or races were detected.
-// Logs all scores including losers for audit trail.
-func (f *FitnessEvaluator) Score(before SpanStats, after SpanStats, report SandboxReport) float64 {
+// Latency improvement is derived from benchmarks in the sandbox report.
+func (f *FitnessEvaluator) Score(before SpanStats, report SandboxReport) float64 {
 	// Hard gate: tests must pass and no races
 	if !report.TestsPassed || !report.RaceClean {
 		return -1.0
 	}
 
 	// Latency improvement: how much did P99 improve?
+	// We use the benchmark ns/op for the target function as the "after" latency.
 	var latencyDelta float64
 	if before.P99LatencyNs > 0 {
-		latencyDelta = float64(before.P99LatencyNs-after.P99LatencyNs) / float64(before.P99LatencyNs)
+		afterP99 := int64(report.BenchmarkNsOp[before.FunctionName])
+		if afterP99 > 0 {
+			latencyDelta = float64(before.P99LatencyNs-afterP99) / float64(before.P99LatencyNs)
+		}
 	}
 
 	// Error improvement: how much did error count decrease?
 	var errorDelta float64
 	if before.ErrorCount > 0 {
-		errorDelta = float64(before.ErrorCount-after.ErrorCount) / float64(before.ErrorCount)
-	} else if after.ErrorCount == 0 {
-		errorDelta = 0 // no change if no errors before or after
+		// Existing errors: calculate percentage reduction
+		errorDelta = float64(before.ErrorCount-report.ErrorCount) / float64(before.ErrorCount)
+	} else if report.ErrorCount > 0 {
+		// New errors introduced: penalize hard
+		errorDelta = -1.0
 	}
 
 	score := (latencyDelta * 0.6) + (errorDelta * 0.4)
-
-	slog.Info("rsi fitness: score computed",
-		"score", math.Round(score*10000)/10000,
-		"latency_delta", math.Round(latencyDelta*10000)/10000,
-		"error_delta", math.Round(errorDelta*10000)/10000,
-		"tests_passed", report.TestsPassed,
-		"race_clean", report.RaceClean,
-	)
-
 	return score
 }
 
@@ -76,10 +72,9 @@ func (f *FitnessEvaluator) SelectWinner(
 	proposals []Proposal,
 	reports []SandboxReport,
 	before SpanStats,
-	afterMetrics []SpanStats,
 ) (*Proposal, float64) {
 
-	if len(proposals) != len(reports) || len(proposals) != len(afterMetrics) {
+	if len(proposals) != len(reports) {
 		return nil, -1.0
 	}
 
@@ -91,13 +86,14 @@ func (f *FitnessEvaluator) SelectWinner(
 			continue // skip empty proposals (failed generation)
 		}
 
-		score := f.Score(before, afterMetrics[i], reports[i])
+		score := f.Score(before, reports[i])
 
 		if f.audit != nil {
 			status := "REJECTED"
 			if score >= f.threshold {
 				status = "QUALIFIED"
 			}
+			afterP99 := int64(reports[i].BenchmarkNsOp[before.FunctionName])
 			payloadBytes, _ := json.Marshal(map[string]interface{}{
 				"proposal_id":   proposals[i].ID,
 				"target_func":   before.FunctionName,
@@ -105,8 +101,8 @@ func (f *FitnessEvaluator) SelectWinner(
 				"status":        status,
 				"tests_passed":  reports[i].TestsPassed,
 				"race_clean":    reports[i].RaceClean,
-				"latency_delta": before.P99LatencyNs - afterMetrics[i].P99LatencyNs,
-				"error_delta":   before.ErrorCount - afterMetrics[i].ErrorCount,
+				"latency_delta": before.P99LatencyNs - afterP99,
+				"error_delta":   before.ErrorCount - reports[i].ErrorCount,
 			})
 
 			f.audit.Write(audit.AuditEntry{

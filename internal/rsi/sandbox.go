@@ -24,6 +24,7 @@ type SandboxReport struct {
 	BenchmarkNsOp map[string]float64
 	TestOutput    string
 	BuildOutput   string
+	ErrorCount    int64
 	Duration      time.Duration
 	Error         string
 }
@@ -100,17 +101,24 @@ func (s *Sandbox) Run(proposal Proposal, baseRepoPath string) (*SandboxReport, e
 	timeout := time.Duration(s.timeoutSec) * time.Second
 
 	if s.UseDocker {
-		return s.runInDocker(sandboxDir, timeout, start, report)
+		return s.runInDocker(sandboxDir, timeout, start, report, proposal.Diff)
 	}
-	return s.runLocally(sandboxDir, timeout, start, report)
+	return s.runLocally(sandboxDir, timeout, start, report, proposal.Diff)
 }
 
-func (s *Sandbox) runLocally(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport) (*SandboxReport, error) {
+func (s *Sandbox) runLocally(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport, diff string) (*SandboxReport, error) {
+	// Extract target packages from the diff to avoid running ALL internal tests
+	targets := extractTargetPackages(diff)
+	if len(targets) == 0 {
+		targets = []string{"./internal/..."} // fallback: test everything
+	}
+
 	// Build the modified code
 	buildCtx, buildCancel := context.WithTimeout(context.Background(), timeout)
 	defer buildCancel()
 
-	buildCmd := exec.CommandContext(buildCtx, "go", "build", "./internal/...")
+	buildArgs := append([]string{"go", "build"}, targets...)
+	buildCmd := exec.CommandContext(buildCtx, buildArgs[0], buildArgs[1:]...)
 	buildCmd.Dir = sandboxDir
 	buildOutput, buildErr := buildCmd.CombinedOutput()
 	report.BuildOutput = string(buildOutput)
@@ -122,33 +130,35 @@ func (s *Sandbox) runLocally(sandboxDir string, timeout time.Duration, start tim
 	}
 	report.BuildPassed = true
 
-	// Run tests
+	// Run tests only on affected packages
 	testCtx, testCancel := context.WithTimeout(context.Background(), timeout)
 	defer testCancel()
 
-	testCmd := exec.CommandContext(testCtx, "go", "test", "-count=1", "./internal/...")
+	testArgs := append([]string{"go", "test", "-count=1"}, targets...)
+	testCmd := exec.CommandContext(testCtx, testArgs[0], testArgs[1:]...)
 	testCmd.Dir = sandboxDir
 	testOutput, testErr := testCmd.CombinedOutput()
 	report.TestOutput = string(testOutput)
+	report.TestsPassed = (testErr == nil)
 
-	report.TestsPassed = true
-
-	// Run benchmarks
+	// Run benchmarks on affected packages
 	benchCtx, benchCancel := context.WithTimeout(context.Background(), timeout)
 	defer benchCancel()
 
-	benchCmd := exec.CommandContext(benchCtx, "go", "test", "-bench", ".", "-benchmem", "-run=^$", "./internal/...")
+	benchArgs := append([]string{"go", "test", "-bench", ".", "-benchmem", "-run=^$"}, targets...)
+	benchCmd := exec.CommandContext(benchCtx, benchArgs[0], benchArgs[1:]...)
 	benchCmd.Dir = sandboxDir
 	benchOutput, benchErr := benchCmd.CombinedOutput()
 	if benchErr == nil {
 		report.BenchmarkNsOp = parseBenchmarks(string(benchOutput))
 	}
 
-	// Run race detector
+	// Run race detector on affected packages
 	raceCtx, raceCancel := context.WithTimeout(context.Background(), timeout)
 	defer raceCancel()
 
-	raceCmd := exec.CommandContext(raceCtx, "go", "test", "-race", "-count=1", "./internal/...")
+	raceArgs := append([]string{"go", "test", "-race", "-count=1"}, targets...)
+	raceCmd := exec.CommandContext(raceCtx, raceArgs[0], raceArgs[1:]...)
 	raceCmd.Dir = sandboxDir
 	_, raceErr := raceCmd.CombinedOutput()
 	report.RaceClean = (raceErr == nil)
@@ -157,7 +167,7 @@ func (s *Sandbox) runLocally(sandboxDir string, timeout time.Duration, start tim
 	return report, nil
 }
 
-func (s *Sandbox) runInDocker(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport) (*SandboxReport, error) {
+func (s *Sandbox) runInDocker(sandboxDir string, timeout time.Duration, start time.Time, report *SandboxReport, diff string) (*SandboxReport, error) {
 	hostDir, err := filepath.Abs(sandboxDir)
 	if err != nil {
 		report.Error = fmt.Sprintf("failed to get absolute path for sandbox: %v", err)
@@ -165,23 +175,30 @@ func (s *Sandbox) runInDocker(sandboxDir string, timeout time.Duration, start ti
 		return report, nil
 	}
 
+	// Extract target packages from the diff
+	targets := extractTargetPackages(diff)
+	if len(targets) == 0 {
+		targets = []string{"./internal/..."}
+	}
+	targetStr := strings.Join(targets, " ")
+
 	// We use golang image and run all steps via a script to save overhead
-	script := `#!/bin/sh
-go build ./internal/... > build.log 2>&1
+	script := fmt.Sprintf(`#!/bin/sh
+go build %s > build.log 2>&1
 if [ $? -ne 0 ]; then
 	exit 1
 fi
-go test -count=1 ./internal/... > test.log 2>&1
+go test -count=1 %s > test.log 2>&1
 if [ $? -ne 0 ]; then
 	exit 2
 fi
-go test -bench . -benchmem -run=^$ ./internal/... > bench.log 2>&1
-go test -race -count=1 ./internal/... > race.log 2>&1
+go test -bench . -benchmem -run=^$ %s > bench.log 2>&1
+go test -race -count=1 %s > race.log 2>&1
 if [ $? -ne 0 ]; then
 	exit 3
 fi
 exit 0
-`
+`, targetStr, targetStr, targetStr, targetStr)
 	if err := os.WriteFile(filepath.Join(sandboxDir, "run_tests.sh"), []byte(script), 0755); err != nil {
 		report.Error = fmt.Sprintf("failed to write test script: %v", err)
 		return report, nil
@@ -201,7 +218,7 @@ exit 0
 	)
 
 	err = dockerCmd.Run()
-	
+
 	buildLog, _ := os.ReadFile(filepath.Join(sandboxDir, "build.log"))
 	testLog, _ := os.ReadFile(filepath.Join(sandboxDir, "test.log"))
 	benchLog, _ := os.ReadFile(filepath.Join(sandboxDir, "bench.log"))
@@ -267,6 +284,40 @@ func copyDir(src, dst string) error {
 		}
 		return os.WriteFile(dstPath, data, info.Mode())
 	})
+}
+
+// extractTargetPackages parses a unified diff and returns the Go package paths
+// that were modified. This avoids running ALL internal tests in the sandbox.
+func extractTargetPackages(diff string) []string {
+	seen := make(map[string]bool)
+	var targets []string
+
+	for _, line := range strings.Split(diff, "\n") {
+		if !strings.HasPrefix(line, "+++ ") {
+			continue
+		}
+		path := strings.TrimPrefix(line, "+++ ")
+		path = strings.TrimPrefix(path, "b/")
+		path = strings.TrimPrefix(path, "a/")
+
+		// Skip /dev/null and non-Go files
+		if path == "/dev/null" || !strings.HasSuffix(path, ".go") {
+			continue
+		}
+
+		// Extract package directory: "internal/rsi/foo.go" → "./internal/rsi"
+		dir := filepath.Dir(path)
+		if dir == "." || dir == "" {
+			continue
+		}
+		pkg := "./" + dir
+		if !seen[pkg] {
+			seen[pkg] = true
+			targets = append(targets, pkg)
+		}
+	}
+
+	return targets
 }
 
 // parseBenchmarks extracts ns/op from Go benchmark output.

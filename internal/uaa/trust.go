@@ -2,6 +2,7 @@ package uaa
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -93,6 +94,56 @@ func (tb *TrustBudget) CanExecute(cost int) (bool, string) {
 	if tb.current < cost {
 		return false, fmt.Sprintf("insufficient trust budget: have %d, need %d", tb.current, cost)
 	}
+	return true, ""
+}
+
+// TryDeduct atomically checks if cost can be deducted and deducts if so.
+// This eliminates the TOCTOU race between CanExecute and Deduct.
+func (tb *TrustBudget) TryDeduct(cost int, actionID string) (bool, string) {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	if tb.current <= 0 {
+		return false, "system in lockdown — trust budget depleted"
+	}
+	if tb.current < cost {
+		return false, fmt.Sprintf("insufficient trust budget: have %d, need %d", tb.current, cost)
+	}
+
+	tb.current -= cost
+	tb.persist()
+
+	if tb.audit != nil {
+		payload, _ := json.Marshal(map[string]interface{}{
+			"action_id":     actionID,
+			"cost":          cost,
+			"remaining":     tb.current,
+			"transaction":   "deduct",
+			"trust_balance": tb.current,
+		})
+		_ = tb.audit.Write(audit.AuditEntry{
+			Subsystem: "trust_budget",
+			EventType: audit.EventTrustDebited,
+			ActorID:   "trust-budget",
+			Payload:   payload,
+		})
+	}
+
+	if tb.current <= 0 {
+		tb.current = 0
+		tb.persist()
+		slog.Warn("trust: LOCKDOWN ENGAGED — all Tier 2+ actions blocked")
+		if tb.events != nil {
+			tb.events.Publish(events.Event{
+				Type:   audit.EventLockdownEngaged,
+				Source: "trust_budget",
+				Payload: map[string]interface{}{
+					"reason": "trust budget depleted",
+				},
+			})
+		}
+	}
+
 	return true, ""
 }
 
@@ -314,6 +365,9 @@ func (tb *TrustBudget) Reset(tokenString string) error {
 
 // StartRegen begins a background goroutine that passively regenerates trust.
 func (tb *TrustBudget) StartRegen() {
+	if tb.regenPerHour <= 0 {
+		return // no regen configured
+	}
 	go func() {
 		// Regen per second = regenPerHour / 3600
 		// For integer math, accumulate and add once per interval

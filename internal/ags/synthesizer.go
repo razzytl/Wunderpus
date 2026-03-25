@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
-)
 
-// LLMFn is a function that calls an LLM for completion.
-type LLMFn func(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	"github.com/wunderpus/wunderpus/internal/audit"
+	"github.com/wunderpus/wunderpus/internal/events"
+	"github.com/wunderpus/wunderpus/internal/provider"
+)
 
 // ProposedGoal is the JSON structure the LLM returns.
 type ProposedGoal struct {
@@ -30,18 +32,20 @@ type ProposedGoalsResponse struct {
 // GoalSynthesizer generates new goals from episodic memory patterns,
 // world model observations, and weakness reports.
 type GoalSynthesizer struct {
-	llmFn       LLMFn
+	provider    provider.Provider
 	store       *GoalStore
 	scorer      *PriorityScorer
+	events      *events.Bus
 	maxPerCycle int
 }
 
 // NewGoalSynthesizer creates a new synthesizer.
-func NewGoalSynthesizer(llmFn LLMFn, store *GoalStore, scorer *PriorityScorer) *GoalSynthesizer {
+func NewGoalSynthesizer(p provider.Provider, store *GoalStore, scorer *PriorityScorer, bus *events.Bus) *GoalSynthesizer {
 	return &GoalSynthesizer{
-		llmFn:       llmFn,
+		provider:    p,
 		store:       store,
 		scorer:      scorer,
+		events:      bus,
 		maxPerCycle: 5,
 	}
 }
@@ -106,15 +110,32 @@ OUTPUT FORMAT:
 
 	userPrompt := fmt.Sprintf("Findings:\n%s", formatFindings(findings))
 
-	response, err := s.llmFn(ctx, systemPrompt, userPrompt)
+	if s.provider == nil {
+		return nil, fmt.Errorf("ags synthesizer: no LLM provider configured")
+	}
+
+	resp, err := s.provider.Complete(ctx, &provider.CompletionRequest{
+		Messages: []provider.Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("ags synthesizer: LLM call failed: %w", err)
 	}
 
 	// 4. Parse response
 	var parsed ProposedGoalsResponse
-	if err := json.Unmarshal([]byte(response), &parsed); err != nil {
-		return nil, fmt.Errorf("ags synthesizer: failed to parse LLM response: %w", err)
+	if err := json.Unmarshal([]byte(resp.Content), &parsed); err != nil {
+		// Attempt to extract JSON if it was wrapped in markdown
+		cleaned := strings.TrimSpace(resp.Content)
+		if strings.HasPrefix(cleaned, "```json") {
+			cleaned = strings.TrimPrefix(cleaned, "```json")
+			cleaned = strings.TrimSuffix(cleaned, "```")
+		}
+		if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+			return nil, fmt.Errorf("ags synthesizer: failed to parse LLM response: %w", err)
+		}
 	}
 
 	// 5. Validate proposals
@@ -148,6 +169,20 @@ OUTPUT FORMAT:
 			slog.Warn("ags synthesizer: failed to save goal", "id", g.ID, "error", err)
 		}
 		slog.Info("ags synthesizer: new goal created", "title", g.Title, "tier", g.Tier, "priority", g.Priority)
+
+		if s.events != nil {
+			s.events.Publish(events.Event{
+				Type:   audit.EventGoalCreated,
+				Source: "ags.synthesizer",
+				Payload: map[string]interface{}{
+					"goal_id":   g.ID,
+					"title":     g.Title,
+					"tier":      g.Tier,
+					"priority":  g.Priority,
+					"parent_id": g.ParentID,
+				},
+			})
+		}
 	}
 
 	return deduped, nil
@@ -226,6 +261,7 @@ func (s *GoalSynthesizer) validateProposal(pg ProposedGoal) error {
 }
 
 // deduplicate removes goals that are too similar to existing active/pending goals.
+// Uses word-overlap similarity (Jaccard) with threshold 0.85 as specified in the plan.
 func (s *GoalSynthesizer) deduplicate(proposals []Goal) []Goal {
 	existing, _ := s.store.GetByStatus(GoalStatusPending)
 	active, _ := s.store.GetByStatus(GoalStatusActive)
@@ -234,8 +270,16 @@ func (s *GoalSynthesizer) deduplicate(proposals []Goal) []Goal {
 	var result []Goal
 	for _, p := range proposals {
 		isDuplicate := false
+		pWords := tokenize(p.Title)
 		for _, e := range existing {
+			// Fast path: exact title match
 			if p.Title == e.Title {
+				isDuplicate = true
+				break
+			}
+			// Similarity path: word-overlap Jaccard similarity
+			eWords := tokenize(e.Title)
+			if jaccardSimilarity(pWords, eWords) > 0.85 {
 				isDuplicate = true
 				break
 			}
@@ -247,6 +291,36 @@ func (s *GoalSynthesizer) deduplicate(proposals []Goal) []Goal {
 	return result
 }
 
+// tokenize normalizes a title into a set of lowercase words.
+func tokenize(s string) map[string]struct{} {
+	words := make(map[string]struct{})
+	for _, w := range strings.Fields(strings.ToLower(s)) {
+		w = strings.Trim(w, ".,;:!?\"'()[]{}")
+		if w != "" {
+			words[w] = struct{}{}
+		}
+	}
+	return words
+}
+
+// jaccardSimilarity computes the Jaccard similarity between two word sets.
+func jaccardSimilarity(a, b map[string]struct{}) float64 {
+	if len(a) == 0 && len(b) == 0 {
+		return 1.0
+	}
+	intersection := 0
+	for word := range a {
+		if _, ok := b[word]; ok {
+			intersection++
+		}
+	}
+	union := len(a) + len(b) - intersection
+	if union == 0 {
+		return 0
+	}
+	return float64(intersection) / float64(union)
+}
+
 func formatFindings(findings []string) string {
 	s := ""
 	for i, f := range findings {
@@ -256,9 +330,6 @@ func formatFindings(findings []string) string {
 }
 
 // StartScheduler runs Synthesize() on a background goroutine.
-// Called every 100 task completions or every 60 minutes.
-// memoriesFn returns the latest episodic memory entries.
-// weaknessesFn returns the latest weakness snapshots.
 func (s *GoalSynthesizer) StartScheduler(
 	ctx context.Context,
 	memoriesFn func() []MemoryEntry,

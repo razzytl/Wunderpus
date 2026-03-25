@@ -116,9 +116,11 @@ func (f *ResourceForecaster) FindShortfalls(forecast ResourceForecast) []Resourc
 func (f *ResourceForecaster) AutoProvision(needs []ResourceNeed, adapter CloudAdapter, maxDailySpend float64) error {
 	for _, need := range needs {
 		cost, _ := adapter.GetCostToDate()
-		if cost+need.MaxCostHr > maxDailySpend {
+		// Calculate total cost: hourly rate × duration in hours
+		totalCost := need.MaxCostHr * need.Duration.Hours()
+		if cost+totalCost > maxDailySpend {
 			slog.Warn("ra forecaster: cannot provision — would exceed daily spend cap",
-				"current_cost", cost, "need_cost", need.MaxCostHr, "cap", maxDailySpend)
+				"current_cost", cost, "need_cost", totalCost, "cap", maxDailySpend)
 			return fmt.Errorf("ra forecaster: daily spend cap would be exceeded")
 		}
 

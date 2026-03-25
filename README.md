@@ -14,263 +14,299 @@
   <a href="https://github.com/wunderpus/wunderpus/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/wunderpus/wunderpus?style=flat-square" alt="License"/>
   </a>
-  <a href="https://discord.gg/wunderpus">
-    <img src="https://img.shields.io/discord/123456789?label=Discord&style=flat-square" alt="Discord"/>
-  </a>
-  <a href="https://github.com/wunderpus/wunderpus/releases">
-    <img src="https://img.shields.io/github/v/release/wunderpus/wunderpus?include_prereleases&style=flat-square" alt="Release"/>
-  </a>
 </p>
 
-Wunderpus is a powerful, vendor-agnostic autonomous AI agent framework written in Go. It provides a unified interface to interact with multiple Large Language Model (LLM) providers through various communication channels, with built-in security features, an extensible skills system, and a comprehensive tool execution environment.
+Wunderpus is an autonomous AI agent written in Go. It doesn't just chat — it profiles its own code, finds weak functions, generates improvement proposals, tests them in a sandbox, and deploys the winners to git. It creates goals from its own memory, manages a trust budget to limit what it can do, and logs everything to a tamper-evident hash chain.
 
-## Features
+This isn't a framework that "supports" self-improvement. It's a system where the self-improvement loop is the core architecture.
 
-### Multi-Provider Support
-Wunderpus supports 15+ LLM providers out of the box, enabling vendor-agnostic AI interactions:
+---
 
-- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-4 Turbo
-- **Anthropic**: Claude Sonnet 4, Claude Opus, Claude Haiku
-- **Google Gemini**: Gemini 2.0 Flash, Gemini 1.5 Pro
-- **Ollama**: Local Llama 3.2, Mistral, and other models
-- **OpenRouter**: Access to 100+ models through unified API
-- **Groq**: Fast inference with Llama 3.3, Mixtral
-- **DeepSeek**: DeepSeek R1, DeepSeek Chat
-- **Cerebras**: Ultra-fast inference at scale
-- **NVIDIA NIM**: Enterprise-grade inference
-- And more: Zhipu (GLM), Moonshot (Kimi), Mistral, vLLM, LiteLLM, Qwen, Volcanic Engine
+## How It Actually Works
 
-### Multi-Channel Interface
-Connect to Wunderpus through multiple communication platforms:
+### The Self-Improvement Loop (RSI)
 
-- **TUI (Terminal User Interface)**: Interactive terminal experience with command palette
-- **Telegram**: Bot-based messaging integration
-- **Discord**: Server-based AI assistant
-- **WebSocket**: Real-time bidirectional communication
-- **QQ**: Chinese messaging platform
-- **WeCom**: WeChat Work integration
-- **DingTalk**: Enterprise communication platform
-- **OneBot**: Standardized bot protocol
+The agent doesn't just run tools. It improves the tools. Here's the exact causal chain:
 
-### Extensible Tool System
-Wunderpus provides a powerful tool execution environment:
+```
+Every 100 tasks or 1 hour:
+    │
+    ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│  1. Profiler    │────▶│ 2. Weakness      │────▶│ 3. Proposal Engine  │
+│                 │     │    Reporter       │     │                     │
+│ Wraps every     │     │ score =          │     │ 3 goroutines run    │
+│ tool call,      │     │ (error_rate×0.5) │     │ concurrently at     │
+│ tracks P99      │     │ +(norm_p99×0.3)  │     │ temperatures        │
+│ latency in a    │     │ +(norm_cplx×0.2) │     │ [0.2, 0.5, 0.8]    │
+│ ring buffer     │     │                  │     │                     │
+│                 │     │ Returns top 10   │     │ Each returns a      │
+│                 │     │ weakest funcs    │     │ unified diff        │
+└─────────────────┘     └──────────────────┘     └──────────┬──────────┘
+                                                            │
+                                                            ▼
+                                              ┌─────────────────────────┐
+                                              │ 4. Sandbox              │
+                                              │                         │
+                                              │ Copies repo to /tmp     │
+                                              │ Applies diff via git    │
+                                              │ go build → go test      │
+                                              │ go test -race           │
+                                              │ go test -bench          │
+                                              │                         │
+                                              │ Docker: --network none  │
+                                              │         --memory 512m   │
+                                              │         --cpus 1.0      │
+                                              └──────────┬──────────────┘
+                                                         │
+                                              ┌──────────▼──────────────┐
+                                              │ 5. Fitness Gate         │
+                                              │                         │
+                                              │ if !tests_passed:       │
+                                              │     score = -1.0        │
+                                              │ if !race_clean:         │
+                                              │     score = -1.0        │
+                                              │                         │
+                                              │ latency_delta =         │
+                                              │   (before-after)/before │
+                                              │ error_delta =           │
+                                              │   (before-after)/before │
+                                              │ score =                 │
+                                              │   latency×0.6           │
+                                              │ + errors×0.4            │
+                                              │                         │
+                                              │ threshold: 0.05         │
+                                              │ (configurable)          │
+                                              └──────────┬──────────────┘
+                                                         │
+                                              ┌──────────▼──────────────┐
+                                              │ 6. Deploy               │
+                                              │                         │
+                                              │ git checkout -b         │
+                                              │   rsi/auto-20260325     │
+                                              │ git commit:             │
+                                              └─────────────────────────┘
+```
 
-- **Shell Command Execution**: Sandboxed command execution with allowlist
-- **File Operations**: Read, write, search, and manipulate files
-- **MCP Client/Server**: Model Context Protocol support for external tools
-- **Web Search**: Brave, Tavily, DuckDuckGo, Perplexity integration
-- **Custom Tools**: Create and register custom tool handlers
-- **Sub-Agent Spawning**: Asynchronous parallel task execution
+Here's what the git commit looks like after a successful improvement:
 
-### Skills System
-Extend Wunderpus capabilities with skills:
+```
+RSI: improve internal/profiler.Track (fitness=0.1523)
 
-- **GitHub Integration**: Issue tracking, PR management, CI/CD monitoring
-- **Tmux Management**: Terminal session automation
-- **Weather Information**: Real-time weather data
-- **Content Summarization**: Automatic content summarization
-- **Skill Creator**: Build new skills from natural language
-- **Version Control**: Semantic versioning for skill management
-- **Custom Registries**: Pull skills from ClawHub or custom registries
+Target: internal/profiler.Track
+Temperature: 0.2
+Rollback tag: rsi/rollback-20260325141522
+```
 
-### Security Features
-Enterprise-grade security built-in:
+If the deployed code causes error rates to spike >20% within 10 minutes, a watchdog goroutine automatically rolls back to the tagged commit.
 
-- **Encryption at Rest**: AES-256-GCM encryption for sensitive data
-- **Audit Logging**: Comprehensive SQLite-based audit trail
-- **Rate Limiting**: Configurable request throttling
-- **Shell Sandboxing**: Regex-based command filtering with allowlist
-- **SSRF Protection**: Blocklist for dangerous network destinations
-- **Workspace Isolation**: Restrict file operations to designated directories
+### The Trust Budget
 
-### Additional Capabilities
+Every action costs trust points. The agent can't do anything it can't afford.
 
-- **SQLite Session Persistence**: Maintain conversation history across restarts
-- **Provider Fallback**: Automatic failover with cooldown periods
-- **Parallel Provider Probing**: Quick response time with concurrent provider checks
-- **Async Tool Execution**: Non-blocking tool operations
-- **Heartbeat Scheduling**: Cron-based periodic task execution
-- **Cost Tracking**: Token usage and cost monitoring per provider
-- **Prometheus Metrics**: Export health and performance metrics
-- **Health Checks**: Built-in HTTP health server
+| Tier | Type | Cost | Examples |
+|------|------|------|----------|
+| 1 | Read-only | 0 | `web_search`, `read_file`, GET requests |
+| 2 | Ephemeral | 1 | temp file writes, `go build`, run tests |
+| 3 | Persistent | 5 | `git commit`, write DB, edit config files |
+| 4 | External | 20 | POST to external host, deploy, spend money |
+
+**Concrete rules:**
+- Budget starts at 1000 (configurable)
+- Passive regen: 10 points/hour (configurable)
+- On success: refund half the cost (trust -= cost, then trust += cost/2)
+- On failure: 2x penalty (trust -= cost*2)
+- At zero: lockdown — only Tier 1 (read-only) actions allowed
+- Human reset: requires a JWT signed with `WUNDERPUS_JWT_SECRET` (env var only — the agent has no code path to read it)
+
+### The Goal Engine (AGS)
+
+The agent generates its own goals from episodic memory. It doesn't wait for you to tell it what to do.
+
+**How a goal is born:**
+1. Scan last 200 memory entries
+2. Detect patterns: same error 5+ times → capability gap, tasks 10x slower → efficiency goal
+3. Check weakness report for functions scoring >0.7
+4. Call LLM with findings, require structured JSON output
+5. Deduplicate against existing goals (Jaccard word overlap >0.85 → drop)
+6. Cap at 5 new goals per cycle
+
+**Goal lifecycle:**
+```
+pending → (SelectNext rescores all goals) → active → Execute tasks →
+    success → completed (fills ActualValue)
+    failure → pending (max 3 attempts)
+    3rd failure → abandoned
+```
+
+**Priority scoring formula:**
+```
+score = urgency×0.25 + impact×0.30 + feasibility×0.20 + novelty×0.10 + alignment×0.15
+```
+- `urgency`: 0.5 base, +0.3 if deferred often, −0.1/day since creation
+- `impact`: ExpectedValue from the LLM proposal
+- `feasibility`: checks tool registry, trust budget, resource availability
+- `novelty`: `1.0 / (1.0 + AttemptCount)`
+- `alignment`: how strongly this serves a Tier 0 goal
+
+**Tier 0 goals (hardcoded, never stored in DB, never writable by the agent):**
+```go
+var Tier0Goals = []string{
+    "Be maximally useful to operators",
+    "Improve own capabilities",
+    "Maintain operational continuity",
+    "Expand knowledge and world-model",
+}
+```
+
+### The Audit Log
+
+Every action, every decision, every trust deduction is logged to a tamper-evident hash chain.
+
+```
+entry_n.Hash = SHA256(entry_{n-1}.Hash + timestamp + subsystem + eventType + actorID + payload)
+```
+
+`Verify()` walks every entry in order, recomputes each hash, and returns an error on the first mismatch. Write 1000 entries concurrently, corrupt one hash in SQLite, and `Verify()` catches it.
+
+### The UAA Gate
+
+No tool executes directly. Every action goes through:
+
+```
+Action → Classify(tier) → CanExecute(cost)? → Shadow(simulate)? → Deduct(cost) → Execute → RecordOutcome
+```
+
+Shadow mode runs Tier 3+ actions through an LLM judge before allowing them:
+> "Given this action and its expected effects, is this safe and appropriate? APPROVE or REJECT"
+
+The shadow simulates the action's effects (file changes, HTTP calls) and asks the LLM to judge. Rejecting `/etc/passwd` writes is a test case, not a theoretical concern.
+
+### Integration Wiring
+
+The event bus connects all four pillars:
+
+| Event | Effect |
+|-------|--------|
+| `EventRSIDeployed` | Trust budget credits +100 points |
+| `EventResourceExhausted` | UAA blocks all Tier 4 actions |
+| `EventGoalCompleted` | Profiler resets baseline stats |
+| `EventGoalAbandoned` | Synthesizer reframes on next cycle |
+| `EventLockdownEngaged` | Resource broker suspends cloud provisioning |
+
+---
+
+## The Full Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Event Bus                                │
+│  (typed pub/sub, DLQ for panicking handlers, zero-crash)       │
+└──────┬──────────┬──────────┬──────────┬──────────┬──────────────┘
+       │          │          │          │          │
+       ▼          ▼          ▼          ▼          ▼
+   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+   │  RSI   │ │  AGS   │ │  UAA   │ │  RA    │ │ Audit  │
+   │        │ │        │ │        │ │        │ │        │
+   │Profilr │ │ Goals  │ │Classifr│ │Resourcs│ │ Hash   │
+   │Weaknes │ │Scorer  │ │Trust   │ │Registry│ │ Chain  │
+   │Proposr │ │Synth   │ │Shadow  │ │Keys    │ │        │
+   │Sandbox │ │Execut  │ │Executr │ │Cloud   │ │        │
+   │Fitness │ │Meta    │ │        │ │Forecast│ │        │
+   │Deployr │ │        │ │        │ │        │ │        │
+   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+```
+
+**33 packages. ~12,000 lines of Go. All tests green.**
+
+---
+
+## Where to Plug In
+
+This is where you'd start if you wanted to contribute.
+
+### Adding a New Cloud Provider
+
+The `CloudAdapter` interface is the contract:
+
+```go
+// internal/ra/forecaster.go
+type CloudAdapter interface {
+    ProvisionCompute(spec ResourceSpec) (Resource, error)
+    ProvisionStorage(spec ResourceSpec) (Resource, error)
+    Deprovision(resourceID string) error
+    ListProvisioned() ([]Resource, error)
+    GetCostToDate() (float64, error)
+}
+```
+
+**What's built:** DigitalOcean (`internal/ra/cloud/digitalocean.go`)
+**What's not:** AWS, GCP, Azure, Vast.ai, Lambda Labs — pick one, implement the interface, add tests.
+
+### Adding a New LLM Provider for RSI
+
+The proposal engine uses a `CompleteFn`:
+
+```go
+type CompleteFn func(ctx context.Context, systemPrompt, userPrompt string, temperature float64) (string, error)
+```
+
+**What's built:** Pluggable via `config.yaml` model list
+**What's not:** Local model fine-tuning for diff generation, multi-model consensus (currently 3 parallel proposals, could be N with quorum voting)
+
+### Improving the Fitness Function
+
+The current formula in `internal/rsi/fitness.go`:
+
+```go
+latencyDelta := float64(before.P99LatencyNs - after.BenchmarkNsOp[target]) / float64(before.P99LatencyNs)
+errorDelta := float64(before.ErrorCount - after.ErrorCount) / max(before.ErrorCount, 1)
+score := latencyDelta*0.6 + errorDelta*0.4
+```
+
+**What's not built:** Code complexity delta, memory usage delta, binary size delta. The weights (0.6/0.4) are hardcoded — making them configurable per-function-type would be valuable.
+
+### Making the Goal Synthesizer Smarter
+
+Currently `computeAlignment` uses a heuristic (does the goal's parent match a Tier 0 title?). The original spec calls for an LLM call to score alignment 0–1.
+
+**File:** `internal/ags/scorer.go:157`
+**What's not built:** LLM-based alignment scoring with caching, episodic memory pattern detection (the synthesizer's `detectPatterns()` is a stub)
+
+### Making the Shadow Simulator Actually Simulate
+
+The shadow currently builds an effect summary and asks an LLM judge. It doesn't actually execute against a mock filesystem.
+
+**File:** `internal/uaa/shadow.go`
+**What's not built:** Using `afero.NewMemMapFs()` for filesystem mocking, stubbed HTTP client for network simulation, actual diff capture of what would change
+
+### Implementing the WASM Sandbox
+
+`internal/rsi/wasm_sandbox.go` compiles with TinyGo but falls back to Docker for execution. Full wazero integration is deferred.
+
+**What's not built:** Actual WASM execution via wazero, 32MB memory cap, instruction count limits
+
+---
 
 ## Quick Start
 
-### Installation
-
-#### Binary Releases
-
-Download pre-built binaries from the [releases page](https://github.com/wunderpus/wunderpus/releases):
+### From Source
 
 ```bash
-# Linux/macOS
-curl -sL https://github.com/wunderpus/wunderpus/releases/latest/download/wunderpus-linux-amd64.tar.gz | tar xz
-sudo mv wunderpus /usr/local/bin/
-
-# macOS with Homebrew
-brew install wunderpus/wunderpus/wunderpus
-```
-
-#### Docker
-
-```bash
-# Pull the image
-docker pull wunderpus/wunderpus:latest
-
-# Run with config mount
-docker run -it -v $(pwd)/config.yaml:/app/config.yaml wunderpus/wunderpus:latest
-```
-
-#### From Source
-
-```bash
-# Clone the repository
 git clone https://github.com/wunderpus/wunderpus.git
 cd wunderpus
-
-# Build
 make build
-
-# Or run directly
-go run cmd/wunderpus/main.go
 ```
 
 ### Configuration
-
-1. Copy the example configuration:
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-2. Edit `config.yaml` and add your API keys. The minimal configuration requires at least one provider:
+Minimal config — one provider:
 
 ```yaml
-# Minimal configuration with OpenAI
-providers:
-  openai:
-    api_key: "sk-your-api-key-here"
-    model: "gpt-4o"
-
-# Or use the new model_list format (recommended)
-model_list:
-  - model_name: "gpt-primary"
-    model: "openai/gpt-4o"
-    api_key: "sk-your-api-key-here"
-```
-
-3. Set environment variables (optional, takes precedence over config file):
-
-```bash
-export OPENAI_API_KEY="sk-your-api-key-here"
-export ANTHROPIC_API_KEY="sk-ant-your-api-key-here"
-```
-
-### Running
-
-```bash
-# Start the interactive TUI
-wunderpus
-
-# One-shot message (no TUI)
-wunderpus agent -m "Hello, help me write a function to calculate fibonacci numbers"
-
-# Start the gateway (background services + channels)
-wunderpus gateway
-```
-
-## Architecture Overview
-
-Wunderpus follows a modular architecture designed for extensibility and scalability:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLI Layer                               │
-│  (Cobra Commands: agent, gateway, skills, cron, auth)          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                      Application Layer                          │
-│  (Bootstrap, Configuration, Channel Management)                │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│    Agent      │   │   Channel     │   │   Skills      │
-│   Manager     │   │   Manager     │   │   Loader      │
-│               │   │               │   │               │
-│ - Sessions    │   │ - Telegram    │   │ - Discovery   │
-│ - Providers   │   │ - Discord     │   │ - Execution   │
-│ - Memory      │   │ - WebSocket   │   │ - Versioning  │
-└───────────────┘   └───────────────┘   └───────────────┘
-        │                   │                   │
-        ▼                   ▼                   ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│   Provider    │   │   Channel     │   │    Skills    │
-│   Adapters    │   │  Implement.   │   │   Registry    │
-│               │   │               │   │               │
-│ - OpenAI      │   │ - Protocol    │   │ - Built-in    │
-│ - Anthropic   │   │   Handlers    │   │ - Global      │
-│ - Ollama      │   │ - Message     │   │ - Remote      │
-│ - Gemini      │   │   Queue       │   │               │
-│ - [15+]       │   │               │   │               │
-└───────────────┘   └───────────────┘   └───────────────┘
-```
-
-### Core Components
-
-#### Agent Manager
-The Agent Manager orchestrates conversation sessions, provider selection, and tool execution. Each session maintains its own context and can operate independently.
-
-#### Provider System
-Providers are abstracted through a common interface, enabling:
-- Unified request/response handling
-- Automatic fallback on provider failures
-- Parallel probing for fastest response
-- Cost tracking per request
-
-#### Channel System
-Channels bridge external communication platforms with the agent system. Each channel handles:
-- Platform-specific authentication
-- Message parsing and formatting
-- Event subscription (messages, callbacks, webhooks)
-- Rate limiting and quota management
-
-#### Skills System
-Skills are modular capability packages that extend agent functionality:
-- **Manifest-based**: YAML-defined metadata and dependencies
-- **Versioned**: Semantic versioning for compatibility
-- **Composable**: Skills can depend on other skills
-- **Discoverable**: Query available skills at runtime
-
-## Supported Providers
-
-| Provider | Protocol | Models | API Base |
-|----------|----------|--------|----------|
-| OpenAI | openai | gpt-4o, gpt-4o-mini, gpt-4-turbo | https://api.openai.com/v1 |
-| Anthropic | anthropic | claude-sonnet-4, claude-opus-4 | https://api.anthropic.com |
-| Google Gemini | gemini | gemini-2.0-flash, gemini-1.5-pro | https://generativelanguage.googleapis.com |
-| Ollama | ollama | llama3.2, mistral, codellama | http://localhost:11434 |
-| OpenRouter | openai | 100+ models | https://openrouter.ai/api/v1 |
-| Groq | openai | llama-3.3-70b, mixtral-8x7b | https://api.groq.com/openai/v1 |
-| DeepSeek | openai | deepseek-r1, deepseek-chat | https://api.deepseek.com/v1 |
-| Cerebras | openai | llama-3.3-70b | https://api.cerebras.ai/v1 |
-| NVIDIA NIM | openai | llama-3.1-nemotron-70b | https://integrate.api.nvidia.com/v1 |
-| Zhipu (GLM) | openai | glm-4, glm-4v | https://open.bigmodel.cn/api/paas/v4 |
-| Moonshot | openai | kimi-latest, kimi-k2 | https://api.moonshot.cn/v1 |
-| Mistral | openai | mistral-large, codestral | https://api.mistral.ai/v1 |
-| vLLM | openai | Any vLLM-served model | http://localhost:8000/v1 |
-| LiteLLM | openai | Any LiteLLM-proxied model | http://localhost:4000/v1 |
-| Qwen | openai | qwen-turbo, qwen-plus | https://dashscope.aliyuncs.com/api/v1 |
-
-## Configuration Examples
-
-### Basic: Single Provider
-
-```yaml
-default_provider: "openai"
 providers:
   openai:
     api_key: "sk-your-key"
@@ -278,205 +314,92 @@ providers:
     max_tokens: 4096
 ```
 
-### Advanced: Multiple Providers with Fallback
+Enable the autonomous subsystems:
 
 ```yaml
-model_list:
-  - model_name: "primary"
-    model: "openai/gpt-4o"
-    api_key: "sk-primary-key"
-    max_tokens: 4096
-    fallback_models:
-      - "anthropic/claude-sonnet-4-20250514"
-      - "openrouter/deepseek/deepseek-r1"
-
-  - model_name: "fast"
-    model: "groq/llama-3.3-70b-versatile"
-    api_key: "gsk-fast-key"
-    api_base: "https://api.groq.com/openai/v1"
-
-  - model_name: "local"
-    model: "ollama/llama3.2"
-    api_base: "http://localhost:11434"
+genesis:
+  rsi_enabled: false                    # flip to true when ready
+  rsi_firewall_enabled: true            # never disable in production
+  ags_enabled: false                    # goal synthesis
+  uaa_enabled: false                    # full autonomy gate
+  ra_enabled: false                     # cloud provisioning
+  trust_budget_max: 1000
+  trust_regen_per_hour: 10
+  max_daily_spend_usd: 10.0
 ```
 
-### Channel Configuration
-
-```yaml
-# Telegram
-telegram:
-  enabled: true
-  bot_token: "your-bot-token"
-
-# Discord
-discord:
-  enabled: true
-  bot_token: "your-discord-token"
-  guild_id: "your-guild-id"
-
-# WebSocket
-websocket:
-  enabled: true
-  host: "0.0.0.0"
-  port: 8081
-```
-
-### Security Configuration
-
-```yaml
-security:
-  encryption:
-    enabled: true
-    key: "base64-encoded-32-byte-key"  # Generate: openssl rand -base64 32
-  audit_db_path: "wunderpus_audit.db"
-
-tools:
-  enabled: true
-  shell_whitelist:
-    - git
-    - go
-    - npm
-    - cargo
-  allowed_paths:
-    - "/home/user/projects"
-  restrict_to_workspace: true
-```
-
-## Skills System
-
-### Built-in Skills
-
-Wunderpus ships with several built-in skills:
-
-| Skill | Description | Dependencies |
-|-------|-------------|--------------|
-| github | GitHub CLI integration for issues, PRs, CI | gh CLI |
-| tmux | Terminal multiplexer automation | tmux |
-| weather | Current weather and forecasts | None |
-| summarize | Content summarization | None |
-| skill-creator | Generate new skills from description | None |
-
-### Creating Custom Skills
-
-Skills are defined by a `SKILL.md` file in a dedicated directory:
-
-```
-skills/my-skill/
-  SKILL.md        # Skill manifest and documentation
-  handler.go      # Optional: custom Go handler
-  tools/          # Additional tools or scripts
-```
-
-Example SKILL.md:
-
-```markdown
----
-name: my-skill
-description: "Description of what the skill does"
-metadata:
-  version: "1.0.0"
-  author: "Your Name"
----
-
-# My Skill
-
-Description of the skill's capabilities and how to use it.
-
-## Usage
-
-Use the skill with specific commands or natural language.
-```
-
-### Installing External Skills
+### Running
 
 ```bash
-# From GitHub
-wunderpus skills install https://github.com/user/skill-name
+# Interactive TUI
+wunderpus
 
-# From local path
-wunderpus skills install ./path/to/skill
+# One-shot
+wunderpus agent -m "Write a fibonacci function in Go"
 
-# List available skills
-wunderpus skills list
+# Background gateway (channels + heartbeat)
+wunderpus gateway
 ```
+
+---
+
+## Supported Providers
+
+| Provider | Protocol | Models |
+|----------|----------|--------|
+| OpenAI | openai | gpt-4o, gpt-4o-mini |
+| Anthropic | anthropic | claude-sonnet-4, claude-opus-4 |
+| Google Gemini | gemini | gemini-2.0-flash |
+| Ollama | ollama | llama3.2, mistral (local) |
+| OpenRouter | openai | 100+ models |
+| Groq | openai | llama-3.3-70b (fast) |
+| DeepSeek | openai | deepseek-r1, deepseek-chat |
+| Cerebras | openai | llama-3.3-70b (fastest) |
+| + 7 more | openai | See `config.example.yaml` |
+
+---
 
 ## Security
 
-### Encryption
+- **Audit log**: SHA-256 hash chain, `Verify()` catches any corruption
+- **Trust budget**: actions cost points, lockdown at zero, JWT-only human reset
+- **RSI firewall**: RSI can only modify `internal/`, never `cmd/` or `config/`
+- **Shadow mode**: Tier 3+ actions simulated before execution
+- **AES-256-GCM**: credentials encrypted at rest in the resource registry
+- **Shell sandbox**: regex allowlist, workspace restriction
 
-Wunderpus supports AES-256-GCM encryption for sensitive configuration data:
+---
 
-```yaml
-security:
-  encryption:
-    enabled: true
-    key: "base64-encoded-32-byte-key"
+## Project Structure
+
+```
+internal/
+  audit/          hash-chained tamper-evident log
+  events/         typed pub/sub bus with DLQ
+  config/         YAML + fsnotify hot-reload + env overrides
+  rsi/            profiler → weakness → proposals → sandbox → fitness → deploy
+  ags/            goals → scorer → synthesizer → executor → metacognition
+  uaa/            classifier → trust → shadow → executor (the autonomy gate)
+  ra/             resources → registry → keys → cloud → forecaster
+  agents/         multi-agent spawn, collect, kill
 ```
 
-Generate a key:
-```bash
-openssl rand -base64 32
-```
-
-### Audit Logging
-
-All agent actions are logged to SQLite for compliance and debugging:
-
-```yaml
-security:
-  audit_db_path: "wunderpus_audit.db"
-```
-
-### Rate Limiting
-
-Configure per-user or global rate limits:
-
-```yaml
-security:
-  rate_limit:
-    requests_per_minute: 60
-    burst: 10
-```
-
-### Shell Sandboxing
-
-Commands are filtered against an allowlist:
-
-```yaml
-tools:
-  shell_whitelist:
-    - git
-    - go
-    - npm
-    - cargo
-    - docker
-```
+---
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+We need help with:
 
-- Code style and conventions
-- Development setup
-- Testing requirements
-- Pull request process
+1. **Cloud adapters** — AWS, GCP, Azure implementations of `CloudAdapter`
+2. **Shadow simulation** — actual filesystem/HTTP mocking (not just LLM judgment)
+3. **WASM sandbox** — wazero integration for faster, lighter sandboxing
+4. **Goal intelligence** — LLM-based alignment scoring, better episodic memory patterns
+5. **Fitness weights** — configurable per-function-type scoring weights
+
+Read [WUNDERPUS_GAP_CHECKLIST.md](WUNDERPUS_GAP_CHECKLIST.md) for the full roadmap. Every `[ ]` is an unsolved problem.
+
+---
 
 ## License
 
-Wunderpus is distributed under the MIT License. See [LICENSE](LICENSE) for details.
-
-## Community
-
-- **Discord**: Join our [Discord server](https://discord.gg/wunderpus) for discussion and support
-- **GitHub Discussions**: Ask questions and share ideas
-- **Issues**: Report bugs and request features
-
-## Resources
-
-- [Documentation](docs/README.md)
-- [Configuration Reference](docs/configuration.md)
-- [Architecture Deep Dive](docs/architecture.md)
-- [Installation Guide](docs/installation.md)
-- [CLI Reference](docs/cli.md)
-- [Skills Documentation](docs/skills.md)
-- [Deployment Guide](docs/deployment.md)
+MIT. See [LICENSE](LICENSE).

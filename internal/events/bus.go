@@ -1,6 +1,7 @@
 package events
 
 import (
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -14,6 +15,13 @@ type Event struct {
 	Source    string      `json:"source"`
 }
 
+// DeadLetter wraps an event that failed processing with error context.
+type DeadLetter struct {
+	Event     Event     `json:"event"`
+	Error     string    `json:"error"`     // panic value or error message
+	Timestamp time.Time `json:"timestamp"` // when the failure occurred
+}
+
 // HandlerFunc is a callback that handles an event.
 type HandlerFunc func(Event)
 
@@ -22,7 +30,7 @@ type HandlerFunc func(Event)
 type Bus struct {
 	subscribers map[EventType][]HandlerFunc
 	mu          sync.RWMutex
-	dlq         []Event // dead-letter queue for panicking handlers
+	dlq         []DeadLetter // dead-letter queue for panicking handlers
 	dlqMu       sync.Mutex
 	dlqMaxSize  int // max DLQ entries (oldest evicted first)
 }
@@ -66,7 +74,7 @@ func (b *Bus) Publish(e Event) {
 						"source", e.Source,
 						"panic", r,
 					)
-					b.sendToDLQ(e)
+					b.sendToDLQ(e, fmt.Sprintf("%v", r))
 				}
 			}()
 			fn(e)
@@ -99,7 +107,7 @@ func (b *Bus) PublishSync(e Event) {
 						"source", e.Source,
 						"panic", r,
 					)
-					b.sendToDLQ(e)
+					b.sendToDLQ(e, fmt.Sprintf("%v", r))
 				}
 			}()
 			fn(e)
@@ -109,10 +117,10 @@ func (b *Bus) PublishSync(e Event) {
 }
 
 // DLQ returns a copy of the dead-letter queue (events whose handlers panicked).
-func (b *Bus) DLQ() []Event {
+func (b *Bus) DLQ() []DeadLetter {
 	b.dlqMu.Lock()
 	defer b.dlqMu.Unlock()
-	cp := make([]Event, len(b.dlq))
+	cp := make([]DeadLetter, len(b.dlq))
 	copy(cp, b.dlq)
 	return cp
 }
@@ -131,14 +139,18 @@ func (b *Bus) ClearDLQ() {
 	b.dlq = nil
 }
 
-func (b *Bus) sendToDLQ(e Event) {
+func (b *Bus) sendToDLQ(e Event, errMsg string) {
 	b.dlqMu.Lock()
 	defer b.dlqMu.Unlock()
 	// Evict oldest if at max capacity
 	if len(b.dlq) >= b.dlqMaxSize {
 		b.dlq = b.dlq[1:]
 	}
-	b.dlq = append(b.dlq, e)
+	b.dlq = append(b.dlq, DeadLetter{
+		Event:     e,
+		Error:     errMsg,
+		Timestamp: time.Now().UTC(),
+	})
 }
 
 // SubscriberCount returns the number of handlers registered for a given event type.

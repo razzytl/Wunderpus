@@ -36,22 +36,22 @@ type Config struct {
 
 // GenesisConfig holds all genesis plan feature flags and parameters.
 type GenesisConfig struct {
-	RSIEnabled            bool     `yaml:"rsi_enabled"`             // Enable Recursive Self-Improvement
-	AGSEnabled            bool     `yaml:"ags_enabled"`             // Enable Autonomous Goal Synthesis
-	UAAEnabled            bool     `yaml:"uaa_enabled"`             // Enable Unbounded Autonomous Action
-	RAEnabled             bool     `yaml:"ra_enabled"`              // Enable Resource Acquisition
-	RSIFirewallEnabled    bool     `yaml:"rsi_firewall_enabled"`    // RSI can only modify internal/ (default: true)
-	MaxDailySpendUSD      float64  `yaml:"max_daily_spend_usd"`     // Hard cap on cloud spend (default: 10.0)
-	TrustBudgetMax        int      `yaml:"trust_budget_max"`        // Maximum trust points (default: 1000)
-	TrustRegenPerHour     int      `yaml:"trust_regen_per_hour"`    // Trust regeneration rate (default: 10)
-	AuditLogDBPath        string   `yaml:"audit_log_db_path"`       // Genesis audit log DB path
-	ProfilerDBPath        string   `yaml:"profiler_db_path"`        // Profiler telemetry DB path
-	ProfilerPPROFPort     int      `yaml:"profiler_pprof_port"`     // pprof endpoint port (default: 6060, 0 = disabled)
-	TrustBudgetDBPath     string   `yaml:"trust_budget_db_path"`    // Trust budget DB path
-	JWTSecretEnv          string   `yaml:"jwt_secret_env"`          // Env var name holding JWT secret (default: WUNDERPUS_JWT_SECRET)
-	ExternalHostAllowlist        []string `yaml:"external_host_allowlist"`          // Known-safe external hosts for Tier 4
-	RSIFitnessThreshold          float64  `yaml:"rsi_fitness_threshold"`            // Minimum fitness score to deploy an RSI proposal (default: 0.05)
-	RSISelfReferentialEnabled    bool     `yaml:"rsi_self_referential_enabled"`     // Allow RSI to modify internal/rsi/ (default: false, Phase 4 unlock)
+	RSIEnabled                bool     `yaml:"rsi_enabled"`                  // Enable Recursive Self-Improvement
+	AGSEnabled                bool     `yaml:"ags_enabled"`                  // Enable Autonomous Goal Synthesis
+	UAAEnabled                bool     `yaml:"uaa_enabled"`                  // Enable Unbounded Autonomous Action
+	RAEnabled                 bool     `yaml:"ra_enabled"`                   // Enable Resource Acquisition
+	RSIFirewallEnabled        bool     `yaml:"rsi_firewall_enabled"`         // RSI can only modify internal/ (default: true)
+	MaxDailySpendUSD          float64  `yaml:"max_daily_spend_usd"`          // Hard cap on cloud spend (default: 10.0)
+	TrustBudgetMax            int      `yaml:"trust_budget_max"`             // Maximum trust points (default: 1000)
+	TrustRegenPerHour         int      `yaml:"trust_regen_per_hour"`         // Trust regeneration rate (default: 10)
+	AuditLogDBPath            string   `yaml:"audit_log_db_path"`            // Genesis audit log DB path
+	ProfilerDBPath            string   `yaml:"profiler_db_path"`             // Profiler telemetry DB path
+	ProfilerPPROFPort         int      `yaml:"profiler_pprof_port"`          // pprof endpoint port (default: 6060, 0 = disabled)
+	TrustBudgetDBPath         string   `yaml:"trust_budget_db_path"`         // Trust budget DB path
+	JWTSecretEnv              string   `yaml:"jwt_secret_env"`               // Env var name holding JWT secret (default: WUNDERPUS_JWT_SECRET)
+	ExternalHostAllowlist     []string `yaml:"external_host_allowlist"`      // Known-safe external hosts for Tier 4
+	RSIFitnessThreshold       float64  `yaml:"rsi_fitness_threshold"`        // Minimum fitness score to deploy an RSI proposal (default: 0.05)
+	RSISelfReferentialEnabled bool     `yaml:"rsi_self_referential_enabled"` // Allow RSI to modify internal/rsi/ (default: false, Phase 4 unlock)
 }
 
 const CurrentConfigVersion = 3
@@ -725,6 +725,9 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_FIREWALL"); v != "" {
 		cfg.Genesis.RSIFirewallEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_SELF_REF"); v != "" {
+		cfg.Genesis.RSISelfReferentialEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_MAX_DAILY_SPEND"); v != "" {
 		if spend, err := strconv.ParseFloat(v, 64); err == nil {

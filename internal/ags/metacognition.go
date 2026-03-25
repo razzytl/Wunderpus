@@ -103,7 +103,7 @@ func (m *MetacognitionLoop) Run() (*MetacognitionReport, error) {
 		"new_weights", clamped,
 	)
 
-	return &MetacognitionReport{
+	report := &MetacognitionReport{
 		Timestamp:      time.Now().UTC(),
 		CompletionRate: completionRate,
 		ValueAccuracy:  avgAccuracy,
@@ -117,7 +117,32 @@ func (m *MetacognitionLoop) Run() (*MetacognitionReport, error) {
 			Novelty:     clamped.Novelty - oldWeights.Novelty,
 			Alignment:   clamped.Alignment - oldWeights.Alignment,
 		},
-	}, nil
+	}
+
+	// 8. If performance is poor, generate a specific improvement goal
+	if (completionRate < 0.4 || avgAccuracy < 0.6) && total > 5 {
+		m.generateImprovementGoal(completionRate, avgAccuracy)
+	}
+
+	return report, nil
+}
+
+func (m *MetacognitionLoop) generateImprovementGoal(rate, accuracy float64) {
+	goal := NewGoal(
+		"Tune AGS Synthesis Parameters",
+		fmt.Sprintf("Metacognition detected poor performance (CR=%.2f, VA=%.2f). Goal synthesis parameters need manual or RSI tuning.", rate, accuracy),
+		2, // Tier 2
+		GoalImproveCapabilities.Title,
+		[]string{fmt.Sprintf("Completion Rate: %.2f", rate), fmt.Sprintf("Value Accuracy: %.2f", accuracy)},
+		[]string{"Metacognition metrics improve in next cycle"},
+		0.8, // high expected value for stability
+	)
+	goal.Priority = m.scorer.Score(goal)
+	if err := m.store.Save(goal); err != nil {
+		slog.Warn("ags metacognition: failed to generate improvement goal", "error", err)
+	} else {
+		slog.Info("ags metacognition: low performance detected, generated improvement goal", "goal", goal.Title)
+	}
 }
 
 // adjustWeights computes target weights based on performance metrics.

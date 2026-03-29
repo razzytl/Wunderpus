@@ -57,7 +57,7 @@ func (ws *WorkspaceSandbox) ValidatePath(path string) error {
 	}
 
 	// Resolve the path relative to the workspace if it's not absolute
-	absPath := path
+	var absPath string
 	if !filepath.IsAbs(path) {
 		// On Windows, paths starting with / or \ are root-relative, not relative to CWD.
 		// filepath.Join will handle this correctly on Unix, but on Windows we need to be careful.

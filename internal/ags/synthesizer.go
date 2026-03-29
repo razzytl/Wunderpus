@@ -53,8 +53,8 @@ func NewGoalSynthesizer(p provider.Provider, store *GoalStore, scorer *PriorityS
 
 // SetWorldModelContext sets a function that provides world model context
 // for goal synthesis. Called before LLM goal generation.
-func (gs *GoalSynthesizer) SetWorldModelContext(fn func(taskDesc string) string) {
-	gs.wmContext = fn
+func (s *GoalSynthesizer) SetWorldModelContext(fn func(taskDesc string) string) {
+	s.wmContext = fn
 }
 
 // MemoryEntry represents an episodic memory record for pattern detection.

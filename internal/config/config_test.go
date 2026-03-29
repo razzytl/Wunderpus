@@ -18,8 +18,7 @@ func TestLoad_Defaults(t *testing.T) {
 }
 
 func TestApplyEnv(t *testing.T) {
-	os.Setenv("WUNDERPUS_OPENAI_API_KEY", "test-key")
-	defer os.Unsetenv("WUNDERPUS_OPENAI_API_KEY")
+	t.Setenv("WUNDERPUS_OPENAI_API_KEY", "test-key")
 
 	cfg := &Config{}
 	applyEnv(cfg)
@@ -177,16 +176,10 @@ func TestApplyDefaults(t *testing.T) {
 
 func TestApplyEnvMultiple(t *testing.T) {
 	// Set multiple env vars
-	os.Setenv("WUNDERPUS_OPENAI_API_KEY", "key1")
-	os.Setenv("WUNDERPUS_ANTHROPIC_API_KEY", "key2")
-	os.Setenv("WUNDERPUS_LOG_LEVEL", "debug")
-	os.Setenv("WUNDERPUS_DEFAULT_PROVIDER", "anthropic")
-	defer func() {
-		os.Unsetenv("WUNDERPUS_OPENAI_API_KEY")
-		os.Unsetenv("WUNDERPUS_ANTHROPIC_API_KEY")
-		os.Unsetenv("WUNDERPUS_LOG_LEVEL")
-		os.Unsetenv("WUNDERPUS_DEFAULT_PROVIDER")
-	}()
+	t.Setenv("WUNDERPUS_OPENAI_API_KEY", "key1")
+	t.Setenv("WUNDERPUS_ANTHROPIC_API_KEY", "key2")
+	t.Setenv("WUNDERPUS_LOG_LEVEL", "debug")
+	t.Setenv("WUNDERPUS_DEFAULT_PROVIDER", "anthropic")
 
 	cfg := &Config{}
 	applyEnv(cfg)
@@ -284,4 +277,3 @@ func TestGenesisConfig_NewFields(t *testing.T) {
 		t.Errorf("MaxDailySpendUSD default = %v, want 10.0", cfg.Genesis.MaxDailySpendUSD)
 	}
 }
-

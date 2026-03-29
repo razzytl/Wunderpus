@@ -16,8 +16,7 @@ func tempTrustDB(t *testing.T) string {
 
 func TestTrustBudget_DeductBelowZero_Lockdown(t *testing.T) {
 	dbPath := tempTrustDB(t)
-	os.Setenv("TEST_JWT_SECRET", "test-secret-key-for-testing")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test-secret-key-for-testing")
 
 	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
 	if err != nil {
@@ -51,8 +50,7 @@ func TestTrustBudget_DeductBelowZero_Lockdown(t *testing.T) {
 
 func TestTrustBudget_ExpiredJWT_ResetFails(t *testing.T) {
 	dbPath := tempTrustDB(t)
-	os.Setenv("TEST_JWT_SECRET", "test-secret-key")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test-secret-key")
 
 	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
 	if err != nil {
@@ -80,8 +78,7 @@ func TestTrustBudget_ExpiredJWT_ResetFails(t *testing.T) {
 
 func TestTrustBudget_AgentCannotGenerateJWT(t *testing.T) {
 	dbPath := tempTrustDB(t)
-	os.Setenv("TEST_JWT_SECRET", "test-secret-key")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test-secret-key")
 
 	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
 	if err != nil {
@@ -106,8 +103,7 @@ func TestTrustBudget_AgentCannotGenerateJWT(t *testing.T) {
 
 func TestTrustBudget_PersistAcrossRestart(t *testing.T) {
 	dbPath := tempTrustDB(t)
-	os.Setenv("TEST_JWT_SECRET", "test-secret")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test-secret")
 
 	// Create budget, deduct, then close
 	tb1, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
@@ -148,8 +144,7 @@ func TestTrustBudget_CreditCappedAtMax(t *testing.T) {
 func TestTrustBudget_ValidHumanReset(t *testing.T) {
 	dbPath := tempTrustDB(t)
 	secretVal := "valid-human-secret"
-	os.Setenv("TEST_JWT_SECRET", secretVal)
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", secretVal)
 
 	tb, _ := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
 	defer tb.Close()

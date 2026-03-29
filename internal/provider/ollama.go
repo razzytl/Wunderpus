@@ -105,13 +105,13 @@ func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 
 	var toolCalls []ToolCallInfo
 	for i, tc := range result.Message.ToolCalls {
-		argsJson, _ := json.Marshal(tc.Function.Arguments)
+		argsJSON, _ := json.Marshal(tc.Function.Arguments)
 		toolCalls = append(toolCalls, ToolCallInfo{
 			ID:   fmt.Sprintf("call_%d", i), // Ollama doesn't always provide IDs
 			Type: "function",
 			Function: ToolCallFunc{
 				Name:      tc.Function.Name,
-				Arguments: string(argsJson),
+				Arguments: string(argsJSON),
 			},
 		})
 	}

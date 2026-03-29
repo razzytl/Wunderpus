@@ -7,8 +7,7 @@ import (
 )
 
 func TestUAAExecutor_Tier4RejectedByBudget(t *testing.T) {
-	os.Setenv("TEST_JWT_SECRET", "test")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test")
 
 	trust, _ := NewTrustBudget(t.TempDir()+"/trust.db", 10, 10, nil, nil, "TEST_JWT_SECRET")
 	defer trust.Close()
@@ -44,8 +43,7 @@ func TestUAAExecutor_Tier4RejectedByBudget(t *testing.T) {
 }
 
 func TestUAAExecutor_Tier1NeverHitsShadow(t *testing.T) {
-	os.Setenv("TEST_JWT_SECRET", "test")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test")
 
 	trust, _ := NewTrustBudget(t.TempDir()+"/trust.db", 1000, 10, nil, nil, "TEST_JWT_SECRET")
 	defer trust.Close()
@@ -85,8 +83,7 @@ func TestUAAExecutor_Tier1NeverHitsShadow(t *testing.T) {
 }
 
 func TestUAAExecutor_Tier3ShadowApproves(t *testing.T) {
-	os.Setenv("TEST_JWT_SECRET", "test")
-	defer os.Unsetenv("TEST_JWT_SECRET")
+	t.Setenv("TEST_JWT_SECRET", "test")
 
 	trust, _ := NewTrustBudget(t.TempDir()+"/trust.db", 1000, 10, nil, nil, "TEST_JWT_SECRET")
 	defer trust.Close()

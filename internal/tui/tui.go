@@ -151,7 +151,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -317,8 +316,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		errStr := err.Error()
 
 		// Friendly error messages
-		friendlyMsg := ""
-		suggestion := ""
+		var friendlyMsg string
+		var suggestion string
 
 		switch {
 		case strings.Contains(errStr, "no api key") || strings.Contains(errStr, "missing api key"):

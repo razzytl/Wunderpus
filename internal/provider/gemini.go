@@ -127,13 +127,13 @@ func (g *Gemini) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 			content += p.Text
 		}
 		if p.FunctionCall != nil {
-			argsJson, _ := json.Marshal(p.FunctionCall.Args)
+			argsJSON, _ := json.Marshal(p.FunctionCall.Args)
 			toolCalls = append(toolCalls, ToolCallInfo{
 				ID:   "call_" + p.FunctionCall.Name, // Gemini doesn't always provide IDs, generate one
 				Type: "function",
 				Function: ToolCallFunc{
 					Name:      p.FunctionCall.Name,
-					Arguments: string(argsJson),
+					Arguments: string(argsJSON),
 				},
 			})
 		}

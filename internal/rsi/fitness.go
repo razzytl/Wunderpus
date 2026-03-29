@@ -73,7 +73,6 @@ func (f *FitnessEvaluator) SelectWinner(
 	reports []SandboxReport,
 	before SpanStats,
 ) (*Proposal, float64) {
-
 	if len(proposals) != len(reports) {
 		return nil, -1.0
 	}

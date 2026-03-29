@@ -368,7 +368,6 @@ func Load(path string) (*Config, error) {
 					altPath := fmt.Sprintf("config.%s.yaml", env)
 					if altData, err := os.ReadFile(altPath); err == nil {
 						data = altData
-						path = altPath
 					}
 				}
 

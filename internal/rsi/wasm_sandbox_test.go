@@ -56,7 +56,7 @@ func TestAdd(t *testing.T) {
 
 func TestWasmSandbox_FallbackToDocker(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not available, skipping WASM sandbox test")
+		t.Skip("docker not available in CI, skipping")
 	}
 
 	repoDir := createWasmTestRepo(t)
@@ -95,7 +95,7 @@ func TestWasmSandbox_FallbackToDocker(t *testing.T) {
 
 func TestWasmSandbox_UseDockerDirectly(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not available, skipping WASM sandbox test")
+		t.Skip("docker not available in CI, skipping")
 	}
 
 	repoDir := createWasmTestRepo(t)

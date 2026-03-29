@@ -1,7 +1,77 @@
-version: "2"
+# golangci-lint configuration (v1 schema)
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  exhaustive:
+    default-signifies-exhaustive: true
+  funlen:
+    lines: 120
+    statements: 40
+  gocognit:
+    min-complexity: 25
+  gocyclo:
+    min-complexity: 20
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  lll:
+    line-length: 120
+    tab-width: 4
+  misspell:
+    locale: US
+  mnd:
+    checks:
+      - argument
+      - assign
+      - case
+      - condition
+      - operation
+      - return
+  nakedret:
+    max-func-lines: 3
+  revive:
+    enable-all-rules: true
+    rules:
+      - name: add-constant
+        disabled: true
+      - name: argument-limit
+        arguments:
+          - 7
+        severity: warning
+      - name: banned-characters
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
+      - name: comment-spacings
+        arguments:
+          - nolint
+        severity: warning
+      - name: cyclomatic
+        disabled: true
+      - name: file-header
+        disabled: true
+      - name: function-result-limit
+        arguments:
+          - 3
+        severity: warning
+      - name: function-length
+        disabled: true
+      - name: line-length-limit
+        disabled: true
+      - name: max-public-structs
+        disabled: true
+      - name: modifies-value-receiver
+        disabled: true
+      - name: package-comments
+        disabled: true
+      - name: unused-receiver
+        disabled: true
 
 linters:
-  default: all
+  enable-all: true
   disable:
     - containedctx
     - contextcheck
@@ -52,72 +122,3 @@ linters:
     - varnamelen
     - wrapcheck
     - wsl
-  settings:
-    errcheck:
-      check-type-assertions: true
-      check-blank: true
-    exhaustive:
-      default-signifies-exhaustive: true
-    funlen:
-      lines: 120
-      statements: 40
-    gocognit:
-      min-complexity: 25
-    gocyclo:
-      min-complexity: 20
-    govet:
-      enable-all: true
-      disable:
-        - fieldalignment
-    lll:
-      line-length: 120
-      tab-width: 4
-    misspell:
-      locale: US
-    mnd:
-      checks:
-        - argument
-        - assign
-        - case
-        - condition
-        - operation
-        - return
-    nakedret:
-      max-func-lines: 3
-    revive:
-      enable-all-rules: true
-      rules:
-        - name: add-constant
-          disabled: true
-        - name: argument-limit
-          arguments:
-            - 7
-          severity: warning
-        - name: banned-characters
-          disabled: true
-        - name: cognitive-complexity
-          disabled: true
-        - name: comment-spacings
-          arguments:
-            - nolint
-          severity: warning
-        - name: cyclomatic
-          disabled: true
-        - name: file-header
-          disabled: true
-        - name: function-result-limit
-          arguments:
-            - 3
-          severity: warning
-        - name: function-length
-          disabled: true
-        - name: line-length-limit
-          disabled: true
-        - name: max-public-structs
-          disabled: true
-        - name: modifies-value-receiver
-          disabled: true
-        - name: package-comments
-          disabled: true
-        - name: unused-receiver
-          disabled: true

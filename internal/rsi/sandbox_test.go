@@ -60,6 +60,10 @@ func execCommand(t *testing.T, dir string, name string, args ...string) error {
 
 // TestSandbox_RunKnownGoodDiff applies a valid diff and expects all green.
 func TestSandbox_RunKnownGoodDiff(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not available, skipping sandbox test")
+	}
+
 	repoDir := createSandboxTestRepo(t)
 
 	sandbox := NewSandbox(repoDir)

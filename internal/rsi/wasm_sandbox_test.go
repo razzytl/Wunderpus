@@ -55,6 +55,10 @@ func TestAdd(t *testing.T) {
 }
 
 func TestWasmSandbox_FallbackToDocker(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not available, skipping WASM sandbox test")
+	}
+
 	repoDir := createWasmTestRepo(t)
 
 	// useWasm=true but TinyGo is likely not installed, so it should fall back
@@ -90,6 +94,10 @@ func TestWasmSandbox_FallbackToDocker(t *testing.T) {
 }
 
 func TestWasmSandbox_UseDockerDirectly(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skip("docker not available, skipping WASM sandbox test")
+	}
+
 	repoDir := createWasmTestRepo(t)
 
 	// useWasm=false — should go directly to Docker/local sandbox

@@ -2,7 +2,6 @@ package uaa
 
 import (
 	"context"
-	"os"
 	"testing"
 )
 

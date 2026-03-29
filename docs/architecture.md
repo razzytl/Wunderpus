@@ -2,6 +2,8 @@
 
 This document provides a detailed overview of the Wunderpus system architecture, explaining the design decisions, component interactions, and extension points.
 
+> **v2 — The Omnipotence Plan**: With Layer 1 (Infrastructure) and Layer 2 (Capability Domains) fully implemented, Wunderpus can now write its own tools, maintain a knowledge graph, use any website, manage teams of specialists, make money, and more.
+
 ## High-Level Architecture
 
 Wunderpus follows a layered architecture pattern with clear separation of concerns:
@@ -12,8 +14,8 @@ Wunderpus follows a layered architecture pattern with clear separation of concer
 │                    (Cobra Commands: agent, gateway, skills,                  │
 │                        cron, auth, onboard, status)                           │
 └──────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       ▼
+                                        │
+                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                           Application Layer                                   │
 │                                                                               │
@@ -30,6 +32,8 @@ Wunderpus follows a layered architecture pattern with clear separation of concer
 │    │   Agent     │            │  Channel    │              │   Skills    │  │
 │    │  Manager    │            │  Manager    │              │   Loader    │  │
 │    └─────────────┘            └─────────────┘              └─────────────┘  │
+│                                                                               │
+│          Plus: Tool Synthesis | World Model | Perception | Swarm            │
 └──────────────────────────────────────────────────────────────────────────────┘
                      │                    │                    │
                      ▼                    ▼                    ▼
@@ -51,6 +55,43 @@ Wunderpus follows a layered architecture pattern with clear separation of concer
 │   └──────────┘  └──────────┘  └──────────┘  └──────────┘  └──────────┘      │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Layer 1 — Infrastructure Components (v2)
+
+The Omnipotence Plan adds four major infrastructure systems:
+
+```
+┌═════════════════════════════════════════════════════════════════════════════════│
+│                        INFRASTRUCTURE LAYER (v2)                               │
+├────────────────┬────────────────┬────────────────┬─────────────────────────────│
+│ Tool Synthesis │  World Model  │  Perception   │      Swarm (A2A)            │
+│                │               │               │                             │
+│ • detector.go  │ • store.go    │ • vision.go   │ • protocol.go               │
+│ • designer.go  │ • extractor   │ • browser     │ • types.go                  │
+│ • coder.go     │ • query.go    │ • dom_agent   │ • profiles.go               │
+│ • tester.go    │ • updater.go  │ • desktop     │ • orchestrator.go           │
+│ • registrar.go │               │               │                             │
+│ • marketplace  │               │               │                             │
+└────────────────┴────────────────┴────────────────┴─────────────────────────────│
+```
+
+### Tool Synthesis Engine (`internal/toolsynth/`)
+
+The agent writes its own tools by detecting capability gaps, designing specifications, generating code, testing in sandbox, and registering for use.
+
+### World Model (`internal/worldmodel/`)
+
+A persistent knowledge graph that stores entities, relationships, and confidence scores.learns from every task completion.
+
+### Perception (`internal/perception/`)
+
+Computer use via Playwright - can navigate any website, fill forms, execute actions through vision-based or DOM-first agents.
+
+### Swarm/A2A (`internal/swarm/`, `internal/a2a/`)
+
+Multi-agent orchestration with Google's Agent2Agent protocol. Specialists (researcher, coder, writer, trader, etc.) work in parallel.
+
+---
 
 ## Core Components
 

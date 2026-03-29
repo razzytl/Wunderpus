@@ -40,6 +40,15 @@ type GenesisConfig struct {
 	AGSEnabled                bool     `yaml:"ags_enabled"`                  // Enable Autonomous Goal Synthesis
 	UAAEnabled                bool     `yaml:"uaa_enabled"`                  // Enable Unbounded Autonomous Action
 	RAEnabled                 bool     `yaml:"ra_enabled"`                   // Enable Resource Acquisition
+	ToolSynthEnabled          bool     `yaml:"toolsynth_enabled"`            // Enable Tool Synthesis Engine (Section 1)
+	ToolSynthDBPath           string   `yaml:"toolsynth_db_path"`            // Tool synthesis metadata DB path
+	ToolSynthMinPassRate      float64  `yaml:"toolsynth_min_pass_rate"`      // Min test pass rate to accept tool (default: 0.8)
+	WorldModelEnabled         bool     `yaml:"worldmodel_enabled"`           // Enable World Model / Knowledge Graph (Section 2)
+	WorldModelDBPath          string   `yaml:"worldmodel_db_path"`           // World model SQLite DB path
+	WorldModelScanIntervalH   int      `yaml:"worldmodel_scan_interval_h"`   // Hours between web scans for dynamic entities (default: 24)
+	PerceptionEnabled         bool     `yaml:"perception_enabled"`           // Enable Computer Use / GUI Control (Section 3)
+	PerceptionMaxActions      int      `yaml:"perception_max_actions"`       // Max browser actions per goal (default: 50)
+	SwarmEnabled              bool     `yaml:"swarm_enabled"`                // Enable Agent Swarm Architecture (Section 4)
 	RSIFirewallEnabled        bool     `yaml:"rsi_firewall_enabled"`         // RSI can only modify internal/ (default: true)
 	MaxDailySpendUSD          float64  `yaml:"max_daily_spend_usd"`          // Hard cap on cloud spend (default: 10.0)
 	TrustBudgetMax            int      `yaml:"trust_budget_max"`             // Maximum trust points (default: 1000)
@@ -624,6 +633,15 @@ func applyDefaults(cfg *Config) {
 	cfg.Genesis.AGSEnabled = false
 	cfg.Genesis.UAAEnabled = false
 	cfg.Genesis.RAEnabled = false
+	cfg.Genesis.ToolSynthEnabled = false
+	cfg.Genesis.ToolSynthDBPath = filepath.Join(cfg.Home, "wunderpus_toolsynth.db")
+	cfg.Genesis.ToolSynthMinPassRate = 0.8
+	cfg.Genesis.WorldModelEnabled = false
+	cfg.Genesis.WorldModelDBPath = filepath.Join(cfg.Home, "wunderpus_worldmodel.db")
+	cfg.Genesis.WorldModelScanIntervalH = 24
+	cfg.Genesis.PerceptionEnabled = false
+	cfg.Genesis.PerceptionMaxActions = 50
+	cfg.Genesis.SwarmEnabled = false
 	cfg.Genesis.RSIFirewallEnabled = true
 	cfg.Genesis.MaxDailySpendUSD = 10.0
 	cfg.Genesis.TrustBudgetMax = 1000
@@ -722,6 +740,29 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_RA"); v != "" {
 		cfg.Genesis.RAEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH"); v != "" {
+		cfg.Genesis.ToolSynthEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH_DB"); v != "" {
+		cfg.Genesis.ToolSynthDBPath = v
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH_PASS_RATE"); v != "" {
+		if rate, err := strconv.ParseFloat(v, 64); err == nil && rate >= 0 && rate <= 1 {
+			cfg.Genesis.ToolSynthMinPassRate = rate
+		}
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_WORLDMODEL"); v != "" {
+		cfg.Genesis.WorldModelEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_WORLDMODEL_DB"); v != "" {
+		cfg.Genesis.WorldModelDBPath = v
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_PERCEPTION"); v != "" {
+		cfg.Genesis.PerceptionEnabled = strings.ToLower(v) == "true" || v == "1"
+	}
+	if v := os.Getenv("WUNDERPUS_GENESIS_SWARM"); v != "" {
+		cfg.Genesis.SwarmEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_FIREWALL"); v != "" {
 		cfg.Genesis.RSIFirewallEnabled = strings.ToLower(v) == "true" || v == "1"

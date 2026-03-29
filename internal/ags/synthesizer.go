@@ -37,6 +37,7 @@ type GoalSynthesizer struct {
 	scorer      *PriorityScorer
 	events      *events.Bus
 	maxPerCycle int
+	wmContext   func(taskDesc string) string // optional: world model context provider
 }
 
 // NewGoalSynthesizer creates a new synthesizer.
@@ -48,6 +49,12 @@ func NewGoalSynthesizer(p provider.Provider, store *GoalStore, scorer *PriorityS
 		events:      bus,
 		maxPerCycle: 5,
 	}
+}
+
+// SetWorldModelContext sets a function that provides world model context
+// for goal synthesis. Called before LLM goal generation.
+func (gs *GoalSynthesizer) SetWorldModelContext(fn func(taskDesc string) string) {
+	gs.wmContext = fn
 }
 
 // MemoryEntry represents an episodic memory record for pattern detection.

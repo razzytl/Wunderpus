@@ -1,0 +1,45 @@
+?   	github.com/wunderpus/wunderpus/cmd/wunderpus	[no test files]
+ok  	github.com/wunderpus/wunderpus/internal/agent	0.987s
+ok  	github.com/wunderpus/wunderpus/internal/agents	0.824s
+ok  	github.com/wunderpus/wunderpus/internal/ags	63.961s
+?   	github.com/wunderpus/wunderpus/internal/app	[no test files]
+ok  	github.com/wunderpus/wunderpus/internal/audit	18.136s
+ok  	github.com/wunderpus/wunderpus/internal/bootstrap	0.946s
+ok  	github.com/wunderpus/wunderpus/internal/channel	0.755s
+?   	github.com/wunderpus/wunderpus/internal/channel/dingtalk	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/discord	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/feishu	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/onebot	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/qq	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/slack	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/telegram	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/websocket	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/wecom	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/channel/whatsapp	[no test files]
+ok  	github.com/wunderpus/wunderpus/internal/config	1.326s
+ok  	github.com/wunderpus/wunderpus/internal/constants	0.751s
+ok  	github.com/wunderpus/wunderpus/internal/cost	17.559s
+ok  	github.com/wunderpus/wunderpus/internal/errors	0.741s
+ok  	github.com/wunderpus/wunderpus/internal/events	1.769s
+ok  	github.com/wunderpus/wunderpus/internal/health	1.586s
+ok  	github.com/wunderpus/wunderpus/internal/heartbeat	0.287s
+ok  	github.com/wunderpus/wunderpus/internal/logging	1.305s
+ok  	github.com/wunderpus/wunderpus/internal/memory	14.022s
+ok  	github.com/wunderpus/wunderpus/internal/provider	0.370s
+ok  	github.com/wunderpus/wunderpus/internal/ra	20.953s
+ok  	github.com/wunderpus/wunderpus/internal/ra/cloud	10.697s
+ok  	github.com/wunderpus/wunderpus/internal/ra/financial	0.849s
+ok  	github.com/wunderpus/wunderpus/internal/ra/marketplace	0.987s
+ok  	github.com/wunderpus/wunderpus/internal/rsi	103.121s
+ok  	github.com/wunderpus/wunderpus/internal/security	1.394s
+ok  	github.com/wunderpus/wunderpus/internal/skills	1.045s
+ok  	github.com/wunderpus/wunderpus/internal/subagent	0.393s
+ok  	github.com/wunderpus/wunderpus/internal/tool	5.201s
+ok  	github.com/wunderpus/wunderpus/internal/tool/builtin	96.963s
+?   	github.com/wunderpus/wunderpus/internal/tool/mcp	[no test files]
+?   	github.com/wunderpus/wunderpus/internal/tui	[no test files]
+ok  	github.com/wunderpus/wunderpus/internal/types	0.776s
+ok  	github.com/wunderpus/wunderpus/internal/uaa	15.270s
+?   	github.com/wunderpus/wunderpus/ui	[no test files]
+?   	github.com/wunderpus/wunderpus/ui/node_modules/flatted/golang/pkg/flatted	[no test files]
+ok  	github.com/wunderpus/wunderpus/web	0.399s

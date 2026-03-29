@@ -22,12 +22,16 @@ import (
 	"github.com/wunderpus/wunderpus/internal/heartbeat"
 	"github.com/wunderpus/wunderpus/internal/logging"
 	"github.com/wunderpus/wunderpus/internal/memory"
+	"github.com/wunderpus/wunderpus/internal/perception"
 	"github.com/wunderpus/wunderpus/internal/provider"
 	"github.com/wunderpus/wunderpus/internal/security"
 	"github.com/wunderpus/wunderpus/internal/skills"
 	"github.com/wunderpus/wunderpus/internal/subagent"
+	"github.com/wunderpus/wunderpus/internal/swarm"
 	"github.com/wunderpus/wunderpus/internal/tool"
 	"github.com/wunderpus/wunderpus/internal/tool/builtin"
+	"github.com/wunderpus/wunderpus/internal/toolsynth"
+	"github.com/wunderpus/wunderpus/internal/worldmodel"
 )
 
 // App encapsulates the Wunderpus application state and dependencies.
@@ -44,6 +48,10 @@ type App struct {
 	Registry            *tool.Registry
 	Browser             *builtin.BrowserTool
 	HumanInTheLoop      *builtin.HumanInTheLoop
+	ToolSynth           *toolsynth.SynthSystem       // Tool Synthesis Engine (Section 1)
+	WorldModel          *worldmodel.WorldModelSystem // World Model / Knowledge Graph (Section 2)
+	Perception          *PerceptionSystem            // Computer Use / GUI Control (Section 3)
+	Swarm               *swarm.SwarmSystem           // Agent Swarm Architecture (Section 4)
 }
 
 // Bootstrap initializes the application with the given config path.
@@ -146,7 +154,55 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	builtinSkills := "./skills"
 	skillsLoader := skills.NewSkillsLoader(cfg.Agents.Defaults.Workspace, globalSkills, builtinSkills)
 
-	// 8. Init agent manager
+	// 8. Init tool synthesis engine (Section 1 — if enabled)
+	var toolSynth *toolsynth.SynthSystem
+	if cfg.Genesis.ToolSynthEnabled {
+		synthCfg := toolsynth.SynthConfig{
+			Enabled:        true,
+			DBPath:         cfg.Genesis.ToolSynthDBPath,
+			MinPassRate:    cfg.Genesis.ToolSynthMinPassRate,
+			ScanLimit:      500,
+			OutputDir:      filepath.Join("internal", "tool", "generated"),
+			RepoRoot:       ".",
+			ProfilerDBPath: cfg.Genesis.ProfilerDBPath,
+		}
+		llmAdapter := &RouterLLMAdapter{router: router}
+		toolSynth, err = toolsynth.InitToolSynth(
+			synthCfg,
+			cfg.Agent.MemoryDBPath,
+			llmAdapter,
+			nil, // genesis audit log — wired separately if available
+			nil, // event bus — wired separately if available
+		)
+		if err != nil {
+			slog.Warn("tool synthesis init failed (non-fatal)", "error", err)
+			toolSynth = nil
+		}
+	}
+
+	// 8b. Init world model / knowledge graph (Section 2 — if enabled)
+	var worldModel *worldmodel.WorldModelSystem
+	if cfg.Genesis.WorldModelEnabled {
+		wmCfg := worldmodel.Config{
+			Enabled:       true,
+			DBPath:        cfg.Genesis.WorldModelDBPath,
+			ScanIntervalH: cfg.Genesis.WorldModelScanIntervalH,
+		}
+		wmLLM := &WorldModelLLMAdapter{router: router}
+		worldModel, err = worldmodel.InitWorldModel(wmCfg, wmLLM, nil)
+		if err != nil {
+			slog.Warn("world model init failed (non-fatal)", "error", err)
+			worldModel = nil
+		}
+	}
+
+	// 8c. Init perception / computer use (Section 3 — if enabled)
+	var perceptionSystem *PerceptionSystem
+	if cfg.Genesis.PerceptionEnabled {
+		perceptionSystem = initPerception(cfg, router, browserTool)
+	}
+
+	// 9. Init agent manager
 	manager := agent.NewManager(cfg, router, sanitizer, audit, memStore, registry, executor, skillsLoader)
 
 	// Set enhanced store for RAG if available
@@ -165,6 +221,31 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		registry.Register(builtin.NewSpawnTool(subAgentMgr))
 		registry.Register(builtin.NewMessageTool(subAgentMgr))
 		registry.Register(builtin.NewAskHumanTool(hitl))
+	}
+
+	// 9c. Init agent swarm (Section 4 — if enabled)
+	var swarmSystem *swarm.SwarmSystem
+	if cfg.Genesis.SwarmEnabled {
+		swarmCfg := swarm.Config{Enabled: true}
+		defaultAgent := manager.GetAgent("default")
+		swarmSystem, err = swarm.InitSwarm(swarmCfg, func(ctx context.Context, goal swarm.Goal, config swarm.AgentConfig) (*swarm.SpecialistResult, error) {
+			resp, err := defaultAgent.HandleMessage(ctx, goal.Description)
+			if err != nil {
+				return nil, err
+			}
+			return &swarm.SpecialistResult{
+				Specialist: config.Name,
+				GoalID:     goal.ID,
+				Output:     resp,
+				Success:    true,
+			}, nil
+		}, nil)
+		if err != nil {
+			slog.Warn("swarm init failed (non-fatal)", "error", err)
+			swarmSystem = nil
+		} else {
+			slog.Info("swarm: initialized successfully")
+		}
 	}
 
 	// 10. Init heartbeat scheduler
@@ -223,11 +304,18 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		Registry:            registry,
 		Browser:             browserTool,
 		HumanInTheLoop:      hitl,
+		ToolSynth:           toolSynth,
+		WorldModel:          worldModel,
+		Perception:          perceptionSystem,
+		Swarm:               swarmSystem,
 	}, nil
 }
 
 // Close gracefully shuts down all application components.
 func (a *App) Close() {
+	if a.ToolSynth != nil && a.ToolSynth.Improver != nil {
+		a.ToolSynth.Improver.Stop()
+	}
 	if a.Browser != nil {
 		a.Browser.Close()
 	}
@@ -246,4 +334,143 @@ func (a *App) Close() {
 	if a.AuditLogger != nil {
 		_ = a.AuditLogger.Close()
 	}
+}
+
+// RouterLLMAdapter adapts the provider.Router to the toolsynth.LLMCaller interface.
+type RouterLLMAdapter struct {
+	router *provider.Router
+}
+
+// Complete sends an LLM request through the provider router with fallback.
+func (a *RouterLLMAdapter) Complete(req toolsynth.CompletionRequest) (string, error) {
+	ctx := context.Background()
+	providerReq := &provider.CompletionRequest{
+		Messages: []provider.Message{
+			{Role: provider.RoleSystem, Content: req.SystemPrompt},
+			{Role: provider.RoleUser, Content: req.UserPrompt},
+		},
+		Temperature: req.Temperature,
+		MaxTokens:   req.MaxTokens,
+	}
+
+	resp, err := a.router.CompleteWithFallback(ctx, providerReq)
+	if err != nil {
+		return "", fmt.Errorf("llm adapter: %w", err)
+	}
+	return resp.Content, nil
+}
+
+// WorldModelLLMAdapter adapts the provider.Router to the worldmodel.LLMCaller interface.
+type WorldModelLLMAdapter struct {
+	router *provider.Router
+}
+
+// Complete sends an LLM request through the provider router with fallback.
+func (a *WorldModelLLMAdapter) Complete(req worldmodel.LLMRequest) (string, error) {
+	ctx := context.Background()
+	providerReq := &provider.CompletionRequest{
+		Messages: []provider.Message{
+			{Role: provider.RoleSystem, Content: req.SystemPrompt},
+			{Role: provider.RoleUser, Content: req.UserPrompt},
+		},
+		Temperature: req.Temperature,
+		MaxTokens:   req.MaxTokens,
+	}
+
+	resp, err := a.router.CompleteWithFallback(ctx, providerReq)
+	if err != nil {
+		return "", fmt.Errorf("worldmodel llm adapter: %w", err)
+	}
+	return resp.Content, nil
+}
+
+// PerceptionSystem holds all perception components (Section 3).
+type PerceptionSystem struct {
+	Vision       *perception.Vision
+	BrowserAgent *perception.BrowserAgent
+	DOMAgent     *perception.DOMAgent
+	DesktopAgent *perception.DesktopAgent
+}
+
+// initPerception initializes the perception system if Playwright is available.
+func initPerception(cfg *config.Config, router *provider.Router, browserTool *builtin.BrowserTool) *PerceptionSystem {
+	// Try to create Playwright bridge
+	bridge, err := perception.NewPlaywrightBridge()
+	if err != nil {
+		slog.Warn("perception: Playwright bridge unavailable, using existing browser tool", "error", err)
+		return nil
+	}
+
+	// Vision LLM adapter
+	visionLLM := &PerceptionLLMAdapter{router: router}
+
+	// Create vision interface
+	vision := perception.NewVision(bridge, bridge, visionLLM)
+
+	// Create browser agent
+	browserAgent := perception.NewBrowserAgent(vision)
+	if cfg.Genesis.PerceptionMaxActions > 0 {
+		browserAgent.SetMaxActions(cfg.Genesis.PerceptionMaxActions)
+	}
+
+	// Create DOM agent
+	domAgent := perception.NewDOMAgent(bridge, visionLLM)
+
+	// Create desktop agent
+	desktopAgent := perception.NewDesktopAgent()
+
+	slog.Info("perception: initialized",
+		"maxActions", cfg.Genesis.PerceptionMaxActions,
+		"platform", desktopAgent.Platform())
+
+	return &PerceptionSystem{
+		Vision:       vision,
+		BrowserAgent: browserAgent,
+		DOMAgent:     domAgent,
+		DesktopAgent: desktopAgent,
+	}
+}
+
+// PerceptionLLMAdapter adapts provider.Router to perception.VisionLLMCaller.
+type PerceptionLLMAdapter struct {
+	router *provider.Router
+}
+
+func (a *PerceptionLLMAdapter) CompleteWithVision(prompt string, imageData []byte, mimeType string) (string, error) {
+	ctx := context.Background()
+	req := &provider.CompletionRequest{
+		Messages: []provider.Message{
+			{
+				Role: provider.RoleUser,
+				MultiContent: []provider.ContentPart{
+					{Type: "text", Text: prompt},
+					{Type: "image_url", ImageURL: &provider.ImageURL{
+						URL: fmt.Sprintf("data:%s;base64,%s", mimeType, base64.StdEncoding.EncodeToString(imageData)),
+					}},
+				},
+			},
+		},
+		MaxTokens: 1000,
+	}
+	resp, err := a.router.CompleteWithFallback(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("perception llm: %w", err)
+	}
+	return resp.Content, nil
+}
+
+func (a *PerceptionLLMAdapter) CompleteText(prompt string) (string, error) {
+	ctx := context.Background()
+	req := &provider.CompletionRequest{
+		Messages: []provider.Message{
+			{Role: provider.RoleSystem, Content: "You are a browser automation agent."},
+			{Role: provider.RoleUser, Content: prompt},
+		},
+		MaxTokens: 500,
+	}
+	resp, err := a.router.CompleteWithFallback(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("perception llm: %w", err)
+	}
+	return resp.Content, nil
 }

@@ -26,9 +26,8 @@ func TestSearchResult(t *testing.T) {
 // TestSearchResult_EmptyContent tests SearchResult with empty content
 func TestSearchResult_EmptyContent(t *testing.T) {
 	result := SearchResult{
-		SessionID: "session-1",
-		Content:   "",
-		Score:     0.0,
+		Content: "",
+		Score:   0.0,
 	}
 
 	if result.Content != "" {

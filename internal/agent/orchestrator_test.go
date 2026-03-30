@@ -10,8 +10,7 @@ import (
 // TestTaskGraph tests TaskGraph structure
 func TestTaskGraph(t *testing.T) {
 	graph := &TaskGraph{
-		Goal:     "test goal",
-		Subtasks: []Subtask{},
+		Goal: "test goal",
 	}
 
 	if graph.Goal != "test goal" {
@@ -90,8 +89,7 @@ func TestMessage_Roles(t *testing.T) {
 
 	for _, role := range roles {
 		msg := provider.Message{
-			Role:    role,
-			Content: "test",
+			Role: role,
 		}
 		if msg.Role != role {
 			t.Errorf("expected Role %q, got %q", role, msg.Role)

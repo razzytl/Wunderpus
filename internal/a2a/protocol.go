@@ -85,7 +85,7 @@ func (s *Server) handleTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var task Task
-	if err := json.Unmarshal(body, &task); err != nil {
+	if err = json.Unmarshal(body, &task); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -239,9 +239,9 @@ func (c *Client) AssignTask(endpoint string, task Task) (*TaskResult, error) {
 	return &result, nil
 }
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
+func truncate(s string, maxVal int) string {
+	if len(s) <= maxVal {
 		return s
 	}
-	return s[:max] + "..."
+	return s[:maxVal] + "..."
 }

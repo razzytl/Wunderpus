@@ -113,12 +113,9 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					return
-				}
+		for range ticker.C {
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
 			}
 		}
 	}()

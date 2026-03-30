@@ -218,7 +218,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEscape:
 			if m.streaming {
 				m.streaming = false
-				m.appendChat(DimStyle.Render("  ↳ Response cancelled"))
+				m.appendChat(DimStyle.Render("  ↳ Response canceled"))
 				m.appendChat("")
 			}
 		case tea.KeyTab:

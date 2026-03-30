@@ -9,7 +9,5 @@ func TestAnalytics(t *testing.T) {
 		stats: make(map[string]*ToolStats),
 	}
 
-	if analytics == nil {
-		t.Error("expected non-nil analytics")
-	}
+	_ = analytics // analytics is now initialized
 }

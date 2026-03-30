@@ -2,18 +2,12 @@ package subagent
 
 import (
 	"testing"
-	"time"
 )
 
 func TestSubAgent(t *testing.T) {
-	now := time.Now()
 	sub := &SubAgent{
-		ID:        "agent-1",
-		SessionID: "session-1",
-		Task:      "test task",
-		Status:    StatusRunning,
-		CreatedAt: now,
-		StartedAt: &now,
+		ID:     "agent-1",
+		Status: StatusRunning,
 	}
 
 	if sub.ID != "agent-1" {
@@ -34,7 +28,7 @@ func TestStatus(t *testing.T) {
 		{StatusRunning, "running"},
 		{StatusCompleted, "completed"},
 		{StatusFailed, "failed"},
-		{StatusCancelled, "cancelled"},
+		{StatusCancelled, "canceled"},
 	}
 
 	for _, tt := range tests {

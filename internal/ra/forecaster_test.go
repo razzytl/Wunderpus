@@ -98,6 +98,7 @@ func (m *mockAdapter) ProvisionCompute(spec ResourceSpec) (Resource, error) {
 	m.provisionCount++
 	return Resource{ID: "mock-compute", Type: ResourceCompute, Provider: "mock", Status: ResourceStatusActive}, nil
 }
+
 func (m *mockAdapter) ProvisionStorage(spec ResourceSpec) (Resource, error) {
 	m.provisionCount++
 	return Resource{ID: "mock-storage", Type: ResourceStorage, Provider: "mock", Status: ResourceStatusActive}, nil

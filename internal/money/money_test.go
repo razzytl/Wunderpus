@@ -3,7 +3,6 @@ package money
 import (
 	"context"
 	"testing"
-	"time"
 )
 
 func TestBidEvaluatorScore_PerfectMatch(t *testing.T) {
@@ -278,8 +277,6 @@ func TestTradingSignal_Create(t *testing.T) {
 		Symbol:     "BTC/USD",
 		Action:     "buy",
 		Confidence: 0.75,
-		Reasoning:  "Strong uptrend with high volume",
-		CreatedAt:  time.Now(),
 	}
 
 	if signal.Symbol != "BTC/USD" {

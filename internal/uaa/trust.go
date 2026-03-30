@@ -31,7 +31,7 @@ type TrustBudget struct {
 
 // NewTrustBudget creates a trust budget backed by SQLite.
 // If no existing state is found, the budget is initialized to max.
-func NewTrustBudget(dbPath string, max int, regenPerHour int, bus *events.Bus, auditLog *audit.AuditLog, jwtSecretEnv string) (*TrustBudget, error) {
+func NewTrustBudget(dbPath string, maxVal int, regenPerHour int, bus *events.Bus, auditLog *audit.AuditLog, jwtSecretEnv string) (*TrustBudget, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("trust: opening db: %w", err)
@@ -62,8 +62,8 @@ func NewTrustBudget(dbPath string, max int, regenPerHour int, bus *events.Bus, a
 	var current int
 	err = db.QueryRow(`SELECT current FROM trust_state WHERE id = 1`).Scan(&current)
 	if err == sql.ErrNoRows {
-		current = max
-		_, _ = db.Exec(`INSERT INTO trust_state (id, current) VALUES (1, ?)`, max)
+		current = maxVal
+		_, _ = db.Exec(`INSERT INTO trust_state (id, current) VALUES (1, ?)`, maxVal)
 	} else if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("trust: loading state: %w", err)
@@ -71,7 +71,7 @@ func NewTrustBudget(dbPath string, max int, regenPerHour int, bus *events.Bus, a
 
 	tb := &TrustBudget{
 		current:      current,
-		max:          max,
+		max:          maxVal,
 		regenPerHour: regenPerHour,
 		db:           db,
 		events:       bus,

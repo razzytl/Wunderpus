@@ -141,7 +141,7 @@ func (si *SkillInstaller) InstallFromLocalPath(ctx context.Context, sourcePath s
 		return fmt.Errorf("failed to read source SKILL.md: %w", err)
 	}
 
-	if err := os.WriteFile(destSkillFile, skillContent, 0o600); err != nil {
+	if err = os.WriteFile(destSkillFile, skillContent, 0o600); err != nil {
 		return fmt.Errorf("failed to write SKILL.md: %w", err)
 	}
 

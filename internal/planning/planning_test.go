@@ -8,9 +8,7 @@ import (
 func TestProjectManager_CreateProject(t *testing.T) {
 	pm := &ProjectManager{}
 
-	if pm == nil {
-		t.Error("Expected project manager to be created")
-	}
+	_ = pm // pm is now initialized
 }
 
 func TestProject_Milestones(t *testing.T) {
@@ -37,9 +35,7 @@ func TestProject_Milestones(t *testing.T) {
 func TestSelfMapEngine_GenerateRoadmap(t *testing.T) {
 	engine := &SelfMapEngine{}
 
-	if engine == nil {
-		t.Error("Expected engine to be created")
-	}
+	_ = engine // engine is now initialized
 }
 
 func TestImprovementGoal_Structure(t *testing.T) {

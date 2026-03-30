@@ -119,22 +119,22 @@ func (c *Channel) Start(ctx context.Context) error {
 						_, _ = rand.Read(cidBytes)
 						cid := hex.EncodeToString(cidBytes)
 
-						ctx := logging.ContextWithCorrelation(context.Background(), cid)
-						ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+						msgCtx := logging.ContextWithCorrelation(context.Background(), cid)
+						msgCtx, cancel := context.WithTimeout(msgCtx, 2*time.Minute)
 						defer cancel()
 
-						logging.L(ctx).Info("processing telegram message", "chat_id", id, "session_id", sid)
+						logging.L(msgCtx).Info("processing telegram message", "chat_id", id, "session_id", sid)
 
 						// Show typing indicator
 						c.bot.Send(tgbotapi.NewChatAction(id, tgbotapi.ChatTyping))
 
-						respRes, err := c.manager.ProcessRequest(ctx, types.UserMessage{
+						respRes, err := c.manager.ProcessRequest(msgCtx, types.UserMessage{
 							SessionID: sid,
 							Content:   input,
 							ChannelID: fmt.Sprintf("%d", id),
 						})
 						if err != nil {
-							logging.L(ctx).Error("failed to process message", "error", err)
+							logging.L(msgCtx).Error("failed to process message", "error", err)
 							msg := tgbotapi.NewMessage(id, "Error: "+err.Error())
 							c.bot.Send(msg)
 							return

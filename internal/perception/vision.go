@@ -39,7 +39,8 @@ func (v *Vision) PlanAction(instruction string) (*BrowserAction, error) {
 
 	// Get current DOM context
 	domContext := ""
-	if elements, err := v.executor.ExtractDOM(); err == nil && len(elements) > 0 {
+	var elements []DOMElement
+	if elements, err = v.executor.ExtractDOM(); err == nil && len(elements) > 0 {
 		domCtx, _ := json.Marshal(elements)
 		domContext = string(domCtx)
 	}
@@ -219,9 +220,9 @@ func parseAction(response string) (*BrowserAction, error) {
 	return &action, nil
 }
 
-func truncate(s string, max int) string {
-	if len(s) <= max {
+func truncate(s string, maxVal int) string {
+	if len(s) <= maxVal {
 		return s
 	}
-	return s[:max] + "..."
+	return s[:maxVal] + "..."
 }

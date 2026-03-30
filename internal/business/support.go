@@ -34,20 +34,14 @@ type TicketReader interface {
 	Read(ctx context.Context) ([]Ticket, error)
 }
 
-// EmailReader reads support emails.
-type EmailReader interface {
-	TicketReader
-}
+// EmailReader reads support emails (same as TicketReader).
+type EmailReader = TicketReader
 
-// DiscordReader reads Discord support messages.
-type DiscordReader interface {
-	TicketReader
-}
+// DiscordReader reads Discord support messages (same as TicketReader).
+type DiscordReader = TicketReader
 
-// TelegramReader reads Telegram support messages.
-type TelegramReader interface {
-	TicketReader
-}
+// TelegramReader reads Telegram support messages (same as TicketReader).
+type TelegramReader = TicketReader
 
 // KnowledgeBase for auto-response.
 type KnowledgeBase interface {

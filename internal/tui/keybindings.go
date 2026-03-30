@@ -126,7 +126,7 @@ func DefaultKeybindings() KeybindingsHelp {
 }
 
 func (kh *KeybindingsHelp) CompactView() string {
-	var lines []string
+	lines := make([]string, 0, len(kh.Bindings)*2)
 
 	grouped := make(map[string][]KeyBinding)
 	for _, binding := range kh.Bindings {

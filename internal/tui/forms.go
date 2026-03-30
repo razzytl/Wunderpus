@@ -95,7 +95,7 @@ func (f *FormModel) ActiveField() *FormField {
 }
 
 func (f *FormModel) View() string {
-	var lines []string
+	lines := make([]string, 0, 2+len(f.Fields))
 
 	titleStyle := lipgloss.NewStyle().
 		Foreground(accentColor).

@@ -12,7 +12,6 @@ func TestHeartbeatTask_Fields(t *testing.T) {
 		Content:  "test content",
 		Line:     10,
 		CronExpr: "0 * * * *",
-		Schedule: "hourly",
 	}
 
 	if task.Type != "quick" {

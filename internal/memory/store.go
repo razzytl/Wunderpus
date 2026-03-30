@@ -18,10 +18,10 @@ type Store struct {
 
 // Session represents a chat session.
 type Session struct {
-	ID        string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Title     string
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Title     string    `json:"title"`
 }
 
 // NewStore initializes a new SQLite memory store.

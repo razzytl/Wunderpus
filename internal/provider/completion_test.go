@@ -7,8 +7,7 @@ import (
 
 func TestCompletionRequest(t *testing.T) {
 	req := &CompletionRequest{
-		Model:    "gpt-4",
-		Messages: []Message{},
+		Model: "gpt-4",
 	}
 
 	if req.Model != "gpt-4" {
@@ -19,7 +18,6 @@ func TestCompletionRequest(t *testing.T) {
 func TestCompletionResponse(t *testing.T) {
 	resp := &CompletionResponse{
 		Content: "Test response",
-		Model:   "gpt-4",
 	}
 
 	if resp.Content != "Test response" {
@@ -44,8 +42,7 @@ func TestMessage_RoleContent(t *testing.T) {
 
 func TestToolCallInfo(t *testing.T) {
 	tc := ToolCallInfo{
-		ID:   "call-123",
-		Type: "function",
+		ID: "call-123",
 		Function: ToolCallFunc{
 			Name:      "web_search",
 			Arguments: `{"query": "test"}`,

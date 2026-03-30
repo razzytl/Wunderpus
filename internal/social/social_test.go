@@ -14,7 +14,6 @@ func TestEmail_Structure(t *testing.T) {
 		ID:      "test-123",
 		To:      "test@example.com",
 		Subject: "Test",
-		Status:  "draft",
 	}
 
 	if email.ID != "test-123" {
@@ -30,10 +29,8 @@ func TestEmail_Structure(t *testing.T) {
 
 func TestPost_Structure(t *testing.T) {
 	post := Post{
-		ID:       "post-123",
 		Platform: PlatformTwitter,
 		Content:  "Hello world",
-		Status:   "draft",
 	}
 
 	if post.Platform != PlatformTwitter {

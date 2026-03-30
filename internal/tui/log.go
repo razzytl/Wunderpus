@@ -93,7 +93,7 @@ func (l *LogModel) Error(message string) {
 }
 
 func (l *LogModel) View() string {
-	var lines []string
+	lines := make([]string, 0, len(l.Entries))
 
 	for _, entry := range l.Entries {
 		if entry.Level < l.Filter {

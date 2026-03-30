@@ -67,11 +67,7 @@ func TestCooldownTracker_GetFailCount(t *testing.T) {
 func TestFallbackAttempt_Structure(t *testing.T) {
 	fa := FallbackAttempt{
 		Provider: "openai",
-		Model:    "gpt-4",
-		Error:    nil,
-		Reason:   FailoverReasonTimeout,
 		Duration: 100 * time.Millisecond,
-		Skipped:  false,
 	}
 
 	if fa.Provider != "openai" {
@@ -86,8 +82,6 @@ func TestFallbackResult_Structure(t *testing.T) {
 	fr := FallbackResult{
 		Response: &CompletionResponse{Content: "test response"},
 		Provider: "openai",
-		Model:    "gpt-4",
-		Attempts: []FallbackAttempt{},
 	}
 
 	if fr.Response.Content != "test response" {

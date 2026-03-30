@@ -242,8 +242,6 @@ func TestHeartbeatTask_Structure(t *testing.T) {
 func TestParseResult_LastModified(t *testing.T) {
 	now := time.Now()
 	result := &ParseResult{
-		QuickTasks:   []HeartbeatTask{},
-		LongTasks:    []HeartbeatTask{},
 		LastModified: now,
 	}
 

@@ -366,7 +366,8 @@ func Load(path string) (*Config, error) {
 				env := os.Getenv("WONDERPUS_ENV")
 				if env != "" {
 					altPath := fmt.Sprintf("config.%s.yaml", env)
-					if altData, err := os.ReadFile(altPath); err == nil {
+					var altData []byte
+					if altData, err = os.ReadFile(altPath); err == nil {
 						data = altData
 					}
 				}

@@ -173,7 +173,7 @@ func (r *AgenticRAG) synthesize(ctx context.Context, question string, results []
 	// Build prompt with all results
 	prompt := "Based on these sources, answer the question thoroughly with citations:\n\nQuestion: " + question + "\n\nSources:\n"
 
-	var citations []Citation
+	citations := make([]Citation, 0, len(results))
 	for _, res := range results {
 		prompt += "- " + res.Content + " [Source: " + res.Source + "]\n"
 		citations = append(citations, Citation{

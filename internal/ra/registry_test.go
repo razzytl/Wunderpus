@@ -33,7 +33,7 @@ func TestResourceRegistry_RegisterAndGet(t *testing.T) {
 		},
 	}
 
-	if err := reg.Register(res); err != nil {
+	if err = reg.Register(res); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 

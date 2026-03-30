@@ -47,9 +47,7 @@ func TestSession_Structure(t *testing.T) {
 
 func TestSession_WithMessages(t *testing.T) {
 	s := Session{
-		ID:       "session-123",
-		Provider: "openai",
-		Model:    "gpt-4",
+		Model: "gpt-4",
 		Messages: []Message{
 			{Role: "user", Content: "Hello"},
 			{Role: "assistant", Content: "Hi!"},

@@ -53,13 +53,10 @@ func TestMessage_Timestamp(t *testing.T) {
 }
 
 func TestSession(t *testing.T) {
-	now := time.Now()
 	session := Session{
-		ID:        "session-1",
-		Provider:  "openai",
-		Model:     "gpt-4",
-		Messages:  []Message{},
-		UpdatedAt: now,
+		ID:       "session-1",
+		Provider: "openai",
+		Model:    "gpt-4",
 	}
 
 	if session.ID != "session-1" {

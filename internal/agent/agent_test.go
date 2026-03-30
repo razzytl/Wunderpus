@@ -10,7 +10,6 @@ func TestAgentCreation(t *testing.T) {
 	agent := &Agent{
 		sessionID: "test-session",
 		sysPrompt: "You are helpful.",
-		ctx:       NewContextManager(4096, nil, "test", nil),
 	}
 
 	if agent.sessionID != "test-session" {

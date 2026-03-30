@@ -58,7 +58,7 @@ func TestStatus_Constants(t *testing.T) {
 		{StatusRunning, "running"},
 		{StatusCompleted, "completed"},
 		{StatusFailed, "failed"},
-		{StatusCancelled, "cancelled"},
+		{StatusCancelled, "canceled"},
 	}
 
 	for _, tt := range tests {

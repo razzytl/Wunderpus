@@ -28,7 +28,7 @@ func (m *mockChannel) Stop() error {
 
 func TestChannelInterface(t *testing.T) {
 	// Verify mockChannel implements Channel interface
-	var _ Channel = &mockChannel{name: "test"}
+	var _ Channel = &mockChannel{}
 }
 
 func TestMockChannelName(t *testing.T) {

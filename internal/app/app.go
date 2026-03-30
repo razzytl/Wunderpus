@@ -132,7 +132,8 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	embedder := router.GetEmbedder()
 	if embedder != nil {
 		// Use enhanced store with embeddings for RAG
-		enhancedStore, err := memory.NewEnhancedStore(cfg.Agent.MemoryDBPath, embedder)
+		var enhancedStore *memory.EnhancedStore
+		enhancedStore, err = memory.NewEnhancedStore(cfg.Agent.MemoryDBPath, embedder)
 		if err != nil {
 			audit.Close()
 			return nil, fmt.Errorf("failed to init enhanced memory store: %w", err)
@@ -229,7 +230,8 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		swarmCfg := swarm.Config{Enabled: true}
 		defaultAgent := manager.GetAgent("default")
 		swarmSystem, err = swarm.InitSwarm(swarmCfg, func(ctx context.Context, goal swarm.Goal, config swarm.AgentConfig) (*swarm.SpecialistResult, error) {
-			resp, err := defaultAgent.HandleMessage(ctx, goal.Description)
+			var resp string
+			resp, err = defaultAgent.HandleMessage(ctx, goal.Description)
 			if err != nil {
 				return nil, err
 			}

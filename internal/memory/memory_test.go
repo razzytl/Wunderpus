@@ -3,7 +3,6 @@ package memory
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/wunderpus/wunderpus/internal/provider"
 )
@@ -30,10 +29,8 @@ func TestSearchResult_Structure(t *testing.T) {
 
 func TestSession_Structure(t *testing.T) {
 	s := Session{
-		ID:        "test-123",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Title:     "Test Session",
+		ID:    "test-123",
+		Title: "Test Session",
 	}
 
 	if s.ID != "test-123" {

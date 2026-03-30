@@ -20,7 +20,7 @@ const (
 	StatusRunning   Status = "running"
 	StatusCompleted Status = "completed"
 	StatusFailed    Status = "failed"
-	StatusCancelled Status = "cancelled"
+	StatusCancelled Status = "canceled"
 )
 
 // SubAgent represents a spawned sub-agent
@@ -214,7 +214,7 @@ func (m *Manager) Cancel(id string) error {
 	}
 
 	if sub.Status != StatusRunning && sub.Status != StatusPending {
-		return fmt.Errorf("subagent cannot be cancelled (status: %s)", sub.Status)
+		return fmt.Errorf("subagent cannot be canceled (status: %s)", sub.Status)
 	}
 
 	sub.Status = StatusCancelled

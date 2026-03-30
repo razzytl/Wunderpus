@@ -103,18 +103,6 @@ func (d *DOMAgent) CanHandle() bool {
 	return false
 }
 
-const domSystemPrompt = `You are a browser automation agent. Given a list of interactive DOM elements and an instruction, determine the next action.
-
-Available actions:
-- {"action": "click", "selector": "CSS_SELECTOR", "reasoning": "..."} — Click element by selector
-- {"action": "type", "selector": "CSS_SELECTOR", "text": "...", "reasoning": "..."} — Type into input
-- {"action": "scroll", "direction": "down", "reasoning": "..."} — Scroll page
-- {"action": "navigate", "text": "https://...", "reasoning": "..."} — Go to URL
-- {"action": "press", "key": "Enter", "reasoning": "..."} — Press keyboard key
-- {"action": "extract", "reasoning": "..."} — Extract data from page
-
-Use selectors from the element list. Respond with ONLY a JSON action object.`
-
 func buildDOMPrompt(instruction, currentURL, domDescription string) string {
 	var sb strings.Builder
 

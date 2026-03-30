@@ -41,8 +41,8 @@ func (kh *KeybindingsHelp) AddGroup(group string, bindings ...KeyBinding) {
 	}
 }
 
-func (kh KeybindingsHelp) View() string {
-	var lines []string
+func (kh *KeybindingsHelp) View() string {
+	lines := make([]string, 0, len(kh.Bindings)*2)
 
 	grouped := make(map[string][]KeyBinding)
 	for _, binding := range kh.Bindings {
@@ -125,7 +125,7 @@ func DefaultKeybindings() KeybindingsHelp {
 	return *kh
 }
 
-func (kh KeybindingsHelp) CompactView() string {
+func (kh *KeybindingsHelp) CompactView() string {
 	var lines []string
 
 	grouped := make(map[string][]KeyBinding)

@@ -5,17 +5,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var (
-	mdWidth int
-)
-
 func InitMarkdownRenderer(width int) error {
-	mdWidth = width
 	return nil
 }
 
 func InitMarkdownRendererWithTheme(width int) error {
-	mdWidth = width
 	return nil
 }
 

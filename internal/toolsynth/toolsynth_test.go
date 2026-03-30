@@ -72,7 +72,7 @@ type mockLLM struct {
 
 func (m *mockLLM) Complete(req CompletionRequest) (string, error) {
 	// Return a canned ToolSpec JSON for any design request
-	if resp, ok := m.responses[req.UserPrompt[:min(20, len(req.UserPrompt))]]; ok {
+	if resp, ok := m.responses[req.UserPrompt[:minInt(20, len(req.UserPrompt))]]; ok {
 		return resp, nil
 	}
 
@@ -93,7 +93,7 @@ func (m *mockLLM) Complete(req CompletionRequest) (string, error) {
 	return string(b), nil
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}

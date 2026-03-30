@@ -103,7 +103,7 @@ func (o *Ollama) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 		return nil, fmt.Errorf("ollama: decode response: %w", err)
 	}
 
-	var toolCalls []ToolCallInfo
+	toolCalls := make([]ToolCallInfo, 0, len(result.Message.ToolCalls))
 	for i, tc := range result.Message.ToolCalls {
 		argsJSON, _ := json.Marshal(tc.Function.Arguments)
 		toolCalls = append(toolCalls, ToolCallInfo{

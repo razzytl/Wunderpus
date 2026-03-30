@@ -6,10 +6,7 @@ import (
 
 func TestSupportEngine_CreateTicket(t *testing.T) {
 	engine := &SupportEngine{}
-
-	if engine == nil {
-		t.Error("Expected engine to be created")
-	}
+	_ = engine
 }
 
 func TestTicket_ClassifyBug(t *testing.T) {
@@ -28,6 +25,10 @@ func TestLaunchOrchestrator_Phases(t *testing.T) {
 	launch := &ProductLaunch{
 		Name:         "Test Product",
 		CurrentPhase: PhaseIdeaValidation,
+	}
+
+	if launch.Name != "Test Product" {
+		t.Errorf("Expected Name 'Test Product', got %s", launch.Name)
 	}
 
 	if launch.CurrentPhase != PhaseIdeaValidation {

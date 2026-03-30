@@ -59,7 +59,7 @@ func (m *MenuModel) SelectedItem() *MenuItem {
 	return nil
 }
 
-func (m MenuModel) View() string {
+func (m *MenuModel) View() string {
 	var lines []string
 
 	titleStyle := lipgloss.NewStyle().

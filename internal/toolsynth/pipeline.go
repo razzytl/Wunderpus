@@ -94,7 +94,7 @@ func (p *Pipeline) Run(ctx context.Context) (*PipelineResult, error) {
 	for _, gap := range gaps {
 		select {
 		case <-ctx.Done():
-			result.Errors = append(result.Errors, "pipeline cancelled")
+			result.Errors = append(result.Errors, "pipeline canceled")
 			result.Duration = time.Since(start)
 			return result, ctx.Err()
 		default:

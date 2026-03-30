@@ -165,7 +165,7 @@ func (e *GoalExecutor) Execute(ctx context.Context, g Goal, tasks []TaskBlueprin
 	slog.Info("ags executor: executing goal", "title", g.Title, "attempt", g.AttemptCount)
 
 	// Execute each task
-	var outcomes []string
+	outcomes := make([]string, 0, len(tasks))
 	for _, task := range tasks {
 		outcome, err := e.taskExec(ctx, task)
 		if err != nil {

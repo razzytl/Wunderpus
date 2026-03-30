@@ -14,6 +14,9 @@ func TestMessage_Role(t *testing.T) {
 	if msg.Role != "user" {
 		t.Errorf("expected role 'user', got %q", msg.Role)
 	}
+	if msg.Content != "Hello" {
+		t.Errorf("expected content 'Hello', got %q", msg.Content)
+	}
 }
 
 func TestMessage_Content(t *testing.T) {
@@ -22,6 +25,9 @@ func TestMessage_Content(t *testing.T) {
 		Content: "Hello there!",
 	}
 
+	if msg.Role != "assistant" {
+		t.Errorf("expected role 'assistant', got %q", msg.Role)
+	}
 	if msg.Content != "Hello there!" {
 		t.Errorf("expected content 'Hello there!', got %q", msg.Content)
 	}
@@ -35,6 +41,12 @@ func TestMessage_Timestamp(t *testing.T) {
 		Timestamp: now,
 	}
 
+	if msg.Role != "user" {
+		t.Errorf("expected role 'user', got %q", msg.Role)
+	}
+	if msg.Content != "Hello" {
+		t.Errorf("expected content 'Hello', got %q", msg.Content)
+	}
 	if !msg.Timestamp.Equal(now) {
 		t.Errorf("expected timestamp %v, got %v", now, msg.Timestamp)
 	}
@@ -61,12 +73,19 @@ func TestSession(t *testing.T) {
 	if session.Model != "gpt-4" {
 		t.Errorf("expected Model 'gpt-4', got %q", session.Model)
 	}
+	if session.UpdatedAt.IsZero() {
+		t.Error("expected UpdatedAt to be set")
+	}
 }
 
 func TestSession_AddMessage(t *testing.T) {
 	session := &Session{
 		ID:       "session-1",
 		Messages: []Message{},
+	}
+
+	if session.ID != "session-1" {
+		t.Errorf("expected ID 'session-1', got %q", session.ID)
 	}
 
 	msg := Message{
@@ -103,6 +122,9 @@ func TestUserMessage(t *testing.T) {
 
 	if msg.AuthorID != "user-123" {
 		t.Errorf("expected AuthorID 'user-123', got %q", msg.AuthorID)
+	}
+	if msg.ChannelID != "channel-456" {
+		t.Errorf("expected ChannelID 'channel-456', got %q", msg.ChannelID)
 	}
 }
 

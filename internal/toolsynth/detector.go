@@ -317,6 +317,11 @@ func (d *Detector) detectTimingSoftGaps(candidates map[string]*gapCandidate) {
 		toolCount++
 	}
 
+	if err := rows.Err(); err != nil {
+		slog.Warn("detector: profiler rows iteration error", "error", err)
+		return
+	}
+
 	if toolCount == 0 {
 		return
 	}

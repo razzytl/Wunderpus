@@ -260,7 +260,7 @@ func (e *CodeEmbedder) FindSimilar(ctx context.Context, query string, topK int) 
 		score float64
 	}
 
-	var scores []scored
+	scores := make([]scored, 0, len(entries))
 	for _, entry := range entries {
 		if len(entry.Embedding) == 0 {
 			continue

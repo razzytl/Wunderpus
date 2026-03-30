@@ -168,20 +168,6 @@ func (v *Vision) SelfHeal(action *BrowserAction, instruction string, maxRetries 
 	return nil
 }
 
-const actionSystemPrompt = `You are a browser automation agent. Given a screenshot of a web page, DOM elements, and an instruction, determine the next action to take.
-
-Current URL is provided. Available actions:
-- {"action": "click", "coordinates": [x, y], "reasoning": "..."} — Click at pixel coordinates
-- {"action": "type", "text": "...", "reasoning": "..."} — Type text at current focus
-- {"action": "scroll", "direction": "down", "reasoning": "..."} — Scroll up or down
-- {"action": "navigate", "text": "https://...", "reasoning": "..."} — Go to URL
-- {"action": "press", "key": "Enter", "reasoning": "..."} — Press keyboard key
-- {"action": "wait", "reasoning": "..."} — Wait for page to load
-- {"action": "screenshot", "reasoning": "..."} — Take screenshot to verify
-- {"action": "extract", "reasoning": "..."} — Extract data from current page
-
-Respond with ONLY a JSON object for ONE action. No explanation, no markdown fences.`
-
 // buildActionPrompt creates the prompt for the LLM.
 func buildActionPrompt(instruction, currentURL, domContext string) string {
 	var sb strings.Builder

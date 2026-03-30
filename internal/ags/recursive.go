@@ -55,7 +55,7 @@ func (r *RecursiveLoop) RunAfterMetacognition(ctx context.Context, report *Metac
 	}
 
 	// Check if any AGS functions are in the top weakness candidates
-	var rsiGoals []Goal
+	rsiGoals := make([]Goal, 0, len(weaknesses))
 	for _, w := range weaknesses {
 		if w.Score < 0.7 {
 			continue

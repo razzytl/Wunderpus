@@ -140,6 +140,15 @@ func TestProjectSpec_Endpoint(t *testing.T) {
 		},
 	}
 
+	if spec.Name != "test" {
+		t.Errorf("Expected name 'test', got %s", spec.Name)
+	}
+	if spec.Type != "rest_api" {
+		t.Errorf("Expected type 'rest_api', got %s", spec.Type)
+	}
+	if spec.Language != "go" {
+		t.Errorf("Expected language 'go', got %s", spec.Language)
+	}
 	if len(spec.Endpoints) != 1 {
 		t.Errorf("Expected 1 endpoint, got %d", len(spec.Endpoints))
 	}

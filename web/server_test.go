@@ -34,6 +34,7 @@ func TestStaticFileServing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to GET static file: %v", err)
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("Expected 200 for static file, got %v", res.StatusCode)
 	}
@@ -43,6 +44,7 @@ func TestStaticFileServing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to GET route: %v", err)
 	}
+	defer res2.Body.Close()
 	if res2.StatusCode != http.StatusOK {
 		t.Errorf("Expected 200 for SPA fallback, got %v", res2.StatusCode)
 	}

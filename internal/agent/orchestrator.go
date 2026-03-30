@@ -98,7 +98,6 @@ func (o *Orchestrator) Execute(ctx context.Context, graph *TaskGraph) (string, e
 					results[subtask.ID] = res
 					completed[subtask.ID] = true
 					mu.Unlock()
-
 				}(t)
 			}
 		}

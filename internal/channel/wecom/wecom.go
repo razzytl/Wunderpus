@@ -131,8 +131,8 @@ func (c *Channel) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	nonce := r.URL.Query().Get("nonce")
 
 	var payload struct {
-		XMLName struct{} `xml:"xml"`
-		Encrypt string   `xml:"Encrypt"`
+		XMLName struct{} `xml:"xml" json:"-"`
+		Encrypt string   `xml:"Encrypt" json:"encrypt"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {

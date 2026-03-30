@@ -282,6 +282,10 @@ func TestTradingSignal_Create(t *testing.T) {
 		CreatedAt:  time.Now(),
 	}
 
+	if signal.Symbol != "BTC/USD" {
+		t.Errorf("Expected symbol 'BTC/USD', got '%s'", signal.Symbol)
+	}
+
 	if signal.Action != "buy" {
 		t.Errorf("Expected action 'buy', got '%s'", signal.Action)
 	}

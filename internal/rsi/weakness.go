@@ -14,19 +14,19 @@ import (
 
 // WeaknessReport contains the results of a weakness analysis cycle.
 type WeaknessReport struct {
-	GeneratedAt            time.Time
-	TopCandidates          []WeaknessEntry
-	TotalFunctionsAnalyzed int
+	GeneratedAt            time.Time       `json:"generated_at"`
+	TopCandidates          []WeaknessEntry `json:"top_candidates"`
+	TotalFunctionsAnalyzed int             `json:"total_functions_analyzed"`
 }
 
 // WeaknessEntry represents a single function identified as weak.
 type WeaknessEntry struct {
-	FunctionNode  FunctionNode
-	WeaknessScore float64
-	PrimaryReason string // which metric dominated the score
-	ErrorRate     float64
-	NormalizedP99 float64
-	NormalizedCC  float64 // normalized cyclomatic complexity
+	FunctionNode  FunctionNode `json:"function_node"`
+	WeaknessScore float64      `json:"weakness_score"`
+	PrimaryReason string       `json:"primary_reason"`
+	ErrorRate     float64      `json:"error_rate"`
+	NormalizedP99 float64      `json:"normalized_p99"`
+	NormalizedCC  float64      `json:"normalized_cc"`
 }
 
 // WeaknessReporter generates weakness reports by combining profiler data
@@ -139,7 +139,7 @@ func (w *WeaknessReporter) Generate(codeMap *CodeMap) *WeaknessReport {
 		complexity int
 	}
 
-	var raw []rawMetrics
+	raw := make([]rawMetrics, 0, len(snapshot))
 	var maxP99 float64
 	var maxCC float64
 
@@ -188,7 +188,7 @@ func (w *WeaknessReporter) Generate(codeMap *CodeMap) *WeaknessReport {
 	}
 
 	// Second pass: compute composite weakness scores
-	var entries []WeaknessEntry
+	entries := make([]WeaknessEntry, 0, len(raw))
 	for _, r := range raw {
 		normP99 := float64(r.p99Ns) / maxP99
 		normCC := float64(r.complexity) / maxCC

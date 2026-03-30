@@ -50,7 +50,7 @@ func NewTree(root *TreeNode) TreeModel {
 	}
 }
 
-func (t TreeModel) View() string {
+func (t *TreeModel) View() string {
 	var lines []string
 	t.renderNode(t.Root, "", true, &lines)
 	return fmt.Sprintf("%s", lines)

@@ -228,7 +228,7 @@ func (g *Gemini) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 }
 
 func buildGeminiBody(msgs []Message, tools []ToolSchema, maxTokens int) map[string]any {
-	var contents []map[string]any
+	contents := make([]map[string]any, 0, len(msgs))
 	var systemInstruction string
 
 	for _, m := range msgs {

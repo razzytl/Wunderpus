@@ -234,7 +234,7 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 		return ""
 	}
 
-	var lines []string
+	lines := make([]string, 0, 2+len(allSkills)*7)
 	lines = append(lines, "<skills>")
 	for _, s := range allSkills {
 		escapedName := escapeXML(s.Name)
@@ -242,7 +242,7 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 		escapedPath := escapeXML(s.Path)
 		escapedVersion := escapeXML(s.Version)
 
-		lines = append(lines, fmt.Sprintf("  <skill>"))
+		lines = append(lines, "  <skill>")
 		lines = append(lines, fmt.Sprintf("    <name>%s</name>", escapedName))
 		lines = append(lines, fmt.Sprintf("    <description>%s</description>", escapedDesc))
 		lines = append(lines, fmt.Sprintf("    <location>%s</location>", escapedPath))
@@ -260,7 +260,7 @@ func (sl *SkillsLoader) BuildSkillsSummary() string {
 func (sl *SkillsLoader) getSkillMetadata(skillPath, fallbackName string) *SkillMetadata {
 	content, err := os.ReadFile(skillPath)
 	if err != nil {
-		slog.Warn("Failed to read skill metadata", cap("skill_path", skillPath), cap("error", err.Error()))
+		slog.Warn("Failed to read skill metadata", capStr("skill_path", skillPath), capStr("error", err.Error()))
 		return nil
 	}
 
@@ -338,6 +338,6 @@ func escapeXML(s string) string {
 }
 
 // helper for slog args
-func cap(k string, v any) slog.Attr {
+func capStr(k string, v any) slog.Attr {
 	return slog.Any(k, v)
 }

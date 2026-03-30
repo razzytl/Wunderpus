@@ -89,7 +89,7 @@ func (nm *NotificationManager) Clear() {
 	nm.Notifications = make([]Notification, 0)
 }
 
-func (nm NotificationManager) View() string {
+func (nm *NotificationManager) View() string {
 	var lines []string
 
 	visible := 0
@@ -112,7 +112,7 @@ func (nm NotificationManager) View() string {
 	return lipgloss.JoinVertical(lipgloss.Right, lines...)
 }
 
-func (nm NotificationManager) formatNotification(notif Notification) string {
+func (nm *NotificationManager) formatNotification(notif Notification) string {
 	var icon string
 	var borderColor lipgloss.Color
 	var titleColor lipgloss.Color

@@ -64,7 +64,6 @@ type Model struct {
 	toolStatus      string
 	latency         int64
 	markdownEnabled bool
-	suggestion      string
 	cmdPalette      bool
 }
 
@@ -140,14 +139,14 @@ func New(ag *agent.Agent, store *memory.Store) Model {
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
 		m.spinner.Tick,
 	)
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
@@ -387,7 +386,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	if !m.ready {
 		return "Initializing..."
 	}
@@ -484,7 +483,7 @@ func (m *Model) updateStreamLine() {
 	m.refreshViewport()
 }
 
-func (m Model) sendStreamCmd(input string) tea.Cmd {
+func (m *Model) sendStreamCmd(input string) tea.Cmd {
 	return func() tea.Msg {
 		ch, err := m.agent.StreamMessage(context.Background(), input)
 		if err != nil {
@@ -507,7 +506,7 @@ func (m Model) sendStreamCmd(input string) tea.Cmd {
 	}
 }
 
-func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
+func (m *Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 	parts := strings.Fields(cmd)
 	command := strings.ToLower(parts[0])
 
@@ -700,7 +699,7 @@ func (m Model) handleCommand(cmd string) (tea.Model, tea.Cmd) {
 func Run(ag *agent.Agent, store *memory.Store) error {
 	_ = provider.RoleSystem // ensure import
 	m := New(ag, store)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(&m, tea.WithAltScreen())
 
 	// Wire up tool callback to send messages to the TUI
 	ag.SetToolCallback(func(name string, args map[string]any, result string) {

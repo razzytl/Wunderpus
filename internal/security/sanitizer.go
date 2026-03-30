@@ -116,11 +116,11 @@ func (s *Sanitizer) Sanitize(input string) (string, []Threat) {
 }
 
 // LimitLength truncates input if it exceeds the maximum allowed length.
-func (s *Sanitizer) LimitLength(input string, max int) (string, bool) {
-	if len(input) <= max {
+func (s *Sanitizer) LimitLength(input string, maxVal int) (string, bool) {
+	if len(input) <= maxVal {
 		return input, false
 	}
-	return input[:max], true
+	return input[:maxVal], true
 }
 
 // HasHighSeverity returns true if any threat is high severity.

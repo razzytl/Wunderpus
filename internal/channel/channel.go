@@ -25,5 +25,7 @@ type FileSender interface {
 }
 
 // Reusing types from Internal package
-type UserMessage = types.UserMessage
-type AgentResponse = types.AgentResponse
+type (
+	UserMessage   = types.UserMessage
+	AgentResponse = types.AgentResponse
+)

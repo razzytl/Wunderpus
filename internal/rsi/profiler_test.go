@@ -15,7 +15,6 @@ func TestProfiler_Track(t *testing.T) {
 
 	// Track a function 100 times with ~10% error rate
 	for i := 0; i < 100; i++ {
-		i := i
 		_ = p.Track("testFunc", func() error {
 			time.Sleep(time.Millisecond) // 1ms latency
 			if i%10 == 0 {

@@ -37,12 +37,12 @@ type ImageURL struct {
 
 // CompletionRequest is the input for an LLM completion call.
 type CompletionRequest struct {
-	Messages    []Message
-	Model       string
-	MaxTokens   int
-	Temperature float64
-	Tools       []ToolSchema // tool definitions for function calling
-	ToolChoice  any          `json:"tool_choice,omitempty"` // "auto", "none", "required", or {"type": "function", "function": {"name": "..."}}
+	Messages    []Message    `json:"messages"`
+	Model       string       `json:"model"`
+	MaxTokens   int          `json:"max_tokens,omitempty"`
+	Temperature float64      `json:"temperature,omitempty"`
+	Tools       []ToolSchema `json:"tools,omitempty"`
+	ToolChoice  any          `json:"tool_choice,omitempty"`
 }
 
 // ToolSchema is an OpenAI-compatible tool/function definition.

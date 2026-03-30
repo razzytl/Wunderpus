@@ -106,7 +106,7 @@ func (o *SocialOperator) GeneratePost(ctx context.Context, topic string, platfor
 
 // Publish posts content to the platform using browser automation.
 func (o *SocialOperator) Publish(ctx context.Context, post *Post) error {
-	slog.Info("social: publishing post", "platform", post.Platform, "content", post.Content[:min(50, len(post.Content))])
+	slog.Info("social: publishing post", "platform", post.Platform, "content", post.Content[:minInt(50, len(post.Content))])
 
 	// In production: use browser agent to navigate to platform and post
 	// For now, just mark as published
@@ -143,7 +143,7 @@ func generateID() string {
 	return time.Now().Format("20060102150405")
 }
 
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}

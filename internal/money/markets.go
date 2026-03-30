@@ -24,7 +24,7 @@ type Order struct {
 	Side      string     `json:"side"` // "buy", "sell"
 	Amount    float64    `json:"amount"`
 	Price     float64    `json:"price"`
-	Status    string     `json:"status"` // "pending", "filled", "cancelled"
+	Status    string     `json:"status"` // "pending", "filled", "canceled"
 	CreatedAt time.Time  `json:"created_at"`
 	FilledAt  *time.Time `json:"filled_at"`
 }

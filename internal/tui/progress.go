@@ -36,7 +36,7 @@ func (p *ProgressBarModel) Increment(delta float64) {
 	p.Current = math.Min(p.Current+delta, p.Total)
 }
 
-func (p ProgressBarModel) View() string {
+func (p *ProgressBarModel) View() string {
 	if p.Total == 0 {
 		return p.renderEmpty()
 	}
@@ -69,7 +69,7 @@ func (p ProgressBarModel) View() string {
 	return result
 }
 
-func (p ProgressBarModel) renderEmpty() string {
+func (p *ProgressBarModel) renderEmpty() string {
 	emptyStyle := lipgloss.NewStyle().
 		Foreground(dimColor)
 
@@ -77,7 +77,7 @@ func (p ProgressBarModel) renderEmpty() string {
 	return fmt.Sprintf("%s [%s]", p.Label, bar)
 }
 
-func (p ProgressBarModel) IsComplete() bool {
+func (p *ProgressBarModel) IsComplete() bool {
 	return p.Current >= p.Total
 }
 
@@ -107,7 +107,7 @@ func (m *MultiProgressModel) UpdateBar(id string, current float64) {
 	}
 }
 
-func (m MultiProgressModel) View() string {
+func (m *MultiProgressModel) View() string {
 	var lines []string
 	for _, bar := range m.Bars {
 		lines = append(lines, bar.View())
@@ -115,7 +115,7 @@ func (m MultiProgressModel) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m MultiProgressModel) IsComplete() bool {
+func (m *MultiProgressModel) IsComplete() bool {
 	for _, bar := range m.Bars {
 		if !bar.IsComplete() {
 			return false

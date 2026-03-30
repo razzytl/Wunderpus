@@ -44,7 +44,8 @@ This is a test skill content.`
 
 	// Verify installed
 	installedPath := filepath.Join(workspace, "skills", filepath.Base(sourceDir), "SKILL.md")
-	if _, err := os.Stat(installedPath); os.IsNotExist(err) {
+	_, statErr := os.Stat(installedPath)
+	if os.IsNotExist(statErr) {
 		t.Fatalf("Skill file not installed at %s", installedPath)
 	}
 
@@ -73,7 +74,7 @@ func TestSkillInstaller_Uninstall(t *testing.T) {
 	if err := os.MkdirAll(skillDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
 		t.Fatal(err)
 	}
 

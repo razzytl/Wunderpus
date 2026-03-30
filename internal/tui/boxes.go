@@ -53,7 +53,7 @@ func (b *BoxModel) SetHeight(height int) {
 	b.Height = height
 }
 
-func (b BoxModel) View() string {
+func (b *BoxModel) View() string {
 	borderStyle := b.getBorderStyle()
 
 	box := lipgloss.NewStyle().
@@ -80,7 +80,7 @@ func (b BoxModel) View() string {
 	return box.Render(b.Content)
 }
 
-func (b BoxModel) getBorderStyle() lipgloss.Border {
+func (b *BoxModel) getBorderStyle() lipgloss.Border {
 	switch b.Style {
 	case BoxStyleRounded:
 		return lipgloss.RoundedBorder()

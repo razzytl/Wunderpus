@@ -159,7 +159,7 @@ func (m *MemoryRegistry) GetAll() []SkillInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	var all []SkillInfo
+	all := make([]SkillInfo, 0, len(m.skills))
 	for _, s := range m.skills {
 		all = append(all, s)
 	}

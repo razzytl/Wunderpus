@@ -101,7 +101,8 @@ func (si *SkillInstaller) InstallFromLocalPath(ctx context.Context, sourcePath s
 	if sourceInfo.IsDir() {
 		// Check if it's a skill directory (contains SKILL.md)
 		skillFile := filepath.Join(sourcePath, "SKILL.md")
-		if _, err := os.Stat(skillFile); err == nil {
+		_, statErr := os.Stat(skillFile)
+		if statErr == nil {
 			// It's a skill directory
 			srcDir = sourcePath
 			skillName = filepath.Base(sourcePath)
@@ -121,12 +122,13 @@ func (si *SkillInstaller) InstallFromLocalPath(ctx context.Context, sourcePath s
 	skillDir := filepath.Join(si.workspace, "skills", skillName)
 
 	// Check if skill already exists
-	if _, err := os.Stat(skillDir); err == nil {
+	_, dirErr := os.Stat(skillDir)
+	if dirErr == nil {
 		return fmt.Errorf("skill '%s' already exists (use --force to overwrite)", skillName)
 	}
 
 	// Create destination directory
-	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+	if err = os.MkdirAll(skillDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create skill directory: %w", err)
 	}
 
@@ -181,7 +183,7 @@ func copyDir(src, dst string) error {
 		return err
 	}
 
-	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+	if err = os.MkdirAll(dst, srcInfo.Mode()); err != nil {
 		return err
 	}
 

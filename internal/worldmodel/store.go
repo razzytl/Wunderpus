@@ -419,10 +419,10 @@ func (s *Store) GetRelations(entityID string) ([]Relation, error) {
 func (s *Store) Count() (entities, relations int, err error) {
 	err = s.db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entities)
 	if err != nil {
-		return
+		return entities, relations, err
 	}
 	err = s.db.QueryRow("SELECT COUNT(*) FROM relations").Scan(&relations)
-	return
+	return entities, relations, err
 }
 
 // Close closes the database connection.

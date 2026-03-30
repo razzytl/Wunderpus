@@ -40,7 +40,7 @@ func (t *TableModel) AddRow(row TableRow) {
 	}
 }
 
-func (t TableModel) View() string {
+func (t *TableModel) View() string {
 	var lines []string
 
 	lines = append(lines, t.renderHeader())
@@ -53,8 +53,8 @@ func (t TableModel) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (t TableModel) renderHeader() string {
-	var cells []string
+func (t *TableModel) renderHeader() string {
+	cells := make([]string, 0, len(t.Columns))
 
 	for _, col := range t.Columns {
 		style := lipgloss.NewStyle().
@@ -70,8 +70,8 @@ func (t TableModel) renderHeader() string {
 	return "│ " + header + " │"
 }
 
-func (t TableModel) renderSeparator() string {
-	var parts []string
+func (t *TableModel) renderSeparator() string {
+	parts := make([]string, 0, len(t.Columns))
 
 	for _, col := range t.Columns {
 		part := strings.Repeat("─", col.Width)
@@ -82,8 +82,8 @@ func (t TableModel) renderSeparator() string {
 	return "├─" + sep + "─┤"
 }
 
-func (t TableModel) renderRow(row TableRow) string {
-	var cells []string
+func (t *TableModel) renderRow(row TableRow) string {
+	cells := make([]string, 0, len(t.Columns))
 
 	for i, col := range t.Columns {
 		content := row[i]
@@ -138,7 +138,7 @@ func SimpleTable(headers []string, rows [][]string) string {
 }
 
 func StatusTable(data map[string]string) string {
-	var rows [][]string
+	rows := make([][]string, 0, len(data))
 	for k, v := range data {
 		rows = append(rows, []string{k, v})
 	}

@@ -49,7 +49,7 @@ func (c *Coder) Generate(spec ToolSpec) ([]GeneratedCandidate, error) {
 		return nil, fmt.Errorf("coder: create output dir: %w", err)
 	}
 
-	var candidates []GeneratedCandidate
+	candidates := make([]GeneratedCandidate, 0, len(CandidateTemperatures))
 
 	for _, temp := range CandidateTemperatures {
 		slog.Debug("coder: generating candidate", "tool", spec.Name, "temperature", temp)

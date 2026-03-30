@@ -468,8 +468,10 @@ func newTestStore(t *testing.T) *Store {
 	return store
 }
 
-var entityNames = []string{"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"}
-var entityTypes = []EntityType{EntityPerson, EntityOrganization, EntityTechnology, EntityConcept, EntityProduct}
+var (
+	entityNames = []string{"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta"}
+	entityTypes = []EntityType{EntityPerson, EntityOrganization, EntityTechnology, EntityConcept, EntityProduct}
+)
 
 func itoa(i int) string {
 	if i == 0 {

@@ -29,19 +29,24 @@ type SupportEngine struct {
 	llm      LLMCaller
 }
 
+// TicketReader reads support tickets from a source.
+type TicketReader interface {
+	Read(ctx context.Context) ([]Ticket, error)
+}
+
 // EmailReader reads support emails.
 type EmailReader interface {
-	Read(ctx context.Context) ([]Ticket, error)
+	TicketReader
 }
 
 // DiscordReader reads Discord support messages.
 type DiscordReader interface {
-	Read(ctx context.Context) ([]Ticket, error)
+	TicketReader
 }
 
 // TelegramReader reads Telegram support messages.
 type TelegramReader interface {
-	Read(ctx context.Context) ([]Ticket, error)
+	TicketReader
 }
 
 // KnowledgeBase for auto-response.

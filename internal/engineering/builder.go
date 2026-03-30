@@ -99,7 +99,7 @@ func (p *ProjectBuilder) Build(ctx context.Context, spec ProjectSpec) (*BuildRes
 	// Step 1: Extract requirements
 	result.Steps = append(result.Steps, BuildStep{
 		Name:     "requirements",
-		Duration: time.Now().Sub(time.Now()),
+		Duration: time.Since(time.Now()),
 		Success:  true,
 	})
 	slog.Info("engineering: requirements extracted")

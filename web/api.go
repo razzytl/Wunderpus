@@ -10,16 +10,16 @@ import (
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	cfg := s.manager.Config()
 	availableProviders := cfg.AvailableProviders()
-	
+
 	// Create a safe config response
-	var models []string
+	models := make([]string, 0, len(cfg.ModelList))
 	for _, m := range cfg.ModelList {
 		models = append(models, m.ModelName)
 	}
-	
+
 	skillsLoader := s.manager.GetSkillsLoader()
 	var loadedSkills []string
 	if skillsLoader != nil {
@@ -50,7 +50,7 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 	// Determine if requesting a specific session or just the list
 	sessionID := r.URL.Query().Get("session")
-	
+
 	if sessionID != "" {
 		// Try to extract encryption key from headers if present
 		var encryptionKey []byte

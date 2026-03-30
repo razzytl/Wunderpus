@@ -102,9 +102,9 @@ func (s *Store) executeParsedQuery(q *parsedQuery) (*QueryResult, error) {
 			if err != nil {
 				continue
 			}
+			defer relRows.Close()
 
 			relations, _ := s.scanRelations(relRows)
-			relRows.Close()
 			allRelations = append(allRelations, relations...)
 
 			// Load connected entities

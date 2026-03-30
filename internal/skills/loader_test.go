@@ -118,6 +118,12 @@ func TestSkillInfo_Structure(t *testing.T) {
 	if info.Source != "builtin" {
 		t.Errorf("expected Source 'builtin', got %q", info.Source)
 	}
+	if info.Description != "A test skill" {
+		t.Errorf("expected Description 'A test skill', got %q", info.Description)
+	}
+	if info.Version != "1.0.0" {
+		t.Errorf("expected Version '1.0.0', got %q", info.Version)
+	}
 }
 
 // TestNewSkillsLoader tests creating a new skills loader

@@ -92,7 +92,7 @@ func (l *LogModel) Error(message string) {
 	l.AddEntry(LogLevelError, message)
 }
 
-func (l LogModel) View() string {
+func (l *LogModel) View() string {
 	var lines []string
 
 	for _, entry := range l.Entries {
@@ -106,7 +106,7 @@ func (l LogModel) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (l LogModel) formatEntry(entry LogEntry) string {
+func (l *LogModel) formatEntry(entry LogEntry) string {
 	var parts []string
 
 	if l.ShowTime {
@@ -131,7 +131,7 @@ func (l LogModel) formatEntry(entry LogEntry) string {
 	return strings.Join(parts, " ")
 }
 
-func (l LogModel) formatLevel(level LogLevel) string {
+func (l *LogModel) formatLevel(level LogLevel) string {
 	var levelStr string
 	var style lipgloss.Style
 
@@ -156,7 +156,7 @@ func (l LogModel) formatLevel(level LogLevel) string {
 	return style.Render(fmt.Sprintf("[%s]", levelStr))
 }
 
-func (l LogModel) Clear() {
+func (l *LogModel) Clear() {
 	l.Entries = make([]LogEntry, 0)
 }
 

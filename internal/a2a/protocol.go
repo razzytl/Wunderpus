@@ -22,7 +22,6 @@ type Server struct {
 	handler    Handler
 	httpServer *http.Server
 	registry   *Registry
-	mu         sync.RWMutex
 }
 
 // NewServer creates an A2A server with the given agent card and task handler.

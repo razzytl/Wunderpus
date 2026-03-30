@@ -29,10 +29,9 @@ type APIKey struct {
 
 // APIServiceEngine exposes Wunderpus capabilities as paid APIs.
 type APIServiceEngine struct {
-	endpoints  map[string]*APIEndpoint
-	keys       map[string]*APIKey
-	keyManager KeyManager
-	rateLimit  RateLimiter
+	endpoints map[string]*APIEndpoint
+	keys      map[string]*APIKey
+	rateLimit RateLimiter
 }
 
 // KeyManager manages API keys.

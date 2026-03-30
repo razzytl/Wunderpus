@@ -146,7 +146,7 @@ OUTPUT FORMAT:
 	}
 
 	// 5. Validate proposals
-	var valid []Goal
+	valid := make([]Goal, 0, len(parsed.ProposedGoals))
 	for _, pg := range parsed.ProposedGoals {
 		if err := s.validateProposal(pg); err != nil {
 			slog.Warn("ags synthesizer: invalid proposal rejected", "title", pg.Title, "error", err)

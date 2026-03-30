@@ -19,7 +19,7 @@ func NewServer(registry *tool.Registry) *Server {
 
 func (s *Server) ListToolsHandler(w http.ResponseWriter, r *http.Request) {
 	tools := s.registry.List()
-	var response []map[string]any
+	response := make([]map[string]any, 0, len(tools))
 	for _, t := range tools {
 		response = append(response, map[string]any{
 			"name":        t.Name(),

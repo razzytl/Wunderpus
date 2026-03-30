@@ -77,7 +77,7 @@ func (b *BugHunter) ScanAndFix(ctx context.Context, repo string) ([]BugFix, erro
 		return nil, err
 	}
 
-	var fixes []BugFix
+	fixes := make([]BugFix, 0, len(issues))
 	for _, issue := range issues {
 		fix, err := b.fixBug(ctx, issue)
 		if err != nil {

@@ -60,7 +60,7 @@ func (e *OSSEngine) ScanIssues(ctx context.Context, language string) ([]OSSIssue
 		return nil, err
 	}
 
-	var result []OSSIssue
+	result := make([]OSSIssue, 0, len(issues))
 	for _, issue := range issues {
 		result = append(result, OSSIssue{
 			Number:     issue.Number,
@@ -80,7 +80,7 @@ func (e *OSSEngine) ScanIssues(ctx context.Context, language string) ([]OSSIssue
 
 // ScoreIssues ranks issues by capability match and project impact.
 func (e *OSSEngine) ScoreIssues(ctx context.Context, issues []OSSIssue, capabilities []string) ([]RankedIssue, error) {
-	var ranked []RankedIssue
+	ranked := make([]RankedIssue, 0, len(issues))
 
 	for _, issue := range issues {
 		// Score based on skill match

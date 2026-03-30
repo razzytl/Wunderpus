@@ -22,7 +22,6 @@ type Channel struct {
 	sessionPath string
 	manager     *agent.Manager
 	client      *whatsmeow.Client
-	qrChan      <-chan whatsmeow.QRChannelItem
 }
 
 // NewChannel creates a new WhatsApp channel.

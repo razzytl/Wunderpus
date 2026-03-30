@@ -62,7 +62,7 @@ func (t *Tester) Test(spec ToolSpec, source string) (*ToolTestResult, error) {
 		return nil, fmt.Errorf("tester: no test cases for tool %s", spec.Name)
 	}
 
-	var results []TestResult
+	results := make([]TestResult, 0, len(spec.TestCases))
 	var totalLatency int64
 	passCount := 0
 

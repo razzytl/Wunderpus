@@ -94,7 +94,7 @@ func (f *FormModel) ActiveField() *FormField {
 	return nil
 }
 
-func (f FormModel) View() string {
+func (f *FormModel) View() string {
 	var lines []string
 
 	titleStyle := lipgloss.NewStyle().
@@ -112,7 +112,7 @@ func (f FormModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
-func (f FormModel) renderField(index int, field FormField) string {
+func (f *FormModel) renderField(index int, field FormField) string {
 	var labelStyle lipgloss.Style
 	var valueStyle lipgloss.Style
 
@@ -148,7 +148,7 @@ func (f FormModel) renderField(index int, field FormField) string {
 	return label + "\n" + valueStyle.Render("  "+value) + "\n"
 }
 
-func (f FormModel) Validate() (bool, string) {
+func (f *FormModel) Validate() (bool, string) {
 	for _, field := range f.Fields {
 		if field.Required && field.Value == "" {
 			return false, field.Label + " is required"

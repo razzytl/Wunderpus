@@ -18,6 +18,9 @@ func TestMessage_Structure(t *testing.T) {
 	if m.Content != "Hello" {
 		t.Errorf("expected Hello, got %s", m.Content)
 	}
+	if m.Timestamp.IsZero() {
+		t.Error("expected Timestamp to be set")
+	}
 }
 
 func TestSession_Structure(t *testing.T) {
@@ -36,6 +39,9 @@ func TestSession_Structure(t *testing.T) {
 	}
 	if s.Model != "gpt-4" {
 		t.Errorf("expected gpt-4, got %s", s.Model)
+	}
+	if len(s.Messages) != 0 {
+		t.Errorf("expected 0 messages, got %d", len(s.Messages))
 	}
 }
 

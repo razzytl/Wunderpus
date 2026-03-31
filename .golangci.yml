@@ -1,5 +1,7 @@
 # golangci-lint configuration (v1 schema)
-version: "2"
+# NOTE: Do NOT add a top-level "version:" key. CI uses golangci-lint v1.64.1
+# which does not support the "version" field (that is a v2-only feature).
+# Adding it causes: jsonschema: "" does not validate: additional properties 'version' not allowed
 
 linters-settings:
   errcheck:

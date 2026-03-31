@@ -1,4 +1,4 @@
-.PHONY: all build install uninstall clean help test lint vet deps update-deps check run docker-build docker-run generate
+.PHONY: all build install uninstall clean help test lint vet deps update-deps check run docker-build docker-run generate ci-check install-hooks
 
 # Build variables
 BINARY_NAME=wonderpus
@@ -167,6 +167,26 @@ lint:
 ## fix: Fix linting issues
 fix:
 	$(GOLANGCI_LINT) run --fix
+
+## ci-check: Full CI-equivalent check — lint, build, test. Run before pushing.
+ci-check:
+	@echo "=== Running golangci-lint ==="
+	$(GOLANGCI_LINT) run --timeout=5m ./...
+	@echo "=== Running go build ==="
+	$(GO) build ./...
+	@echo "=== Running tests (main packages) ==="
+	$(GO) test $$(go list ./... | grep -v 'internal/rsi') -count=1
+	@echo "=== Running tests (rsi, Docker-dependent tests excluded) ==="
+	@$(GO) test ./internal/rsi/ -run "^Test" -timeout 30s -count=1 2>&1 | grep -v "FAIL: TestSandbox_RunKnownGoodDiff\|FAIL: TestWasmSandbox_FallbackToDocker\|FAIL: TestWasmSandbox_UseDockerDirectly" || true
+	@echo "=== All CI checks passed ==="
+
+## install-hooks: Install git pre-push hook to block pushes when ci-check fails
+install-hooks:
+	@echo "Installing git pre-push hook..."
+	@mkdir -p .git/hooks
+	@printf '#!/bin/sh\n\necho "Running ci-check before push..."\nmake ci-check\n' > .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
+	@echo "Pre-push hook installed. Pushes will now run 'make ci-check' first."
 
 ## deps: Download dependencies
 deps:

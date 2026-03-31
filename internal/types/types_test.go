@@ -57,6 +57,9 @@ func TestSession_WithMessages(t *testing.T) {
 	if len(s.Messages) != 2 {
 		t.Errorf("expected 2 messages, got %d", len(s.Messages))
 	}
+	if s.Model != "gpt-4" {
+		t.Errorf("expected Model 'gpt-4', got %q", s.Model)
+	}
 }
 
 func TestUserMessage_Structure(t *testing.T) {

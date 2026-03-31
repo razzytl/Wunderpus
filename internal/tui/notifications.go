@@ -90,7 +90,7 @@ func (nm *NotificationManager) Clear() {
 }
 
 func (nm *NotificationManager) View() string {
-	var lines []string
+	lines := make([]string, 0, nm.MaxVisible)
 
 	visible := 0
 	for _, notif := range nm.Notifications {

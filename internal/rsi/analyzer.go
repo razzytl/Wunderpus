@@ -29,16 +29,16 @@ type PackageNode struct {
 
 // FunctionNode contains everything the RSI engine needs to reason about a function.
 type FunctionNode struct {
-	Name            string
-	QualifiedName   string // e.g., "package.FunctionName"
-	File            string
-	Package         string
-	StartLine       int
-	EndLine         int
-	CyclomaticComp  int
-	Dependencies    []string // functions this one calls
-	SourceCode      string
-	EmbeddingVector []float64
+	Name            string    `json:"name"`
+	QualifiedName   string    `json:"qualified_name"`
+	File            string    `json:"file"`
+	Package         string    `json:"package"`
+	StartLine       int       `json:"start_line"`
+	EndLine         int       `json:"end_line"`
+	CyclomaticComp  int       `json:"cyclomatic_complexity"`
+	Dependencies    []string  `json:"dependencies"`
+	SourceCode      string    `json:"source_code"`
+	EmbeddingVector []float64 `json:"embedding_vector"`
 }
 
 // DirectedGraph represents call relationships between functions.

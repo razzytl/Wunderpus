@@ -60,7 +60,7 @@ func (m *MenuModel) SelectedItem() *MenuItem {
 }
 
 func (m *MenuModel) View() string {
-	var lines []string
+	lines := make([]string, 0, 2+len(m.Items))
 
 	titleStyle := lipgloss.NewStyle().
 		Foreground(accentColor).

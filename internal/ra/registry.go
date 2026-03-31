@@ -99,28 +99,7 @@ func (r *ResourceRegistry) ListByType(t ResourceType) ([]Resource, error) {
 		return nil, err
 	}
 	defer rows.Close()
-
-	var resources []Resource
-	for rows.Next() {
-		var res Resource
-		var typeStr, statusStr, acquiredStr string
-		var capsStr string
-		var expiresStr sql.NullString
-
-		if err := rows.Scan(&res.ID, &typeStr, &res.Provider, &capsStr, &res.CostPerHour, &acquiredStr, &expiresStr, &statusStr); err != nil {
-			return nil, fmt.Errorf("ra registry: scan: %w", err)
-		}
-		res.Type = ResourceType(typeStr)
-		res.Status = ResourceStatus(statusStr)
-		res.AcquiredAt, _ = time.Parse(time.RFC3339Nano, acquiredStr)
-		if expiresStr.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, expiresStr.String)
-			res.ExpiresAt = &t
-		}
-		json.Unmarshal([]byte(capsStr), &res.Capabilities)
-		resources = append(resources, res)
-	}
-	return resources, rows.Err()
+	return r.scanResources(rows)
 }
 
 // ListActive returns all resources with status "active".
@@ -147,7 +126,11 @@ func (r *ResourceRegistry) ListByStatus(status ResourceStatus) ([]Resource, erro
 		return nil, err
 	}
 	defer rows.Close()
+	return r.scanResources(rows)
+}
 
+// scanResources iterates sql.Rows and returns a slice of Resources.
+func (r *ResourceRegistry) scanResources(rows *sql.Rows) ([]Resource, error) {
 	var resources []Resource
 	for rows.Next() {
 		var res Resource

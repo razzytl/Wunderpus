@@ -41,7 +41,7 @@ func (t *TableModel) AddRow(row TableRow) {
 }
 
 func (t *TableModel) View() string {
-	var lines []string
+	lines := make([]string, 0, 2+len(t.Rows))
 
 	lines = append(lines, t.renderHeader())
 	lines = append(lines, t.renderSeparator())

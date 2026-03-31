@@ -108,7 +108,7 @@ func (m *MultiProgressModel) UpdateBar(id string, current float64) {
 }
 
 func (m *MultiProgressModel) View() string {
-	var lines []string
+	lines := make([]string, 0, len(m.Bars))
 	for _, bar := range m.Bars {
 		lines = append(lines, bar.View())
 	}

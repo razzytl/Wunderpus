@@ -77,4 +77,4 @@ jobs:
           go-version-file: go.work
           cache: true
       - name: Build
-        run: go build -o wonderpus ./cmd/wonderpus
+        run: go build -o wonderpus github.com/wunderpus/wunderpus/cmd/wunderpus

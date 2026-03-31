@@ -49,7 +49,7 @@ func TestAPIConfig(t *testing.T) {
 	if data["default_provider"] != "openai" {
 		t.Errorf("Expected default_provider 'openai', got %v", data["default_provider"])
 	}
-	
+
 	if data["tools_enabled"] != true {
 		t.Errorf("Expected tools_enabled true, got %v", data["tools_enabled"])
 	}
@@ -64,12 +64,12 @@ func TestAPIHistoryNoStore(t *testing.T) {
 	}
 
 	server, _ := NewServer(mockFS, "dist", 0, manager)
-	
+
 	req := httptest.NewRequest("GET", "/api/history", nil)
 	w := httptest.NewRecorder()
 
 	server.handleHistory(w, req)
-	
+
 	res := w.Result()
 	if res.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("Expected 503 for no history store, got %v", res.StatusCode)

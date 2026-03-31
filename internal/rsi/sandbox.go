@@ -199,7 +199,7 @@ if [ $? -ne 0 ]; then
 fi
 exit 0
 `, targetStr, targetStr, targetStr, targetStr)
-	if err := os.WriteFile(filepath.Join(sandboxDir, "run_tests.sh"), []byte(script), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(sandboxDir, "run_tests.sh"), []byte(script), 0o755); err != nil {
 		report.Error = fmt.Sprintf("failed to write test script: %v", err)
 		return report, nil
 	}

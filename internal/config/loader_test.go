@@ -18,7 +18,7 @@ genesis:
   rsi_enabled: false
   trust_budget_max: 500
 `
-	os.WriteFile(cfgPath, []byte(initial), 0644)
+	os.WriteFile(cfgPath, []byte(initial), 0o644)
 
 	var reloadCount int
 	var latestCfg *Config
@@ -43,7 +43,7 @@ genesis:
   rsi_enabled: true
   trust_budget_max: 800
 `
-	os.WriteFile(cfgPath, []byte(updated), 0644)
+	os.WriteFile(cfgPath, []byte(updated), 0o644)
 
 	// Wait for reload
 	deadline := time.Now().Add(3 * time.Second)

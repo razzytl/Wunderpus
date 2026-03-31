@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/types"
 )
@@ -121,7 +120,6 @@ func (c *Channel) processMessage(sessionID, content string) {
 		SessionID: sessionID,
 		Content:   content,
 	})
-
 	if err != nil {
 		return
 	}

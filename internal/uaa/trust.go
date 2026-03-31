@@ -314,7 +314,6 @@ func (tb *TrustBudget) Reset(tokenString string) error {
 		}
 		return []byte(secret), nil
 	}, jwt.WithExpirationRequired())
-
 	if err != nil {
 		return fmt.Errorf("trust: invalid JWT: %w", err)
 	}

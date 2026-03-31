@@ -34,13 +34,13 @@ func setupTestRepo(t *testing.T) string {
 	_ = cmd.Run()
 
 	// Need a go.mod
-	err := os.WriteFile(filepath.Join(repoDir, "go.mod"), []byte("module testmod\n\ngo 1.21\n"), 0644)
+	err := os.WriteFile(filepath.Join(repoDir, "go.mod"), []byte("module testmod\n\ngo 1.21\n"), 0o644)
 	if err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
 	// Make an internal/testpkg/test.go
-	err = os.MkdirAll(filepath.Join(repoDir, "internal", "testpkg"), 0755)
+	err = os.MkdirAll(filepath.Join(repoDir, "internal", "testpkg"), 0o755)
 	if err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -51,7 +51,7 @@ func Add(a, b int) int {
 	return a + b
 }
 `
-	err = os.WriteFile(filepath.Join(repoDir, "internal", "testpkg", "test.go"), []byte(testGo), 0644)
+	err = os.WriteFile(filepath.Join(repoDir, "internal", "testpkg", "test.go"), []byte(testGo), 0o644)
 	if err != nil {
 		t.Fatalf("write test.go: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestDeployer_Rollback(t *testing.T) {
 	_ = cmd.Run()
 
 	// Make a change
-	err := os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "test.go"), []byte("package testpkg\n\nfunc Add(a, b int) int { return a + b + 1 }\n"), 0644)
+	err := os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "test.go"), []byte("package testpkg\n\nfunc Add(a, b int) int { return a + b + 1 }\n"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestDeployer_MonitorPostDeploy(t *testing.T) {
 	_ = cmd.Run()
 
 	// Create a bad change and commit it
-	os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "test.go"), []byte("package testpkg\n\nfunc Add(a, b int) int { return a + b + 1 }\n"), 0644)
+	os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "test.go"), []byte("package testpkg\n\nfunc Add(a, b int) int { return a + b + 1 }\n"), 0o644)
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = repoRoot
 	_ = cmd.Run()

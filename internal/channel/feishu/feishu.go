@@ -102,7 +102,6 @@ func (c *Channel) processMessage(chatID, senderID, text string) {
 			Content:   text,
 			ChannelID: chatID,
 		})
-
 		if err != nil {
 			slog.Error("feishu: failed to process message", "error", err)
 			return

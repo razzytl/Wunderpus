@@ -9,12 +9,12 @@ const (
 	MsgTypeUserMessage = "user_message"
 
 	// Server → Client
-	MsgTypeChatToken          = "chat_token"
-	MsgTypeChatComplete       = "chat_complete"
-	MsgTypeToolExecutionStart = "tool_execution_start"
+	MsgTypeChatToken           = "chat_token"
+	MsgTypeChatComplete        = "chat_complete"
+	MsgTypeToolExecutionStart  = "tool_execution_start"
 	MsgTypeToolExecutionResult = "tool_execution_result"
-	MsgTypeSystemLog          = "system_log"
-	MsgTypeError              = "error"
+	MsgTypeSystemLog           = "system_log"
+	MsgTypeError               = "error"
 )
 
 // WSMessage is the envelope for all WebSocket messages.

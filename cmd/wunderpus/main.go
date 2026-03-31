@@ -190,7 +190,7 @@ var cronAddCmd = &cobra.Command{
 
 		content := fmt.Sprintf("\n## %s\n- [ ] %s\n", time.Now().Format("2006-01-02 15:04"), taskDesc)
 
-		f, err := os.OpenFile(heartbeatPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(heartbeatPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
@@ -319,20 +319,20 @@ func runAgent(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "Error starting UI: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		go func() {
 			if err := appServer.Start(); err != nil {
 				fmt.Fprintf(os.Stderr, "Web server error: %v\n", err)
 			}
 		}()
-		
+
 		fmt.Printf("[Wunderpus] Web UI running at http://localhost:8080\n")
-		
+
 		// Wait for interrupt
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		<-sigCh
-		
+
 		fmt.Println("Shutting down UI server...")
 		appServer.Stop()
 		return

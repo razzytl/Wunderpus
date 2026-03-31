@@ -7,7 +7,6 @@ import (
 	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
-
 func TestGoalExecutor_SelectNext(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()

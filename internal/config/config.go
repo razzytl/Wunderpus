@@ -9,11 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/wunderpus/wunderpus/internal/errors"
 	"github.com/wunderpus/wunderpus/internal/security"
 	"github.com/wunderpus/wunderpus/internal/skills"
+	"gopkg.in/yaml.v3"
 )
 
 // Config is the root configuration for Wonderpus.
@@ -516,12 +515,12 @@ func tryGenerateConfig(path string) (bool, error) {
 
 	dir := filepath.Dir(path)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return false, err
 		}
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return false, err
 	}
 

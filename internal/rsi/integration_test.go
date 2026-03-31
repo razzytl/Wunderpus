@@ -27,7 +27,7 @@ func SlowFunction() {
 	time.Sleep(50 * time.Millisecond)
 }
 `
-	err := os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "slow.go"), []byte(dummyCode), 0644)
+	err := os.WriteFile(filepath.Join(repoRoot, "internal", "testpkg", "slow.go"), []byte(dummyCode), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,9 +67,9 @@ func SlowFunction() {
 	target := report.TopCandidates[0]
 
 	// 4. Proposer (Mocked via API override to ensure it returns a valid faster function)
-	// We'll mock the LLM client behavior or just inject a Proposal directly since 
+	// We'll mock the LLM client behavior or just inject a Proposal directly since
 	// ProposalEngine needs an API key and network call.
-	
+
 	// Create a dummy proposal
 	diff := `--- a/internal/testpkg/slow.go
 +++ b/internal/testpkg/slow.go
@@ -113,7 +113,7 @@ func SlowFunction() {
 
 	// 6. Deployer
 	deployer := NewDeployer(repoRoot, true, auditLog)
-	
+
 	err = deployer.Deploy(proposals[0], fitness)
 	if err != nil {
 		t.Fatalf("Deployer failed: %v", err)
@@ -132,7 +132,7 @@ func SlowFunction() {
 	if !strings.HasPrefix(string(out), "rsi/auto-") {
 		t.Errorf("Expected branch to be changed to rsi/auto-, got %s", string(out))
 	}
-	
+
 	// Check audit log
 	entries, _ := auditLog.Query(audit.AuditFilter{EventType: audit.EventRSIDeployed})
 	if len(entries) == 0 {

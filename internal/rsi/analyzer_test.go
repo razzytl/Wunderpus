@@ -10,10 +10,10 @@ import (
 func createTestGoFile(t *testing.T, dir, filename, content string) string {
 	t.Helper()
 	fullPath := filepath.Join(dir, filename)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return fullPath
@@ -194,7 +194,7 @@ func Foo() string { return "foo" }
 func Foo() string { return "modified foo" }
 func Bar() int { return 42 }
 `
-	os.WriteFile(filePath, []byte(modified), 0644)
+	os.WriteFile(filePath, []byte(modified), 0o644)
 	after, _ := mapper.Build(dir)
 
 	changed := mapper.Diff(before, after)

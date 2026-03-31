@@ -221,7 +221,7 @@ func (m *Manager) Cancel(id string) error {
 	now := time.Now()
 	sub.CompletedAt = &now
 
-	slog.Info("subagent cancelled", "id", id[:8])
+	slog.Info("subagent canceled", "id", id[:8])
 	return nil
 }
 
@@ -264,6 +264,7 @@ func (s *SubAgent) GetError() string {
 	defer s.mu.RUnlock()
 	return s.Error
 }
+
 func (m *Manager) SendMessage(ctx context.Context, subID string, message string) (string, error) {
 	sub, ok := m.Get(subID)
 	if !ok {
@@ -292,7 +293,7 @@ func (m *Manager) GetStats() map[string]int {
 		"running":   0,
 		"completed": 0,
 		"failed":    0,
-		"cancelled": 0,
+		"canceled":  0,
 	}
 
 	for _, sub := range m.subAgents {
@@ -306,7 +307,7 @@ func (m *Manager) GetStats() map[string]int {
 		case StatusFailed:
 			stats["failed"]++
 		case StatusCancelled:
-			stats["cancelled"]++
+			stats["canceled"]++
 		}
 	}
 

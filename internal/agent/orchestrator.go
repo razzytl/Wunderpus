@@ -86,7 +86,6 @@ func (o *Orchestrator) Execute(ctx context.Context, graph *TaskGraph) (string, e
 					worker := NewWorkerArm(subtask.ID, subtask.Type, o.router, o.globalRegistry, o.executor)
 
 					res, err := worker.ExecuteSubtask(ctx, subtask, contextData)
-
 					if err != nil {
 						muErr.Lock()
 						loopErrs = append(loopErrs, fmt.Errorf("task %s failed: %w", subtask.ID, err))

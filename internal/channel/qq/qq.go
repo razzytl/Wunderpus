@@ -10,10 +10,9 @@ import (
 	"github.com/tencent-connect/botgo/event"
 	"github.com/tencent-connect/botgo/openapi"
 	"github.com/tencent-connect/botgo/token"
-	"golang.org/x/oauth2"
-
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/types"
+	"golang.org/x/oauth2"
 )
 
 type Channel struct {
@@ -147,7 +146,6 @@ func (c *Channel) processMessage(sessionID, content, senderID string) {
 		SessionID: sessionID,
 		Content:   content,
 	})
-
 	if err != nil {
 		c.sendMessage(senderID, fmt.Sprintf("Error: %v", err))
 		return

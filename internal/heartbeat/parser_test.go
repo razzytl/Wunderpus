@@ -23,7 +23,7 @@ func TestParser_Parse(t *testing.T) {
 - Check for updates
 `
 
-	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+	err := os.WriteFile(heartbeatFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestParser_EmptyFile(t *testing.T) {
 	heartbeatFile := filepath.Join(tmpDir, "HEARTBEAT.md")
 
 	// Empty file
-	err := os.WriteFile(heartbeatFile, []byte("# Empty"), 0644)
+	err := os.WriteFile(heartbeatFile, []byte("# Empty"), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestParser_NoTasks(t *testing.T) {
 ## Long Tasks
 `
 
-	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+	err := os.WriteFile(heartbeatFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -128,7 +128,7 @@ This is not a task
 - Valid task
 `
 
-	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+	err := os.WriteFile(heartbeatFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestFindHeartbeatFile(t *testing.T) {
 
 	// Create HEARTBEAT.md in workspace root
 	heartbeatFile := filepath.Join(tmpDir, "HEARTBEAT.md")
-	err := os.WriteFile(heartbeatFile, []byte("# Test"), 0644)
+	err := os.WriteFile(heartbeatFile, []byte("# Test"), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -183,13 +183,13 @@ func TestFindHeartbeatFile_InWunderpusDir(t *testing.T) {
 
 	// Create in .wunderpus subdirectory
 	wunderpusDir := filepath.Join(tmpDir, ".wunderpus")
-	err := os.MkdirAll(wunderpusDir, 0755)
+	err := os.MkdirAll(wunderpusDir, 0o755)
 	if err != nil {
 		t.Fatalf("failed to create directory: %v", err)
 	}
 
 	heartbeatFile := filepath.Join(wunderpusDir, "HEARTBEAT.md")
-	err = os.WriteFile(heartbeatFile, []byte("# Test"), 0644)
+	err = os.WriteFile(heartbeatFile, []byte("# Test"), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestParser_CronExpression(t *testing.T) {
 - [at 14:30] Check for updates
 `
 
-	err := os.WriteFile(heartbeatFile, []byte(content), 0644)
+	err := os.WriteFile(heartbeatFile, []byte(content), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}

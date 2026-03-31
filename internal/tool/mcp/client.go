@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"github.com/wunderpus/wunderpus/internal/config"
 	"github.com/wunderpus/wunderpus/internal/tool"
 )

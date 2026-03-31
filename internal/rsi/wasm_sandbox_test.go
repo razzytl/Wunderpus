@@ -12,16 +12,16 @@ func createWasmTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module testrepo\n\ngo 1.21\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module testrepo\n\ngo 1.21\n"), 0o644)
 
 	pkgDir := filepath.Join(dir, "internal", "testpkg")
-	os.MkdirAll(pkgDir, 0755)
+	os.MkdirAll(pkgDir, 0o755)
 	os.WriteFile(filepath.Join(pkgDir, "test.go"), []byte(`package testpkg
 
 func Add(a, b int) int {
 	return a + b
 }
-`), 0644)
+`), 0o644)
 	os.WriteFile(filepath.Join(pkgDir, "test_test.go"), []byte(`package testpkg
 
 import "testing"
@@ -31,7 +31,7 @@ func TestAdd(t *testing.T) {
 		t.Fatal("Add failed")
 	}
 }
-`), 0644)
+`), 0o644)
 
 	// Init git
 	cmd := exec.Command("git", "init")

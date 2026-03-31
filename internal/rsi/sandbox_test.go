@@ -13,17 +13,17 @@ func createSandboxTestRepo(t *testing.T) string {
 	dir := t.TempDir()
 
 	// Create a minimal Go module
-	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module testrepo\n\ngo 1.25\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module testrepo\n\ngo 1.25\n"), 0o644)
 
 	// Create internal/testpkg/ with a valid Go file
 	pkgDir := filepath.Join(dir, "internal", "testpkg")
-	os.MkdirAll(pkgDir, 0755)
+	os.MkdirAll(pkgDir, 0o755)
 	os.WriteFile(filepath.Join(pkgDir, "test.go"), []byte(`package testpkg
 
 func Add(a, b int) int {
 	return a + b
 }
-`), 0644)
+`), 0o644)
 
 	// Create internal/testpkg/ with a test file
 	os.WriteFile(filepath.Join(pkgDir, "test_test.go"), []byte(`package testpkg
@@ -35,7 +35,7 @@ func TestAdd(t *testing.T) {
 		t.Fatal("Add failed")
 	}
 }
-`), 0644)
+`), 0o644)
 
 	// Initialize git repo (required for git apply)
 	gitInit := execCommand(t, dir, "git", "init")

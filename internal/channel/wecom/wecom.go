@@ -197,7 +197,6 @@ func (c *Channel) processMessage(sessionID, content, userID string) {
 		SessionID: sessionID,
 		Content:   content,
 	})
-
 	if err != nil {
 		c.sendMessage(userID, fmt.Sprintf("Error: %v", err))
 		return

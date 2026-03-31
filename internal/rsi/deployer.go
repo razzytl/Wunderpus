@@ -3,12 +3,13 @@ package rsi
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/wunderpus/wunderpus/internal/audit"
 	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
 // Deployer applies winning RSI proposals to the live codebase via git.

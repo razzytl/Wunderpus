@@ -29,7 +29,7 @@ description: A test skill
 ---
 # Test Skill
 This is a test skill content.`
-	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte(skillContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte(skillContent), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -71,10 +71,10 @@ func TestSkillInstaller_Uninstall(t *testing.T) {
 	skillDir := filepath.Join(workspace, "skills", skillName)
 
 	// Create a skill directory
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err = os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
+	if err = os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,7 +107,7 @@ func TestSkillInstaller_InstallFromLocalPath_DoubleInstall(t *testing.T) {
 	defer os.RemoveAll(sourceDir)
 
 	// Write SKILL.md
-	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte("# Test"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte("# Test"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

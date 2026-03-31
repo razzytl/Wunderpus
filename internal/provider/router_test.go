@@ -178,7 +178,6 @@ func TestRouterCompleteWithFallback(t *testing.T) {
 		resp, err := router.CompleteWithFallback(context.Background(), &CompletionRequest{
 			Messages: []Message{{Role: RoleUser, Content: "test"}},
 		})
-
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

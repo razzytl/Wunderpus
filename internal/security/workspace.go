@@ -32,7 +32,7 @@ func NewWorkspaceSandbox(workspace string, restricted bool) (*WorkspaceSandbox, 
 // Initialize ensures the workspace directory exists.
 func (ws *WorkspaceSandbox) Initialize() error {
 	if ws.restricted {
-		if err := os.MkdirAll(ws.workspace, 0755); err != nil {
+		if err := os.MkdirAll(ws.workspace, 0o755); err != nil {
 			return fmt.Errorf("cannot create workspace directory %q: %w", ws.workspace, err)
 		}
 	}

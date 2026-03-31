@@ -4,12 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/wunderpus/wunderpus/internal/audit"
 	"log/slog"
 	"math"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
 // WeaknessReport contains the results of a weakness analysis cycle.

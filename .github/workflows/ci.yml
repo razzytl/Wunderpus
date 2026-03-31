@@ -63,7 +63,7 @@ jobs:
         run: go test -v -coverprofile=coverage.out $(go list ./... | grep -v 'internal/rsi')
 
       - name: Test (rsi - excludes Docker-dependent sandbox tests)
-        run: go test -v ./internal/rsi/ -run "^(?!TestSandbox_RunKnownGoodDiff|TestWasmSandbox_FallbackToDocker|TestWasmSandbox_UseDockerDirectly)" -timeout 60s
+        run: go test -v ./internal/rsi/ -skip "TestSandbox_RunKnownGoodDiff|TestWasmSandbox_FallbackToDocker|TestWasmSandbox_UseDockerDirectly" -timeout 60s
 
   build:
     runs-on: ubuntu-latest

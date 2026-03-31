@@ -177,7 +177,7 @@ ci-check:
 	@echo "=== Running tests (main packages) ==="
 	$(GO) test $$(go list ./... | grep -v 'internal/rsi') -count=1
 	@echo "=== Running tests (rsi, Docker-dependent tests excluded) ==="
-	@$(GO) test ./internal/rsi/ -run "^Test" -timeout 30s -count=1 2>&1 | grep -v "FAIL: TestSandbox_RunKnownGoodDiff\|FAIL: TestWasmSandbox_FallbackToDocker\|FAIL: TestWasmSandbox_UseDockerDirectly" || true
+	@$(GO) test ./internal/rsi/ -skip "TestSandbox_RunKnownGoodDiff|TestWasmSandbox_FallbackToDocker|TestWasmSandbox_UseDockerDirectly" -timeout 30s -count=1
 	@echo "=== All CI checks passed ==="
 
 ## install-hooks: Install git pre-push hook to block pushes when ci-check fails

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test artifacts
+test_out.txt
+test_output.txt
+*.exe
+claude.txt

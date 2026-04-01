@@ -51,7 +51,7 @@ export function WebSocketProvider({ children, url }: WebSocketProviderProps) {
   const [systemLogs, setSystemLogs] = useState<SystemLogPayload[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reconnectAttemptRef = useRef(0);
 
   // Resolve WebSocket URL

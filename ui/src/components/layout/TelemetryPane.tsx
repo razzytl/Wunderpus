@@ -1,6 +1,6 @@
 import { Activity, Wrench, Terminal, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useWebSocket } from '../../contexts/WebSocketContext';
-import { ToolExecution } from '../../types/websocket';
+import type { ToolExecution } from '../../types/websocket';
 
 export function TelemetryPane() {
   const { systemLogs, messages } = useWebSocket();

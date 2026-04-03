@@ -7,86 +7,63 @@ import (
 	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
-func TestWireEvents_RSIDeployed_Credits(t *testing.T) {
+func TestWireEvents_GoalCompleted_ResetsProfiler(t *testing.T) {
 	bus := NewBus()
 
-	var credited bool
-	mockCreditor := &mockCreditor{onCredit: func(amount int, reason string) {
-		if amount == 100 {
-			credited = true
-		}
+	var resetGoal atomic.Value
+	mockProfiler := &mockProfiler{onReset: func(name string) {
+		resetGoal.Store(name)
 	}}
 
-	WireEvents(bus, mockCreditor, nil, nil, nil, nil)
+	WireEvents(bus, mockProfiler, nil)
 
-	bus.PublishSync(Event{Type: audit.EventRSIDeployed, Source: "test"})
+	bus.PublishSync(Event{
+		Type:   audit.EventGoalCompleted,
+		Source: "test",
+		Payload: map[string]interface{}{
+			"title": "test-goal",
+		},
+	})
 
-	if !credited {
-		t.Fatal("RSI deployed should credit +100 trust")
+	if got, _ := resetGoal.Load().(string); got != "test-goal" {
+		t.Fatal("goal completed should reset profiler baseline")
 	}
 }
 
-func TestWireEvents_ResourceExhausted_Gates(t *testing.T) {
+func TestWireEvents_GoalAbandoned_RefamesSynth(t *testing.T) {
 	bus := NewBus()
 
-	var suspended atomic.Bool
-	mockGate := &mockGate{onSuspend: func(s bool) {
-		suspended.Store(s)
+	var reframed atomic.Bool
+	mockSynth := &mockSynth{onReframe: func() {
+		reframed.Store(true)
 	}}
 
-	WireEvents(bus, nil, mockGate, nil, nil, nil)
+	WireEvents(bus, nil, mockSynth)
 
-	bus.PublishSync(Event{Type: audit.EventResourceExhausted, Source: "test"})
+	bus.PublishSync(Event{Type: audit.EventGoalAbandoned, Source: "test"})
 
-	if !suspended.Load() {
-		t.Fatal("resource exhausted should suspend Tier 4 actions")
-	}
-}
-
-func TestWireEvents_Lockdown_SuspendsProvisioning(t *testing.T) {
-	bus := NewBus()
-
-	var suspended atomic.Bool
-	mockRA := &mockRA{onSuspend: func(s bool) {
-		suspended.Store(s)
-	}}
-
-	WireEvents(bus, nil, nil, nil, nil, mockRA)
-
-	bus.PublishSync(Event{Type: audit.EventTrustLockdown, Source: "test"})
-
-	if !suspended.Load() {
-		t.Fatal("lockdown should suspend provisioning")
+	if !reframed.Load() {
+		t.Fatal("goal abandoned should trigger synthesizer reframe")
 	}
 }
 
 // Mock implementations
-type mockCreditor struct {
-	onCredit func(int, string)
+type mockProfiler struct {
+	onReset func(string)
 }
 
-func (m *mockCreditor) Credit(amount int, reason string) {
-	if m.onCredit != nil {
-		m.onCredit(amount, reason)
+func (m *mockProfiler) ResetBaseline(name string) {
+	if m.onReset != nil {
+		m.onReset(name)
 	}
 }
 
-type mockGate struct {
-	onSuspend func(bool)
+type mockSynth struct {
+	onReframe func()
 }
 
-func (m *mockGate) SuspendExternalActions(s bool) {
-	if m.onSuspend != nil {
-		m.onSuspend(s)
-	}
-}
-
-type mockRA struct {
-	onSuspend func(bool)
-}
-
-func (m *mockRA) SuspendProvisioning(s bool) {
-	if m.onSuspend != nil {
-		m.onSuspend(s)
+func (m *mockSynth) TriggerReframe() {
+	if m.onReframe != nil {
+		m.onReframe()
 	}
 }

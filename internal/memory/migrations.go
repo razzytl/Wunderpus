@@ -24,20 +24,20 @@ var migrations = []Migration{
 	{
 		Version: 2,
 		SQL: `
-			ALTER TABLE messages ADD COLUMN encrypted INTEGER DEFAULT 0;
+			ALTER TABLE mem_messages ADD COLUMN encrypted INTEGER DEFAULT 0;
 		`,
 	},
 	{
 		Version: 3,
 		SQL: `
-			CREATE TABLE IF NOT EXISTS sop_store (
+			CREATE TABLE IF NOT EXISTS mem_sops (
 				id TEXT PRIMARY KEY,
 				title TEXT NOT NULL,
 				content TEXT NOT NULL,
 				created_at TEXT NOT NULL,
 				success_count INTEGER DEFAULT 1
 			);
-			CREATE INDEX IF NOT EXISTS idx_sop_title ON sop_store(title);
+			CREATE INDEX IF NOT EXISTS idx_mem_sops_title ON mem_sops(title);
 		`,
 	},
 }

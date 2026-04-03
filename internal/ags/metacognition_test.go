@@ -8,7 +8,7 @@ import (
 func TestMetacognition_ReduceImpactWhenOverestimated(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil, nil)
+	scorer := NewPriorityScorer(nil)
 
 	// Inject 20 completed goals where ExpectedValue=0.9 but ActualValue avg=0.4
 	for i := 0; i < 20; i++ {
@@ -38,7 +38,7 @@ func TestMetacognition_ReduceImpactWhenOverestimated(t *testing.T) {
 func TestMetacognition_NoSuddenWeightCollapse(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil, nil)
+	scorer := NewPriorityScorer(nil)
 
 	// Extreme case: all goals way overestimated
 	for i := 0; i < 50; i++ {

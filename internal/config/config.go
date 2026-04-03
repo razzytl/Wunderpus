@@ -35,31 +35,30 @@ type Config struct {
 
 // GenesisConfig holds all genesis plan feature flags and parameters.
 type GenesisConfig struct {
-	RSIEnabled                bool     `yaml:"rsi_enabled"`                  // Enable Recursive Self-Improvement
-	AGSEnabled                bool     `yaml:"ags_enabled"`                  // Enable Autonomous Goal Synthesis
-	UAAEnabled                bool     `yaml:"uaa_enabled"`                  // Enable Unbounded Autonomous Action
-	RAEnabled                 bool     `yaml:"ra_enabled"`                   // Enable Resource Acquisition
-	ToolSynthEnabled          bool     `yaml:"toolsynth_enabled"`            // Enable Tool Synthesis Engine (Section 1)
-	ToolSynthDBPath           string   `yaml:"toolsynth_db_path"`            // Tool synthesis metadata DB path
-	ToolSynthMinPassRate      float64  `yaml:"toolsynth_min_pass_rate"`      // Min test pass rate to accept tool (default: 0.8)
-	WorldModelEnabled         bool     `yaml:"worldmodel_enabled"`           // Enable World Model / Knowledge Graph (Section 2)
-	WorldModelDBPath          string   `yaml:"worldmodel_db_path"`           // World model SQLite DB path
-	WorldModelScanIntervalH   int      `yaml:"worldmodel_scan_interval_h"`   // Hours between web scans for dynamic entities (default: 24)
-	PerceptionEnabled         bool     `yaml:"perception_enabled"`           // Enable Computer Use / GUI Control (Section 3)
-	PerceptionMaxActions      int      `yaml:"perception_max_actions"`       // Max browser actions per goal (default: 50)
-	SwarmEnabled              bool     `yaml:"swarm_enabled"`                // Enable Agent Swarm Architecture (Section 4)
-	RSIFirewallEnabled        bool     `yaml:"rsi_firewall_enabled"`         // RSI can only modify internal/ (default: true)
-	MaxDailySpendUSD          float64  `yaml:"max_daily_spend_usd"`          // Hard cap on cloud spend (default: 10.0)
-	TrustBudgetMax            int      `yaml:"trust_budget_max"`             // Maximum trust points (default: 1000)
-	TrustRegenPerHour         int      `yaml:"trust_regen_per_hour"`         // Trust regeneration rate (default: 10)
-	AuditLogDBPath            string   `yaml:"audit_log_db_path"`            // Genesis audit log DB path
-	ProfilerDBPath            string   `yaml:"profiler_db_path"`             // Profiler telemetry DB path
-	ProfilerPPROFPort         int      `yaml:"profiler_pprof_port"`          // pprof endpoint port (default: 6060, 0 = disabled)
-	TrustBudgetDBPath         string   `yaml:"trust_budget_db_path"`         // Trust budget DB path
-	JWTSecretEnv              string   `yaml:"jwt_secret_env"`               // Env var name holding JWT secret (default: WUNDERPUS_JWT_SECRET)
-	ExternalHostAllowlist     []string `yaml:"external_host_allowlist"`      // Known-safe external hosts for Tier 4
-	RSIFitnessThreshold       float64  `yaml:"rsi_fitness_threshold"`        // Minimum fitness score to deploy an RSI proposal (default: 0.05)
-	RSISelfReferentialEnabled bool     `yaml:"rsi_self_referential_enabled"` // Allow RSI to modify internal/rsi/ (default: false, Phase 4 unlock)
+	ToolSynthEnabled        bool     `yaml:"toolsynth_enabled"`          // Enable Tool Synthesis Engine (Section 1)
+	ToolSynthMinPassRate    float64  `yaml:"toolsynth_min_pass_rate"`    // Min test pass rate to accept tool (default: 0.8)
+	WorldModelEnabled       bool     `yaml:"worldmodel_enabled"`         // Enable World Model / Knowledge Graph (Section 2)
+	WorldModelScanIntervalH int      `yaml:"worldmodel_scan_interval_h"` // Hours between web scans for dynamic entities (default: 24)
+	PerceptionEnabled       bool     `yaml:"perception_enabled"`         // Enable Computer Use / GUI Control (Section 3)
+	PerceptionMaxActions    int      `yaml:"perception_max_actions"`     // Max browser actions per goal (default: 50)
+	SwarmEnabled            bool     `yaml:"swarm_enabled"`              // Enable Agent Swarm Architecture (Section 4)
+	MaxDailySpendUSD        float64  `yaml:"max_daily_spend_usd"`        // Hard cap on cloud spend (default: 10.0)
+	TrustBudgetMax          int      `yaml:"trust_budget_max"`           // Maximum trust points (default: 1000)
+	TrustRegenPerHour       int      `yaml:"trust_regen_per_hour"`       // Trust regeneration rate (default: 10)
+	ProfilerPPROFPort       int      `yaml:"profiler_pprof_port"`        // pprof endpoint port (default: 6060, 0 = disabled)
+	ExternalHostAllowlist   []string `yaml:"external_host_allowlist"`    // Known-safe external hosts for Tier 4
+}
+
+// ToolPolicy defines an approval policy for a tool or tool pattern.
+type ToolPolicy struct {
+	ToolPattern string `yaml:"tool_pattern"` // glob or regex matching tool names
+	Level       string `yaml:"level"`        // "auto", "notify", "approval", "blocked"
+}
+
+// PoliciesConfig holds tool approval policies.
+type PoliciesConfig struct {
+	DefaultLevel string       `yaml:"default_level"` // default approval level for unlisted tools
+	Rules        []ToolPolicy `yaml:"rules"`         // per-tool or pattern-based overrides
 }
 
 const CurrentConfigVersion = 3
@@ -183,23 +182,9 @@ type MCPServerConfig struct {
 
 // SkillsConfig holds configuration for the skills system.
 type SkillsConfig struct {
-	Enabled           bool                   `yaml:"enabled"`
-	GlobalSkillsPath  string                 `yaml:"global_skills_path"`
-	BuiltinSkillsPath string                 `yaml:"builtin_skills_path"`
-	Registries        SkillsRegistriesConfig `yaml:"registries"`
-}
-
-// SkillsRegistriesConfig holds configuration for skill registries.
-type SkillsRegistriesConfig struct {
-	ClawHub ClawHubRegistryConfig `yaml:"clawhub"`
-}
-
-// ClawHubRegistryConfig configures the ClawHub registry.
-type ClawHubRegistryConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	BaseURL   string `yaml:"base_url"`
-	AuthToken string `yaml:"auth_token"`
-	Timeout   int    `yaml:"timeout"` // seconds
+	Enabled           bool   `yaml:"enabled"`
+	GlobalSkillsPath  string `yaml:"global_skills_path"`
+	BuiltinSkillsPath string `yaml:"builtin_skills_path"`
 }
 
 // SecurityConfig holds security settings.
@@ -416,11 +401,6 @@ func (c *Config) resolvePaths() {
 	c.Agent.CostDBPath = resolveDBPath(c.Agent.CostDBPath, c.Home, "wonderpus_cost.db")
 	c.Security.AuditDBPath = resolveDBPath(c.Security.AuditDBPath, c.Home, "wunderpus_audit.db")
 	c.Tools.Skills.GlobalSkillsPath = resolveDBPath(c.Tools.Skills.GlobalSkillsPath, c.Home, "skills")
-
-	// Genesis paths
-	c.Genesis.AuditLogDBPath = resolveDBPath(c.Genesis.AuditLogDBPath, c.Home, "wunderpus_genesis_audit.db")
-	c.Genesis.ProfilerDBPath = resolveDBPath(c.Genesis.ProfilerDBPath, c.Home, "wunderpus_profiler.db")
-	c.Genesis.TrustBudgetDBPath = resolveDBPath(c.Genesis.TrustBudgetDBPath, c.Home, "wunderpus_trust.db")
 }
 
 func resolveDBPath(path, home, defaultFile string) string {
@@ -597,9 +577,6 @@ func applyDefaults(cfg *Config) {
 	cfg.Tools.Skills.Enabled = true
 	cfg.Tools.Skills.GlobalSkillsPath = filepath.Join(cfg.Home, "skills")
 	cfg.Tools.Skills.BuiltinSkillsPath = "./skills"
-	cfg.Tools.Skills.Registries.ClawHub.Enabled = false
-	cfg.Tools.Skills.Registries.ClawHub.BaseURL = "https://clawhub.ai"
-	cfg.Tools.Skills.Registries.ClawHub.Timeout = 30
 	cfg.Logging.Level = "info"
 	cfg.Logging.Format = "json"
 	cfg.Logging.Output = "stderr"
@@ -628,30 +605,18 @@ func applyDefaults(cfg *Config) {
 	cfg.Agents.Defaults.RestrictToWorkspace = true
 
 	// Genesis defaults
-	cfg.Genesis.RSIEnabled = false
-	cfg.Genesis.AGSEnabled = false
-	cfg.Genesis.UAAEnabled = false
-	cfg.Genesis.RAEnabled = false
 	cfg.Genesis.ToolSynthEnabled = false
-	cfg.Genesis.ToolSynthDBPath = filepath.Join(cfg.Home, "wunderpus_toolsynth.db")
 	cfg.Genesis.ToolSynthMinPassRate = 0.8
 	cfg.Genesis.WorldModelEnabled = false
-	cfg.Genesis.WorldModelDBPath = filepath.Join(cfg.Home, "wunderpus_worldmodel.db")
 	cfg.Genesis.WorldModelScanIntervalH = 24
 	cfg.Genesis.PerceptionEnabled = false
 	cfg.Genesis.PerceptionMaxActions = 50
 	cfg.Genesis.SwarmEnabled = false
-	cfg.Genesis.RSIFirewallEnabled = true
 	cfg.Genesis.MaxDailySpendUSD = 10.0
 	cfg.Genesis.TrustBudgetMax = 1000
 	cfg.Genesis.TrustRegenPerHour = 10
-	cfg.Genesis.AuditLogDBPath = filepath.Join(cfg.Home, "wunderpus_genesis_audit.db")
-	cfg.Genesis.ProfilerDBPath = filepath.Join(cfg.Home, "wunderpus_profiler.db")
 	cfg.Genesis.ProfilerPPROFPort = 0 // disabled by default
-	cfg.Genesis.TrustBudgetDBPath = filepath.Join(cfg.Home, "wunderpus_trust.db")
-	cfg.Genesis.JWTSecretEnv = "WUNDERPUS_JWT_SECRET"
-	cfg.Genesis.RSIFitnessThreshold = 0.05
-	cfg.Genesis.RSISelfReferentialEnabled = false
+	cfg.Genesis.ExternalHostAllowlist = []string{}
 
 	cfg.Providers.OpenAI.Model = "gpt-4o"
 	cfg.Providers.OpenAI.MaxTokens = 4096
@@ -728,23 +693,8 @@ func applyEnv(cfg *Config) {
 	}
 
 	// Genesis env overrides
-	if v := os.Getenv("WUNDERPUS_GENESIS_RSI"); v != "" {
-		cfg.Genesis.RSIEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_AGS"); v != "" {
-		cfg.Genesis.AGSEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_UAA"); v != "" {
-		cfg.Genesis.UAAEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_RA"); v != "" {
-		cfg.Genesis.RAEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH"); v != "" {
 		cfg.Genesis.ToolSynthEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH_DB"); v != "" {
-		cfg.Genesis.ToolSynthDBPath = v
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_TOOLSYNTH_PASS_RATE"); v != "" {
 		if rate, err := strconv.ParseFloat(v, 64); err == nil && rate >= 0 && rate <= 1 {
@@ -754,28 +704,16 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("WUNDERPUS_GENESIS_WORLDMODEL"); v != "" {
 		cfg.Genesis.WorldModelEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_WORLDMODEL_DB"); v != "" {
-		cfg.Genesis.WorldModelDBPath = v
-	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_PERCEPTION"); v != "" {
 		cfg.Genesis.PerceptionEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_SWARM"); v != "" {
 		cfg.Genesis.SwarmEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_FIREWALL"); v != "" {
-		cfg.Genesis.RSIFirewallEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_RSI_SELF_REF"); v != "" {
-		cfg.Genesis.RSISelfReferentialEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_MAX_DAILY_SPEND"); v != "" {
 		if spend, err := strconv.ParseFloat(v, 64); err == nil {
 			cfg.Genesis.MaxDailySpendUSD = spend
 		}
-	}
-	if v := os.Getenv("WUNDERPUS_JWT_SECRET"); v != "" {
-		cfg.Genesis.JWTSecretEnv = "WUNDERPUS_JWT_SECRET"
 	}
 }
 
@@ -1155,16 +1093,6 @@ func ConvertLegacyToModelList(cfg *Config) []ModelEntry {
 // ToSkillsRegistryConfig converts the config to skills.RegistryConfig for the skills system.
 func (c *Config) ToSkillsRegistryConfig() skills.RegistryConfig {
 	return skills.RegistryConfig{
-		ClawHub: skills.ClawHubConfig{
-			Enabled:         c.Tools.Skills.Registries.ClawHub.Enabled,
-			BaseURL:         c.Tools.Skills.Registries.ClawHub.BaseURL,
-			AuthToken:       c.Tools.Skills.Registries.ClawHub.AuthToken,
-			SearchPath:      "/api/v1/search",
-			SkillsPath:      "/api/v1/skills",
-			DownloadPath:    "/api/v1/download",
-			Timeout:         c.Tools.Skills.Registries.ClawHub.Timeout,
-			MaxZipSize:      50 * 1024 * 1024, // 50 MB
-			MaxResponseSize: 2 * 1024 * 1024,  // 2 MB
-		},
+		MaxConcurrentSearches: 2,
 	}
 }

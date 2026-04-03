@@ -249,21 +249,10 @@ func TestAvailableProviders(t *testing.T) {
 	}
 }
 
-// TestGenesisConfig_NewFields verifies the two checklist-required genesis fields
-// are present in the struct and receive correct default values.
-func TestGenesisConfig_NewFields(t *testing.T) {
+// TestGenesisConfig_Defaults verifies genesis config defaults after Phase 1 cleanup.
+func TestGenesisConfig_Defaults(t *testing.T) {
 	cfg := &Config{}
 	applyDefaults(cfg)
-
-	// RSIFitnessThreshold: default 0.05 per checklist
-	if cfg.Genesis.RSIFitnessThreshold != 0.05 {
-		t.Errorf("RSIFitnessThreshold default = %v, want 0.05", cfg.Genesis.RSIFitnessThreshold)
-	}
-
-	// RSISelfReferentialEnabled: default false per checklist
-	if cfg.Genesis.RSISelfReferentialEnabled != false {
-		t.Errorf("RSISelfReferentialEnabled default = %v, want false", cfg.Genesis.RSISelfReferentialEnabled)
-	}
 
 	// Sanity: trust budget defaults still correct
 	if cfg.Genesis.TrustBudgetMax != 1000 {

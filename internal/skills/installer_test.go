@@ -125,30 +125,3 @@ func TestSkillInstaller_InstallFromLocalPath_DoubleInstall(t *testing.T) {
 		t.Error("Expected error for double install, got nil")
 	}
 }
-
-func TestValidateSkillIdentifier(t *testing.T) {
-	tests := []struct {
-		name    string
-		slug    string
-		wantErr bool
-	}{
-		{"valid simple", "test-skill", false},
-		{"valid with numbers", "skill123", false},
-		{"valid complex", "my-awesome-skill-123", false},
-		{"empty", "", true},
-		{"invalid chars", "test_skill", true},
-		{"invalid start", "-test", true},
-		{"invalid end", "test-", true},
-		// Long but valid (regex accepts it, validation is handled by length check)
-		{"long but valid", "a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateSkillIdentifier(tt.slug)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateSkillIdentifier() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}

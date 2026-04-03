@@ -34,9 +34,10 @@ func (s *SearchFiles) Name() string { return "content_search" }
 func (s *SearchFiles) Description() string {
 	return "Search for a string within files in restricted directories (grep-like). Supports recursive search if path is a directory."
 }
-func (s *SearchFiles) Sensitive() bool        { return false }
-func (s *SearchFiles) Version() string        { return "1.0.0" }
-func (s *SearchFiles) Dependencies() []string { return nil }
+func (s *SearchFiles) Sensitive() bool                   { return false }
+func (s *SearchFiles) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (s *SearchFiles) Version() string                   { return "1.0.0" }
+func (s *SearchFiles) Dependencies() []string            { return nil }
 func (s *SearchFiles) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "query", Type: "string", Description: "The string to search for", Required: true},

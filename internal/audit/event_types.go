@@ -11,17 +11,6 @@ const (
 	EventActionSimulated EventType = "action.simulated"
 )
 
-// RSI events — Recursive Self-Improvement
-const (
-	EventRSICycleStarted      EventType = "rsi.cycle_started"
-	EventRSIProposalGenerated EventType = "rsi.proposal_generated"
-	EventRSIDeployed          EventType = "rsi.deployed"
-	EventRSIRolledBack        EventType = "rsi.rolled_back"
-	EventRSISandboxPassed     EventType = "rsi.sandbox_passed"
-	EventRSISandboxFailed     EventType = "rsi.sandbox_failed"
-	EventRSIFitnessEvaluated  EventType = "rsi.fitness_evaluated"
-)
-
 // Goal events — Autonomous Goal Synthesis
 const (
 	EventGoalCreated   EventType = "goal.created"
@@ -29,14 +18,6 @@ const (
 	EventGoalCompleted EventType = "goal.completed"
 	EventGoalAbandoned EventType = "goal.abandoned"
 	EventGoalDeferred  EventType = "goal.deferred"
-)
-
-// Resource events — Resource Acquisition
-const (
-	EventResourceAcquired    EventType = "resource.acquired"
-	EventResourceReleased    EventType = "resource.released"
-	EventResourceExhausted   EventType = "resource.exhausted"
-	EventResourceProvisioned EventType = "resource.provisioned"
 )
 
 // Trust events — Unbounded Autonomous Action

@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/wunderpus/wunderpus/internal/provider"
-	_ "modernc.org/sqlite"
 )
 
 // SOP represents a Standard Operating Procedure - a learned workflow.
@@ -174,11 +173,16 @@ type EnhancedStore struct {
 	embedder    provider.Embedder
 }
 
-// NewEnhancedStore creates a new store with vector search capabilities.
-func NewEnhancedStore(dbPath string, embedder provider.Embedder) (*EnhancedStore, error) {
-	store, err := NewStore(dbPath)
+// NewEnhancedStore creates a new store with vector search capabilities using the shared core DB connection.
+func NewEnhancedStore(db *sql.DB, embedder provider.Embedder) (*EnhancedStore, error) {
+	store, err := NewStore(db)
 	if err != nil {
 		return nil, err
+	}
+
+	// Add SOP table if not present
+	if err := AddSOPTable(db); err != nil {
+		return nil, fmt.Errorf("memory: adding sop table: %w", err)
 	}
 
 	dimension := 1536 // Default for OpenAI embeddings
@@ -214,7 +218,7 @@ func (s *EnhancedStore) StoreSOP(ctx context.Context, title, content string) (*S
 
 	// Also save to SQLite for persistence
 	_, err := s.Store.db.Exec(`
-		INSERT INTO sop_store (id, title, content, created_at, success_count)
+		INSERT INTO mem_sops (id, title, content, created_at, success_count)
 		VALUES (?, ?, ?, ?, ?)`,
 		sop.ID, sop.Title, sop.Content, sop.CreatedAt.Format(time.RFC3339), sop.SuccessCount)
 
@@ -238,7 +242,7 @@ func (s *EnhancedStore) SearchMemories(ctx context.Context, query string, encKey
 	// Also do keyword fallback (with lower priority)
 	rows, err := s.Store.db.QueryContext(ctx, `
 		SELECT session_id, content, encrypted 
-		FROM messages 
+		FROM mem_messages 
 		WHERE content LIKE ? 
 		LIMIT 10`, "%"+query+"%")
 	if err != nil {
@@ -306,14 +310,15 @@ func (s *EnhancedStore) GetRelevantSOPs(ctx context.Context, taskDescription str
 // RecordSuccess increments the success count for an SOP.
 func (s *EnhancedStore) RecordSuccess(sopID string) error {
 	_, err := s.Store.db.Exec(`
-		UPDATE sop_store SET success_count = success_count + 1 WHERE id = ?`, sopID)
+		UPDATE mem_sops SET success_count = success_count + 1 WHERE id = ?`, sopID)
 	return err
 }
 
 // AddSOPTable adds the SOP table to an existing database.
+// Tables are namespaced with mem_ to prevent collisions.
 func AddSOPTable(db *sql.DB) error {
 	schema := `
-	CREATE TABLE IF NOT EXISTS sop_store (
+	CREATE TABLE IF NOT EXISTS mem_sops (
 		id TEXT PRIMARY KEY,
 		title TEXT NOT NULL,
 		content TEXT NOT NULL,
@@ -321,7 +326,7 @@ func AddSOPTable(db *sql.DB) error {
 		success_count INTEGER DEFAULT 1
 	);
 	
-	CREATE INDEX IF NOT EXISTS idx_sop_title ON sop_store(title);
+	CREATE INDEX IF NOT EXISTS idx_mem_sops_title ON mem_sops(title);
 	`
 	_, err := db.Exec(schema)
 	return err

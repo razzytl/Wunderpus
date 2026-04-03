@@ -49,9 +49,10 @@ func (t *CronTool) Name() string { return "cron" }
 func (t *CronTool) Description() string {
 	return "Schedule reminders, tasks, or commands. Use action='add' for one-time or recurring tasks. Use 'at_seconds' for reminders in X seconds. Use 'every_seconds' for recurring tasks."
 }
-func (t *CronTool) Sensitive() bool        { return false }
-func (t *CronTool) Version() string        { return "1.0.0" }
-func (t *CronTool) Dependencies() []string { return nil }
+func (t *CronTool) Sensitive() bool                   { return false }
+func (t *CronTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (t *CronTool) Version() string                   { return "1.0.0" }
+func (t *CronTool) Dependencies() []string            { return nil }
 func (t *CronTool) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "action", Type: "string", Description: "Action: add, list, remove, enable, disable", Required: true},

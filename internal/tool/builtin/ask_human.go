@@ -150,6 +150,9 @@ func (t *AskHumanTool) Sensitive() bool {
 	return false
 }
 
+// ApprovalLevel returns the policy-based approval level for this tool.
+func (t *AskHumanTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+
 // Version returns the tool version
 func (t *AskHumanTool) Version() string {
 	return "1.0.0"

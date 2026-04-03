@@ -144,7 +144,7 @@ func (u *Updater) updateDynamicEntities() int {
 	// Get all dynamic entities
 	rows, err := u.store.db.Query(`
 		SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE is_dynamic = 1 AND confidence > 0.1`)
+		FROM wm_entities WHERE is_dynamic = 1 AND confidence > 0.1`)
 	if err != nil {
 		return 0
 	}

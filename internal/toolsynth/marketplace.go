@@ -63,14 +63,14 @@ type ImprovementCandidate struct {
 //  2. Scans MCP registry and GitHub for existing implementations
 //  3. Auto-PRs to the repo when a strong candidate is found
 type ImprovementLoop struct {
-	scanner        MarketplaceScanner
-	registrar      *Registrar
-	profilerDBPath string // optional: profiler SQLite for syncing usage
-	usage          map[string]*ToolUsage
-	mu             sync.RWMutex
-	minUses        int64 // minimum uses before RSI eligibility (default 100)
-	scanInterval   time.Duration
-	stopCh         chan struct{}
+	scanner      MarketplaceScanner
+	registrar    *Registrar
+	profilerDB   *sql.DB // optional: shared core DB for syncing usage
+	usage        map[string]*ToolUsage
+	mu           sync.RWMutex
+	minUses      int64 // minimum uses before RSI eligibility (default 100)
+	scanInterval time.Duration
+	stopCh       chan struct{}
 }
 
 // NewImprovementLoop creates a new improvement loop.
@@ -85,9 +85,9 @@ func NewImprovementLoop(scanner MarketplaceScanner, registrar *Registrar) *Impro
 	}
 }
 
-// SetProfilerDB configures the profiler database path for syncing usage data.
-func (l *ImprovementLoop) SetProfilerDB(path string) {
-	l.profilerDBPath = path
+// SetProfilerDB configures the shared database connection for syncing usage data.
+func (l *ImprovementLoop) SetProfilerDB(db *sql.DB) {
+	l.profilerDB = db
 }
 
 // SetMinUses overrides the minimum use count for RSI eligibility.
@@ -126,17 +126,11 @@ func (l *ImprovementLoop) RecordCall(name string, hadError bool) {
 // and updates internal usage tracking. Call this periodically to sync
 // profiler data with the improvement loop.
 func (l *ImprovementLoop) SyncFromProfiler() error {
-	if l.profilerDBPath == "" {
+	if l.profilerDB == nil {
 		return nil
 	}
 
-	db, err := openProfilerDB(l.profilerDBPath)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	rows, err := db.Query(`
+	rows, err := l.profilerDB.Query(`
 		SELECT function_name, call_count, error_count
 		FROM profiler_snapshots
 		WHERE id IN (
@@ -297,13 +291,4 @@ func (l *ImprovementLoop) UsageStats() map[string]ToolUsage {
 		stats[k] = *v
 	}
 	return stats
-}
-
-// openProfilerDB opens the profiler's SQLite database for reading usage data.
-func openProfilerDB(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, fmt.Errorf("improvement: open profiler db: %w", err)
-	}
-	return db, nil
 }

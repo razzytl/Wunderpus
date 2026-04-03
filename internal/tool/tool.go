@@ -5,6 +5,16 @@ import (
 	"encoding/json"
 )
 
+// ApprovalLevel determines how a tool is executed.
+type ApprovalLevel int
+
+const (
+	AutoExecute      ApprovalLevel = iota // Run immediately, no approval needed
+	NotifyOnly                            // Run but notify the user
+	RequiresApproval                      // Pause and wait for user approval
+	Blocked                               // Never execute, reject immediately
+)
+
 // Tool is the interface every tool must implement.
 type Tool interface {
 	// Name returns the tool identifier.
@@ -17,6 +27,8 @@ type Tool interface {
 	Execute(ctx context.Context, args map[string]any) (*Result, error)
 	// Sensitive returns true if this tool requires user approval before execution.
 	Sensitive() bool
+	// ApprovalLevel returns the policy-based approval level for this tool.
+	ApprovalLevel() ApprovalLevel
 	// Version returns the tool version string.
 	Version() string
 	// Dependencies returns a list of other tool names this tool relies on.

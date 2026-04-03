@@ -15,7 +15,6 @@ func TestConfig_WatchRoundTrip(t *testing.T) {
 	initial := `version: 2
 default_provider: openai
 genesis:
-  rsi_enabled: false
   trust_budget_max: 500
 `
 	os.WriteFile(cfgPath, []byte(initial), 0o644)
@@ -60,9 +59,5 @@ genesis:
 
 	if latestCfg.Genesis.TrustBudgetMax != 800 {
 		t.Fatalf("expected reloaded value 800, got %d", latestCfg.Genesis.TrustBudgetMax)
-	}
-
-	if !latestCfg.Genesis.RSIEnabled {
-		t.Fatal("expected RSIEnabled to be true after reload")
 	}
 }

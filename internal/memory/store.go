@@ -24,27 +24,19 @@ type Session struct {
 	Title     string    `json:"title"`
 }
 
-// NewStore initializes a new SQLite memory store.
-func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("memory: opening db: %w", err)
-	}
-
-	// Optimize SQLite
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
-
-	// Create tables if not exist
+// NewStore initializes a new memory store using the shared core DB connection.
+// Tables are namespaced with mem_ to prevent collisions.
+func NewStore(db *sql.DB) (*Store, error) {
+	// Create tables if not exist (namespaced with mem_)
 	schema := `
-	CREATE TABLE IF NOT EXISTS sessions (
+	CREATE TABLE IF NOT EXISTS mem_sessions (
 		id TEXT PRIMARY KEY,
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL,
 		title TEXT NOT NULL DEFAULT 'New Conversation'
 	);
 	
-	CREATE TABLE IF NOT EXISTS messages (
+	CREATE TABLE IF NOT EXISTS mem_messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id TEXT NOT NULL,
 		role TEXT NOT NULL,
@@ -52,19 +44,18 @@ func NewStore(dbPath string) (*Store, error) {
 		tool_call_id TEXT DEFAULT '',
 		tool_calls TEXT DEFAULT '',
 		timestamp TEXT NOT NULL,
-		FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+		FOREIGN KEY (session_id) REFERENCES mem_sessions(id) ON DELETE CASCADE
 	);
 	
-	CREATE TABLE IF NOT EXISTS preferences (
+	CREATE TABLE IF NOT EXISTS mem_preferences (
 		key TEXT PRIMARY KEY,
 		value TEXT NOT NULL
 	);
 	
-	CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id);
+	CREATE INDEX IF NOT EXISTS idx_mem_messages_session ON mem_messages(session_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
 		return nil, fmt.Errorf("memory: creating tables: %w", err)
 	}
 
@@ -86,7 +77,7 @@ func (s *Store) Backup(destPath string) error {
 func (s *Store) EnsureSession(sessionID string) error {
 	now := time.Now().Format(time.RFC3339)
 	_, err := s.db.Exec(`
-		INSERT OR IGNORE INTO sessions (id, created_at, updated_at)
+		INSERT OR IGNORE INTO mem_sessions (id, created_at, updated_at)
 		VALUES (?, ?, ?)`,
 		sessionID, now, now)
 	return err
@@ -118,13 +109,13 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKe
 	}
 
 	_, err := s.db.Exec(`
-		INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted)
+		INSERT INTO mem_messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		sessionID, msg.Role, content, msg.ToolCallID, toolCallsStr, now, isEncrypted,
 	)
 
 	if err == nil {
-		s.db.Exec(`UPDATE sessions SET updated_at = ? WHERE id = ?`, now, sessionID)
+		s.db.Exec(`UPDATE mem_sessions SET updated_at = ? WHERE id = ?`, now, sessionID)
 	}
 	return err
 }
@@ -133,7 +124,7 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKe
 func (s *Store) GetSessions() ([]Session, error) {
 	rows, err := s.db.Query(`
 		SELECT id, created_at, updated_at, title
-		FROM sessions 
+		FROM mem_sessions 
 		ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -166,7 +157,7 @@ func (s *Store) GetSessions() ([]Session, error) {
 func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.Message, error) {
 	rows, err := s.db.Query(`
 		SELECT role, content, tool_call_id, tool_calls, encrypted
-		FROM messages 
+		FROM mem_messages 
 		WHERE session_id = ? 
 		ORDER BY timestamp ASC`, sessionID)
 	if err != nil {
@@ -214,7 +205,7 @@ func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.
 // GetPreference gets a user preference string.
 func (s *Store) GetPreference(key string, defaultVal string) string {
 	var val string
-	err := s.db.QueryRow(`SELECT value FROM preferences WHERE key = ?`, key).Scan(&val)
+	err := s.db.QueryRow(`SELECT value FROM mem_preferences WHERE key = ?`, key).Scan(&val)
 	if err != nil {
 		return defaultVal
 	}
@@ -224,7 +215,7 @@ func (s *Store) GetPreference(key string, defaultVal string) string {
 // SetPreference saves a user preference string.
 func (s *Store) SetPreference(key, value string) error {
 	_, err := s.db.Exec(`
-		INSERT INTO preferences (key, value) VALUES (?, ?)
+		INSERT INTO mem_preferences (key, value) VALUES (?, ?)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 		key, value)
 	return err
@@ -233,17 +224,14 @@ func (s *Store) SetPreference(key, value string) error {
 // PruneOldSessions deletes sessions that haven't been updated for the given days.
 func (s *Store) PruneOldSessions(days int) (int64, error) {
 	cutoff := time.Now().AddDate(0, 0, -days).Format(time.RFC3339)
-	res, err := s.db.Exec(`DELETE FROM sessions WHERE updated_at < ?`, cutoff)
+	res, err := s.db.Exec(`DELETE FROM mem_sessions WHERE updated_at < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-// Close closes the database connection.
+// Close is a no-op — the shared DB connection is managed by db.Manager.
 func (s *Store) Close() error {
-	if s.db != nil {
-		return s.db.Close()
-	}
 	return nil
 }

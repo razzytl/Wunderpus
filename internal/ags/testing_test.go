@@ -1,17 +1,18 @@
 package ags
 
 import (
-	"io/ioutil"
-	"os"
+	"database/sql"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
-func tempGoalDB(t *testing.T) string {
-	f, err := ioutil.TempFile("", "ags_test_*.db")
+func tempGoalDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("sql.Open: %v", err)
 	}
-	f.Close()
-	t.Cleanup(func() { os.Remove(f.Name()) })
-	return f.Name()
+	t.Cleanup(func() { db.Close() })
+	return db
 }

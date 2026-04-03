@@ -69,6 +69,7 @@ func (m *mockTool) Parameters() []ParameterDef { return nil }
 func (m *mockTool) Execute(ctx context.Context, args map[string]any) (*Result, error) {
 	return &Result{Output: "ok"}, nil
 }
-func (m *mockTool) Sensitive() bool        { return false }
-func (m *mockTool) Version() string        { return "1.0" }
-func (m *mockTool) Dependencies() []string { return nil }
+func (m *mockTool) Sensitive() bool              { return false }
+func (m *mockTool) ApprovalLevel() ApprovalLevel { return AutoExecute }
+func (m *mockTool) Version() string              { return "1.0" }
+func (m *mockTool) Dependencies() []string       { return nil }

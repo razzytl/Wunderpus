@@ -50,9 +50,9 @@ func (s *SandboxTool) Description() string {
 		"The container is automatically created, executed, and destroyed after running."
 }
 
-func (s *SandboxTool) Sensitive() bool { return false }
-
-func (s *SandboxTool) Version() string { return "1.0.0" }
+func (s *SandboxTool) Sensitive() bool                   { return false }
+func (s *SandboxTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (s *SandboxTool) Version() string                   { return "1.0.0" }
 
 func (s *SandboxTool) Dependencies() []string { return nil }
 

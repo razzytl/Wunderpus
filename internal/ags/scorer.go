@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wunderpus/wunderpus/internal/ra"
 	"github.com/wunderpus/wunderpus/internal/uaa"
 )
 
@@ -62,15 +61,13 @@ type PriorityScorer struct {
 	mu      sync.RWMutex
 	weights ScorerWeights
 	trust   *uaa.TrustBudget
-	ra      *ra.ResourceRegistry
 }
 
 // NewPriorityScorer creates a scorer with default weights and dependencies.
-func NewPriorityScorer(trust *uaa.TrustBudget, resourceReg *ra.ResourceRegistry) *PriorityScorer {
+func NewPriorityScorer(trust *uaa.TrustBudget) *PriorityScorer {
 	return &PriorityScorer{
 		weights: DefaultScorerWeights(),
 		trust:   trust,
-		ra:      resourceReg,
 	}
 }
 
@@ -126,7 +123,7 @@ func computeUrgency(g Goal) float64 {
 func (s *PriorityScorer) computeFeasibility(g Goal) float64 {
 	feasibility := 0.7 // base default
 
-	// 1. Trust impact: Higher budget = higher feasibility for autonomy
+	// Trust impact: Higher budget = higher feasibility for autonomy
 	if s.trust != nil {
 		balance := float64(s.trust.Current())
 		// Assuming max trust is around 1000 for normalization
@@ -135,23 +132,6 @@ func (s *PriorityScorer) computeFeasibility(g Goal) float64 {
 			trustFactor = 1.0
 		}
 		feasibility *= (0.5 + 0.5*trustFactor)
-	}
-
-	// 2. Resource impact: Check for active compute resources
-	if s.ra != nil {
-		active, err := s.ra.ListActive()
-		if err == nil {
-			hasCompute := false
-			for _, res := range active {
-				if res.Type == ra.ResourceCompute {
-					hasCompute = true
-					break
-				}
-			}
-			if !hasCompute {
-				feasibility *= 0.2 // severely penalized if no compute
-			}
-		}
 	}
 
 	return clamp01(feasibility)

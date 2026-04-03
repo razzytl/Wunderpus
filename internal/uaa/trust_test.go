@@ -1,24 +1,26 @@
 package uaa
 
 import (
-	"os"
-	"path/filepath"
+	"database/sql"
 	"testing"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	_ "modernc.org/sqlite"
 )
 
-func tempTrustDB(t *testing.T) string {
+func newTrustDB(t *testing.T) *sql.DB {
 	t.Helper()
-	return filepath.Join(t.TempDir(), "test_trust.db")
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
 }
 
 func TestTrustBudget_DeductBelowZero_Lockdown(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	t.Setenv("TEST_JWT_SECRET", "test-secret-key-for-testing")
+	db := newTrustDB(t)
 
-	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
+	tb, err := NewTrustBudget(db, 100, 10, nil, nil)
 	if err != nil {
 		t.Fatalf("NewTrustBudget: %v", err)
 	}
@@ -48,65 +50,43 @@ func TestTrustBudget_DeductBelowZero_Lockdown(t *testing.T) {
 	}
 }
 
-func TestTrustBudget_ExpiredJWT_ResetFails(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	t.Setenv("TEST_JWT_SECRET", "test-secret-key")
+func TestTrustBudget_Reset(t *testing.T) {
+	db := newTrustDB(t)
 
-	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
+	tb, err := NewTrustBudget(db, 100, 10, nil, nil)
 	if err != nil {
 		t.Fatalf("NewTrustBudget: %v", err)
 	}
 	defer tb.Close()
 
-	// Create an expired JWT
-	secret := os.Getenv("TEST_JWT_SECRET")
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss": "human-operator",
-		"exp": time.Now().Add(-1 * time.Hour).Unix(), // expired 1 hour ago
-		"iat": time.Now().Add(-2 * time.Hour).Unix(),
-	})
-	tokenString, err := token.SignedString([]byte(secret))
+	// Enter lockdown
+	tb.Deduct(100, "drain")
+	if tb.Current() != 0 {
+		t.Fatal("should be in lockdown")
+	}
+
+	// Reset should work without JWT
+	err = tb.Reset()
 	if err != nil {
-		t.Fatalf("sign token: %v", err)
+		t.Fatalf("reset should succeed: %v", err)
 	}
 
-	err = tb.Reset(tokenString)
-	if err == nil {
-		t.Fatal("expired JWT reset should have failed")
-	}
-}
-
-func TestTrustBudget_AgentCannotGenerateJWT(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	t.Setenv("TEST_JWT_SECRET", "test-secret-key")
-
-	tb, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
-	if err != nil {
-		t.Fatalf("NewTrustBudget: %v", err)
-	}
-	defer tb.Close()
-
-	// Agent tries to issue a JWT with issuer = wunderpus-agent
-	secret := os.Getenv("TEST_JWT_SECRET")
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss": "wunderpus-agent", // this should be rejected
-		"exp": time.Now().Add(1 * time.Hour).Unix(),
-		"iat": time.Now().Unix(),
-	})
-	tokenString, _ := token.SignedString([]byte(secret))
-
-	err = tb.Reset(tokenString)
-	if err == nil {
-		t.Fatal("agent-issued JWT should be rejected for reset")
+	if tb.Current() != 100 {
+		t.Fatalf("expected 100 after reset, got %d", tb.Current())
 	}
 }
 
 func TestTrustBudget_PersistAcrossRestart(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	t.Setenv("TEST_JWT_SECRET", "test-secret")
+	// Use file-based DB for persistence test
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/test_trust_persist.db"
 
-	// Create budget, deduct, then close
-	tb1, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
+	db1, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+
+	tb1, err := NewTrustBudget(db1, 100, 10, nil, nil)
 	if err != nil {
 		t.Fatalf("NewTrustBudget: %v", err)
 	}
@@ -115,9 +95,16 @@ func TestTrustBudget_PersistAcrossRestart(t *testing.T) {
 		t.Fatalf("expected 20, got %d", tb1.Current())
 	}
 	tb1.Close()
+	db1.Close()
 
 	// Reopen — should load persisted value, not reset to max
-	tb2, err := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
+	db2, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db2.Close()
+
+	tb2, err := NewTrustBudget(db2, 100, 10, nil, nil)
 	if err != nil {
 		t.Fatalf("NewTrustBudget reopen: %v", err)
 	}
@@ -129,8 +116,8 @@ func TestTrustBudget_PersistAcrossRestart(t *testing.T) {
 }
 
 func TestTrustBudget_CreditCappedAtMax(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	tb, _ := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
+	db := newTrustDB(t)
+	tb, _ := NewTrustBudget(db, 100, 10, nil, nil)
 	defer tb.Close()
 
 	tb.Deduct(10, "test")
@@ -138,37 +125,5 @@ func TestTrustBudget_CreditCappedAtMax(t *testing.T) {
 
 	if tb.Current() != 100 {
 		t.Fatalf("expected capped at 100, got %d", tb.Current())
-	}
-}
-
-func TestTrustBudget_ValidHumanReset(t *testing.T) {
-	dbPath := tempTrustDB(t)
-	secretVal := "valid-human-secret"
-	t.Setenv("TEST_JWT_SECRET", secretVal)
-
-	tb, _ := NewTrustBudget(dbPath, 100, 10, nil, nil, "TEST_JWT_SECRET")
-	defer tb.Close()
-
-	// Enter lockdown
-	tb.Deduct(100, "drain")
-	if tb.Current() != 0 {
-		t.Fatal("should be in lockdown")
-	}
-
-	// Valid human-issued JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iss": "human-operator",
-		"exp": time.Now().Add(1 * time.Hour).Unix(),
-		"iat": time.Now().Unix(),
-	})
-	tokenString, _ := token.SignedString([]byte(secretVal))
-
-	err := tb.Reset(tokenString)
-	if err != nil {
-		t.Fatalf("valid reset should succeed: %v", err)
-	}
-
-	if tb.Current() != 100 {
-		t.Fatalf("expected 100 after reset, got %d", tb.Current())
 	}
 }

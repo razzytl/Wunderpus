@@ -4,35 +4,23 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 // AuditLog is a hash-chained, append-only, SQLite-backed audit log.
 // It is the single source of truth for everything the system does.
 type AuditLog struct {
-	db     *sql.DB
-	mu     sync.Mutex
-	dbPath string
+	db *sql.DB
+	mu sync.Mutex
 }
 
-// NewAuditLog opens or creates the audit log database at dbPath.
+// NewAuditLog creates an audit log using the shared audit DB connection.
 // The database uses WAL mode for concurrent read performance.
-func NewAuditLog(dbPath string) (*AuditLog, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("audit: opening db: %w", err)
-	}
-
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
-
-	_, err = db.Exec(`
+func NewAuditLog(db *sql.DB) (*AuditLog, error) {
+	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS audit_entries (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			timestamp  TEXT    NOT NULL,
@@ -49,11 +37,10 @@ func NewAuditLog(dbPath string) (*AuditLog, error) {
 		CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_entries(actor_id);
 	`)
 	if err != nil {
-		db.Close()
 		return nil, fmt.Errorf("audit: creating schema: %w", err)
 	}
 
-	return &AuditLog{db: db, dbPath: dbPath}, nil
+	return &AuditLog{db: db}, nil
 }
 
 // Write appends a new entry to the audit log with hash chaining.
@@ -251,11 +238,7 @@ func (l *AuditLog) LatestHash() (string, error) {
 	return hash, err
 }
 
-// Close closes the database connection.
+// Close is a no-op — the shared DB connection is managed by db.Manager.
 func (l *AuditLog) Close() error {
-	if l.db != nil {
-		slog.Debug("audit: closing database")
-		return l.db.Close()
-	}
 	return nil
 }

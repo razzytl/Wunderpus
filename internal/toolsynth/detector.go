@@ -18,25 +18,25 @@ import (
 // - Soft gaps: tasks that succeeded but took >5x average time (from profiler data)
 // - Efficiency gaps: tasks where shell+curl was used instead of a proper tool
 type Detector struct {
-	dbPath         string
-	profilerDBPath string // optional: profiler SQLite for timing-based soft gap detection
-	scanLimit      int    // max entries to scan per run (default 500)
-	minPriority    float64
-	stats          ScanStats
+	db          *sql.DB
+	profilerDB  *sql.DB // optional: profiler SQLite for timing-based soft gap detection
+	scanLimit   int     // max entries to scan per run (default 500)
+	minPriority float64
+	stats       ScanStats
 }
 
-// NewDetector creates a detector that reads from the given memory database.
-func NewDetector(dbPath string) *Detector {
+// NewDetector creates a detector that reads from the given shared core DB connection.
+func NewDetector(db *sql.DB) *Detector {
 	return &Detector{
-		dbPath:      dbPath,
+		db:          db,
 		scanLimit:   500,
 		minPriority: 0.1,
 	}
 }
 
-// SetProfilerDB configures the profiler database path for timing-based soft gap detection.
-func (d *Detector) SetProfilerDB(path string) {
-	d.profilerDBPath = path
+// SetProfilerDB configures the profiler database connection for timing-based soft gap detection.
+func (d *Detector) SetProfilerDB(db *sql.DB) {
+	d.profilerDB = db
 }
 
 // SetScanLimit overrides the default number of entries scanned per run.
@@ -51,16 +51,10 @@ func (d *Detector) SetScanLimit(n int) {
 func (d *Detector) Scan() ([]ToolGap, error) {
 	start := time.Now()
 
-	db, err := sql.Open("sqlite", d.dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("detector: open db: %w", err)
-	}
-	defer db.Close()
-
 	// Read last N messages from episodic memory
-	rows, err := db.Query(`
+	rows, err := d.db.Query(`
 		SELECT role, content, tool_calls, tool_call_id
-		FROM messages
+		FROM mem_messages
 		ORDER BY rowid DESC
 		LIMIT ?`, d.scanLimit)
 	if err != nil {
@@ -268,19 +262,12 @@ func (d *Detector) detectGaps(entries []memoryEntry) []ToolGap {
 
 // detectTimingSoftGaps reads profiler data and flags tools that take >5x average time.
 func (d *Detector) detectTimingSoftGaps(candidates map[string]*gapCandidate) {
-	if d.profilerDBPath == "" {
+	if d.profilerDB == nil {
 		return
 	}
-
-	db, err := sql.Open("sqlite", d.profilerDBPath)
-	if err != nil {
-		slog.Warn("detector: cannot open profiler DB for timing analysis", "error", err)
-		return
-	}
-	defer db.Close()
 
 	// Get latest snapshot per function
-	rows, err := db.Query(`
+	rows, err := d.profilerDB.Query(`
 		SELECT function_name, call_count, total_duration_ns, error_count, success_count
 		FROM profiler_snapshots
 		WHERE id IN (

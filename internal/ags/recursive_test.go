@@ -8,7 +8,7 @@ import (
 func TestRecursiveLoop_GeneratesRSIGoalsFromWeakness(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil, nil)
+	scorer := NewPriorityScorer(nil)
 	synth := NewGoalSynthesizer(nil, store, scorer, nil)
 
 	loop := NewRecursiveLoop(scorer, store, synth)
@@ -33,7 +33,7 @@ func TestRecursiveLoop_GeneratesRSIGoalsFromWeakness(t *testing.T) {
 func TestRecursiveLoop_CheckAGSHealth(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil, nil)
+	scorer := NewPriorityScorer(nil)
 
 	loop := NewRecursiveLoop(scorer, store, nil)
 

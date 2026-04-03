@@ -28,9 +28,9 @@ func (b *BrowserTool) Description() string {
 	return "Interact with a web browser to visually navigate pages, click, type, and take screenshots."
 }
 
-func (b *BrowserTool) Sensitive() bool { return false } // Assuming not sensitive, or based on security model
-
-func (b *BrowserTool) Version() string { return "1.0.0" }
+func (b *BrowserTool) Sensitive() bool                   { return false }
+func (b *BrowserTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (b *BrowserTool) Version() string                   { return "1.0.0" }
 
 func (b *BrowserTool) Dependencies() []string { return nil }
 
@@ -101,7 +101,7 @@ func (b *BrowserTool) Execute(ctx context.Context, args map[string]any) (*tool.R
 		if url == "" {
 			return &tool.Result{Error: "url is required for navigate action"}, nil
 		}
-		
+
 		// Add http protocol if missing
 		if len(url) > 4 && url[:4] != "http" {
 			url = "https://" + url
@@ -121,7 +121,7 @@ func (b *BrowserTool) Execute(ctx context.Context, args map[string]any) (*tool.R
 		if err != nil {
 			return &tool.Result{Error: fmt.Sprintf("failed to take screenshot: %v", err)}, nil
 		}
-		
+
 		encodedString := base64.StdEncoding.EncodeToString(screenshotBytes)
 		return &tool.Result{Output: fmt.Sprintf("Screenshot taken:\ndata:image/jpeg;base64,%s", encodedString)}, nil
 
@@ -131,7 +131,7 @@ func (b *BrowserTool) Execute(ctx context.Context, args map[string]any) (*tool.R
 		if !okX || !okY {
 			return &tool.Result{Error: "x and y coordinates are required for click action"}, nil
 		}
-		
+
 		if err := b.page.Mouse().Click(xFloat, yFloat); err != nil {
 			return &tool.Result{Error: fmt.Sprintf("failed to click at (%v, %v): %v", xFloat, yFloat, err)}, nil
 		}
@@ -142,7 +142,7 @@ func (b *BrowserTool) Execute(ctx context.Context, args map[string]any) (*tool.R
 		if text == "" {
 			return &tool.Result{Error: "text is required for type action"}, nil
 		}
-		
+
 		err := b.page.Keyboard().Type(text)
 		if err != nil {
 			return &tool.Result{Error: fmt.Sprintf("failed to type text: %v", err)}, nil

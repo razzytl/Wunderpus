@@ -4,22 +4,25 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"testing"
 
 	_ "modernc.org/sqlite"
 )
 
-func tempDB(t *testing.T) string {
+func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dir := t.TempDir()
-	return filepath.Join(dir, "test_audit.db")
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
 }
 
 func TestAuditLog_WriteAndVerify(t *testing.T) {
-	dbPath := tempDB(t)
-	log, err := NewAuditLog(dbPath)
+	db := newTestDB(t)
+	log, err := NewAuditLog(db)
 	if err != nil {
 		t.Fatalf("NewAuditLog: %v", err)
 	}
@@ -51,8 +54,8 @@ func TestAuditLog_WriteAndVerify(t *testing.T) {
 }
 
 func TestAuditLog_ConcurrentWritesAndVerify(t *testing.T) {
-	dbPath := tempDB(t)
-	log, err := NewAuditLog(dbPath)
+	db := newTestDB(t)
+	log, err := NewAuditLog(db)
 	if err != nil {
 		t.Fatalf("NewAuditLog: %v", err)
 	}
@@ -94,8 +97,8 @@ func TestAuditLog_ConcurrentWritesAndVerify(t *testing.T) {
 }
 
 func TestAuditLog_CorruptedHash(t *testing.T) {
-	dbPath := tempDB(t)
-	log, err := NewAuditLog(dbPath)
+	db := newTestDB(t)
+	log, err := NewAuditLog(db)
 	if err != nil {
 		t.Fatalf("NewAuditLog: %v", err)
 	}
@@ -113,19 +116,13 @@ func TestAuditLog_CorruptedHash(t *testing.T) {
 	log.Close()
 
 	// Corrupt the hash of entry 3 directly in SQLite
-
-	rawDB, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf("open raw db: %v", err)
-	}
-	_, err = rawDB.Exec(`UPDATE audit_entries SET hash = 'corrupted_hash' WHERE id = 3`)
+	_, err = db.Exec(`UPDATE audit_entries SET hash = 'corrupted_hash' WHERE id = 3`)
 	if err != nil {
 		t.Fatalf("corrupt: %v", err)
 	}
-	rawDB.Close()
 
 	// Reopen and verify
-	log2, err := NewAuditLog(dbPath)
+	log2, err := NewAuditLog(db)
 	if err != nil {
 		t.Fatalf("NewAuditLog: %v", err)
 	}
@@ -141,15 +138,15 @@ func TestAuditLog_CorruptedHash(t *testing.T) {
 }
 
 func TestAuditLog_Query(t *testing.T) {
-	dbPath := tempDB(t)
-	log, err := NewAuditLog(dbPath)
+	db := newTestDB(t)
+	log, err := NewAuditLog(db)
 	if err != nil {
 		t.Fatalf("NewAuditLog: %v", err)
 	}
 	defer log.Close()
 
 	// Write entries for different subsystems
-	types := []EventType{EventActionExecuted, EventRSICycleStarted, EventGoalCreated}
+	types := []EventType{EventActionExecuted, EventToolSynthesized, EventGoalCreated}
 	for i, et := range types {
 		for j := 0; j < 3; j++ {
 			payload, _ := json.Marshal(map[string]int{"i": i, "j": j})

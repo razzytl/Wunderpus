@@ -20,7 +20,7 @@ type Analytics struct {
 	stats map[string]*ToolStats
 }
 
-// ProfilerFn wraps a function with telemetry. Matches rsi.Profiler.Track signature.
+// ProfilerFn wraps a function with telemetry.
 type ProfilerFn func(name string, fn func() error) error
 
 // ToolStats holds metrics for a single tool.
@@ -64,6 +64,7 @@ func (e *Executor) SetProfiler(fn ProfilerFn) {
 }
 
 // Execute runs a tool call with sandbox, approval, and audit.
+// Approval is now policy-based via the tool's ApprovalLevel.
 func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 	start := time.Now()
 
@@ -73,21 +74,40 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 		return &Result{Error: fmt.Sprintf("unknown tool: %s", call.Name)}
 	}
 
-	// 2. Check approval for sensitive tools
-	if t.Sensitive() && e.approvalFn != nil {
-		approved, err := e.approvalFn(call.Name, call.Args)
-		if err != nil {
-			return &Result{Error: fmt.Sprintf("approval error: %v", err)}
+	// 2. Policy-based approval check
+	level := t.ApprovalLevel()
+	switch level {
+	case Blocked:
+		e.audit.Log(security.AuditEvent{
+			Timestamp:   time.Now(),
+			Action:      "tool_blocked",
+			Input:       fmt.Sprintf("%s(%v)", call.Name, call.Args),
+			ThreatLevel: "high",
+		})
+		return &Result{Error: fmt.Sprintf("tool %q is blocked by policy", call.Name)}
+
+	case RequiresApproval:
+		if e.approvalFn != nil {
+			approved, err := e.approvalFn(call.Name, call.Args)
+			if err != nil {
+				return &Result{Error: fmt.Sprintf("approval error: %v", err)}
+			}
+			if !approved {
+				e.audit.Log(security.AuditEvent{
+					Timestamp:   time.Now(),
+					Action:      "tool_denied",
+					Input:       fmt.Sprintf("%s(%v)", call.Name, call.Args),
+					ThreatLevel: "none",
+				})
+				return &Result{Error: "tool execution denied by user"}
+			}
 		}
-		if !approved {
-			e.audit.Log(security.AuditEvent{
-				Timestamp:   time.Now(),
-				Action:      "tool_denied",
-				Input:       fmt.Sprintf("%s(%v)", call.Name, call.Args),
-				ThreatLevel: "none",
-			})
-			return &Result{Error: "tool execution denied by user"}
-		}
+
+	case NotifyOnly:
+		slog.Info("tool executing (notify-only)", "tool", call.Name, "args", call.Args)
+
+	case AutoExecute:
+		// Run immediately, no approval needed
 	}
 
 	// 3. Apply timeout
@@ -95,7 +115,7 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 	defer cancel()
 
 	// 4. Execute (with optional profiler wrapping)
-	slog.Info("tool executing", "tool", call.Name, "args", call.Args)
+	slog.Info("tool executing", "tool", call.Name, "args", call.Args, "level", level)
 
 	var result *Result
 	var execErr error

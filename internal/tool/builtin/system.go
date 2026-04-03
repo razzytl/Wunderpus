@@ -21,10 +21,11 @@ func (s *SystemInfo) Name() string { return "system_info" }
 func (s *SystemInfo) Description() string {
 	return "Get information about the system (OS, Arch, CPU, Memory)."
 }
-func (s *SystemInfo) Sensitive() bool                 { return false }
-func (s *SystemInfo) Version() string                 { return "1.0.0" }
-func (s *SystemInfo) Dependencies() []string          { return nil }
-func (s *SystemInfo) Parameters() []tool.ParameterDef { return nil }
+func (s *SystemInfo) Sensitive() bool                   { return false }
+func (s *SystemInfo) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (s *SystemInfo) Version() string                   { return "1.0.0" }
+func (s *SystemInfo) Dependencies() []string            { return nil }
+func (s *SystemInfo) Parameters() []tool.ParameterDef   { return nil }
 
 func (s *SystemInfo) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	v, _ := mem.VirtualMemoryWithContext(ctx)

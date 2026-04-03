@@ -2,6 +2,7 @@ package tool_test
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/wunderpus/wunderpus/internal/security"
 	"github.com/wunderpus/wunderpus/internal/tool"
 	"github.com/wunderpus/wunderpus/internal/tool/builtin"
+	_ "modernc.org/sqlite"
 )
 
 // mockTool is a simple tool for testing the executor.
@@ -17,12 +19,13 @@ type mockTool struct {
 	errResult error
 }
 
-func (m *mockTool) Name() string                    { return "mock_tool" }
-func (m *mockTool) Description() string             { return "A mock tool" }
-func (m *mockTool) Parameters() []tool.ParameterDef { return nil }
-func (m *mockTool) Sensitive() bool                 { return m.sensitive }
-func (m *mockTool) Version() string                 { return "1.0.0" }
-func (m *mockTool) Dependencies() []string          { return nil }
+func (m *mockTool) Name() string                      { return "mock_tool" }
+func (m *mockTool) Description() string               { return "A mock tool" }
+func (m *mockTool) Parameters() []tool.ParameterDef   { return nil }
+func (m *mockTool) Sensitive() bool                   { return m.sensitive }
+func (m *mockTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (m *mockTool) Version() string                   { return "1.0.0" }
+func (m *mockTool) Dependencies() []string            { return nil }
 func (m *mockTool) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	if m.errResult != nil {
 		return nil, m.errResult
@@ -62,7 +65,12 @@ func TestRegistry(t *testing.T) {
 
 func TestExecutor_Approval(t *testing.T) {
 	// Need an audit logger for executor
-	audit, _ := security.NewAuditLogger(":memory:", nil)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+	audit, _ := security.NewAuditLogger(db, nil)
 	defer audit.Close()
 
 	reg := tool.NewRegistry()
@@ -96,7 +104,12 @@ func TestExecutor_Approval(t *testing.T) {
 }
 
 func TestExecutor_Analytics(t *testing.T) {
-	audit, _ := security.NewAuditLogger(":memory:", nil)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+	audit, _ := security.NewAuditLogger(db, nil)
 	defer audit.Close()
 
 	reg := tool.NewRegistry()

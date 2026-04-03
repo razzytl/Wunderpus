@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"database/sql"
 	"sync"
 	"time"
 
@@ -43,6 +44,7 @@ func NewManager(
 	registry *tool.Registry,
 	executor *tool.Executor,
 	loader *skills.SkillsLoader,
+	costDB *sql.DB,
 ) *Manager {
 	m := &Manager{
 		cfg:       cfg,
@@ -67,7 +69,7 @@ func NewManager(
 		}
 	}
 
-	tr, err := cost.NewTracker(cfg.Agent.CostDBPath, cfg.Agent.Budget)
+	tr, err := cost.NewTracker(costDB, cfg.Agent.Budget)
 	if err == nil {
 		m.tracker = tr
 	}

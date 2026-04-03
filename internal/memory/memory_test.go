@@ -1,10 +1,11 @@
 package memory
 
 import (
-	"os"
+	"database/sql"
 	"testing"
 
 	"github.com/wunderpus/wunderpus/internal/provider"
+	_ "modernc.org/sqlite"
 )
 
 func TestSearchResult_Structure(t *testing.T) {
@@ -51,10 +52,13 @@ func TestStore_Initialization(t *testing.T) {
 }
 
 func TestNewStore(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_memory.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -70,10 +74,13 @@ func TestNewStore(t *testing.T) {
 }
 
 func TestEnsureSession(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_ensure.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -93,10 +100,13 @@ func TestEnsureSession(t *testing.T) {
 }
 
 func TestSaveAndLoadMessage(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_msg.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -134,10 +144,13 @@ func TestSaveAndLoadMessage(t *testing.T) {
 }
 
 func TestSaveMultipleMessages(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_multi_msg.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -182,10 +195,13 @@ func TestSaveMultipleMessages(t *testing.T) {
 }
 
 func TestLoadNonExistentSession(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_nonexistent.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -202,10 +218,13 @@ func TestLoadNonExistentSession(t *testing.T) {
 }
 
 func TestPreferences(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_prefs.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
@@ -231,14 +250,17 @@ func TestPreferences(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_close.db"
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
 
-	store, err := NewStore(tmpFile)
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("NewStore failed: %v", err)
 	}
 
-	// Close should not error
+	// Close should not error (no-op with shared DB)
 	err = store.Close()
 	if err != nil {
 		t.Errorf("Close failed: %v", err)

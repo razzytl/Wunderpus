@@ -6,30 +6,13 @@ import (
 	"github.com/wunderpus/wunderpus/internal/audit"
 )
 
-// WireEvents connects all four pillars via the event bus.
+// WireEvents connects subsystems via the event bus.
 // Call this once at application startup after all subsystems are initialized.
 func WireEvents(
 	bus *Bus,
-	trustCreditor interface {
-		Credit(amount int, reason string)
-	},
-	uaaGate interface{ SuspendExternalActions(suspend bool) },
 	profilerReset interface{ ResetBaseline(name string) },
 	synthReframer interface{ TriggerReframe() },
-	raSuspend interface{ SuspendProvisioning(suspend bool) },
 ) {
-	// RSI deployed → Trust budget credits +100
-	bus.Subscribe(audit.EventRSIDeployed, func(e Event) {
-		trustCreditor.Credit(100, "RSI improvement deployed")
-		slog.Info("events wiring: RSI deployed → trust +100")
-	})
-
-	// Resource exhausted → UAA gates Tier 4 actions
-	bus.Subscribe(audit.EventResourceExhausted, func(e Event) {
-		uaaGate.SuspendExternalActions(true)
-		slog.Info("events wiring: resource exhausted → Tier 4 actions suspended")
-	})
-
 	// Goal completed → Profiler resets baseline
 	bus.Subscribe(audit.EventGoalCompleted, func(e Event) {
 		if goalID, ok := e.Payload.(map[string]interface{}); ok {
@@ -46,11 +29,5 @@ func WireEvents(
 		slog.Info("events wiring: goal abandoned → synthesizer reframing")
 	})
 
-	// Lockdown → RA suspends provisioning
-	bus.Subscribe(audit.EventTrustLockdown, func(e Event) {
-		raSuspend.SuspendProvisioning(true)
-		slog.Info("events wiring: lockdown engaged → provisioning suspended")
-	})
-
-	slog.Info("events wiring: all cross-pillar subscriptions established")
+	slog.Info("events wiring: all cross-subsystem subscriptions established")
 }

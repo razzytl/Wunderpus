@@ -1,6 +1,7 @@
 package web
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,11 +9,14 @@ import (
 
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/config"
+	_ "modernc.org/sqlite"
 )
 
 func TestStaticFileServing(t *testing.T) {
 	cfg := &config.Config{}
-	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil)
+	db, _ := sql.Open("sqlite", ":memory:")
+	defer db.Close()
+	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil, db)
 
 	mockFS := fstest.MapFS{
 		"dist/index.html":       &fstest.MapFile{Data: []byte("index")},

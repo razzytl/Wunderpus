@@ -18,39 +18,42 @@ type ActionResult struct {
 	Error    string
 }
 
+// Action represents a tool execution request.
+type Action struct {
+	ID         string
+	Tool       string
+	Parameters map[string]interface{}
+	Tier       int
+	TrustCost  int
+}
+
 // ToolRunnerFn executes the actual tool operation.
 type ToolRunnerFn func(ctx context.Context, action Action) (*ActionResult, error)
 
-// Profiler is the interface for telemetry tracking. Matches rsi.Profiler.Track signature.
+// Profiler is the interface for telemetry tracking.
 type Profiler interface {
 	Track(name string, fn func() error) error
 }
 
-// UAA is the Unbounded Autonomous Action executor. It gates every action
-// through classification, trust budget, and shadow mode before execution.
+// UAA is the Unbounded Autonomous Action executor.
+// Actions are gated through trust budget before execution.
 type UAA struct {
-	classifier *Classifier
 	trust      *TrustBudget
-	shadow     *ShadowSimulator
 	audit      *audit.AuditLog
 	events     *events.Bus
 	toolRunner ToolRunnerFn
-	profiler   Profiler // optional — tracks tool execution telemetry for RSI
+	profiler   Profiler // optional — tracks tool execution telemetry
 }
 
 // NewUAA creates a new UAA executor.
 func NewUAA(
-	classifier *Classifier,
 	trust *TrustBudget,
-	shadow *ShadowSimulator,
 	auditLog *audit.AuditLog,
 	bus *events.Bus,
 	toolRunner ToolRunnerFn,
 ) *UAA {
 	return &UAA{
-		classifier: classifier,
 		trust:      trust,
-		shadow:     shadow,
 		audit:      auditLog,
 		events:     bus,
 		toolRunner: toolRunner,
@@ -63,14 +66,10 @@ func (u *UAA) SetProfiler(p Profiler) {
 	u.profiler = p
 }
 
-// Execute gates and executes an action through the full UAA pipeline:
-// classify → trust check → shadow → deduct → execute → record outcome.
+// Execute gates and executes an action through the UAA pipeline:
+// trust check → deduct → execute → record outcome.
 func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error) {
-	// 1. Classify
-	action.Tier = u.classifier.Classify(action)
-	action.TrustCost = TrustCostForTier(action.Tier)
-
-	// 2. Check trust budget (non-binding pre-check; atomic TryDeduct happens after shadow)
+	// 1. Check trust budget (non-binding pre-check; atomic TryDeduct happens below)
 	ok, reason := u.trust.CanExecute(action.TrustCost)
 	if !ok {
 		u.writeAudit(audit.EventActionRejected, action, reason)
@@ -78,21 +77,7 @@ func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error)
 		return nil, fmt.Errorf("uaa: action rejected — %s", reason)
 	}
 
-	// 3. Shadow mode for Tier 3+ actions
-	if action.Tier >= TierPersistent && u.shadow != nil {
-		simResult, err := u.shadow.Simulate(ctx, action)
-		if err != nil || !simResult.Approved {
-			rejectReason := "shadow simulation rejected"
-			if simResult != nil {
-				rejectReason = simResult.Reason
-			}
-			u.writeAudit(audit.EventActionRejected, action, rejectReason)
-			u.publishEvent(audit.EventActionRejected, action, rejectReason)
-			return nil, fmt.Errorf("uaa: shadow rejected — %s", rejectReason)
-		}
-	}
-
-	// 4. Atomically check + deduct trust (eliminates TOCTOU race)
+	// 2. Atomically check + deduct trust (eliminates TOCTOU race)
 	deducted, deductReason := u.trust.TryDeduct(action.TrustCost, action.ID)
 	if !deducted {
 		u.writeAudit(audit.EventActionRejected, action, deductReason)
@@ -100,7 +85,7 @@ func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error)
 		return nil, fmt.Errorf("uaa: trust deduction failed — %s", deductReason)
 	}
 
-	// 5. Execute — optionally wrapped with profiler telemetry
+	// 3. Execute — optionally wrapped with profiler telemetry
 	var result *ActionResult
 	var err error
 	if u.profiler != nil {
@@ -115,7 +100,7 @@ func (u *UAA) Execute(ctx context.Context, action Action) (*ActionResult, error)
 		result, err = u.toolRunner(ctx, action)
 	}
 
-	// 6. Record outcome
+	// 4. Record outcome
 	success := err == nil
 	u.trust.RecordOutcome(action.ID, action.TrustCost, success)
 

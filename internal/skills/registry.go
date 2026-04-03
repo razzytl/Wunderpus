@@ -41,7 +41,7 @@ type InstallResult struct {
 }
 
 // SkillRegistry is the interface that all skill registries must implement.
-// Each registry represents a different source of skills (e.g., clawhub.ai)
+// Each registry represents a different source of skills.
 type SkillRegistry interface {
 	// Name returns the unique name of this registry (e.g., "clawhub").
 	Name() string
@@ -57,21 +57,7 @@ type SkillRegistry interface {
 
 // RegistryConfig holds configuration for all skill registries.
 type RegistryConfig struct {
-	ClawHub               ClawHubConfig
 	MaxConcurrentSearches int
-}
-
-// ClawHubConfig configures the ClawHub registry.
-type ClawHubConfig struct {
-	Enabled         bool
-	BaseURL         string
-	AuthToken       string
-	SearchPath      string // e.g. "/api/v1/search"
-	SkillsPath      string // e.g. "/api/v1/skills"
-	DownloadPath    string // e.g. "/api/v1/download"
-	Timeout         int    // seconds, 0 = default (30s)
-	MaxZipSize      int    // bytes, 0 = default (50MB)
-	MaxResponseSize int    // bytes, 0 = default (2MB)
 }
 
 // MemoryRegistry is an implementation of SkillRegistry that holds local skills.
@@ -189,9 +175,6 @@ func NewRegistryManagerFromConfig(cfg RegistryConfig) *RegistryManager {
 	rm := NewRegistryManager()
 	if cfg.MaxConcurrentSearches > 0 {
 		rm.maxConcurrent = cfg.MaxConcurrentSearches
-	}
-	if cfg.ClawHub.Enabled {
-		rm.AddRegistry(NewClawHubRegistry(cfg.ClawHub))
 	}
 	return rm
 }

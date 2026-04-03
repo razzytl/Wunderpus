@@ -2,10 +2,10 @@ package toolsynth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/audit"
@@ -107,25 +107,11 @@ func (b *EventBridge) PublishToolGapDetected(gap ToolGap) {
 
 // SynthConfig holds configuration for the complete tool synthesis system.
 type SynthConfig struct {
-	Enabled        bool
-	DBPath         string
-	MinPassRate    float64
-	ScanLimit      int
-	OutputDir      string // where generated .go files go
-	RepoRoot       string // project root for sandbox compilation
-	ProfilerDBPath string // optional: profiler SQLite for timing analysis
-}
-
-// DefaultSynthConfig returns sensible defaults for tool synthesis.
-func DefaultSynthConfig(homeDir, repoRoot string) SynthConfig {
-	return SynthConfig{
-		Enabled:     false,
-		DBPath:      filepath.Join(homeDir, "wunderpus_toolsynth.db"),
-		MinPassRate: 0.8,
-		ScanLimit:   500,
-		OutputDir:   filepath.Join(repoRoot, "internal", "tool", "generated"),
-		RepoRoot:    repoRoot,
-	}
+	Enabled     bool
+	MinPassRate float64
+	ScanLimit   int
+	OutputDir   string // where generated .go files go
+	RepoRoot    string // project root for sandbox compilation
 }
 
 // SynthSystem holds all tool synthesis components wired together.
@@ -142,11 +128,11 @@ type SynthSystem struct {
 }
 
 // InitToolSynth initializes the complete tool synthesis system.
-// memoryDBPath is the path to the memory store's SQLite database.
+// coreDB is the shared core database connection.
 // llm is the LLM caller for design and code generation.
 func InitToolSynth(
 	cfg SynthConfig,
-	memoryDBPath string,
+	coreDB *sql.DB,
 	llm LLMCaller,
 	auditLog *audit.AuditLog,
 	bus *events.Bus,
@@ -157,20 +143,16 @@ func InitToolSynth(
 	}
 
 	slog.Info("toolsynth: initializing",
-		"db", cfg.DBPath,
 		"output", cfg.OutputDir,
 		"minPassRate", cfg.MinPassRate)
 
 	// 1. Detector — scans episodic memory for gaps
-	detector := NewDetector(memoryDBPath)
+	detector := NewDetector(coreDB)
 	detector.SetScanLimit(cfg.ScanLimit)
-	if cfg.ProfilerDBPath != "" {
-		detector.SetProfilerDB(cfg.ProfilerDBPath)
-	}
 
 	// 2. Designer — LLM-based tool specification generator
 	designer := NewDesigner(llm)
-	designer.SetDBPath(cfg.DBPath)
+	designer.SetDB(coreDB)
 
 	// 3. Coder — LLM-based Go source code generator
 	validator := NewDefaultValidator()
@@ -182,13 +164,10 @@ func InitToolSynth(
 	tester.SetMinPassRate(cfg.MinPassRate)
 
 	// 5. Registrar — tool registration + metadata persistence
-	registrar := NewRegistrar(cfg.OutputDir, cfg.DBPath)
+	registrar := NewRegistrar(cfg.OutputDir, coreDB)
 
 	// 6. Improvement Loop — MCP/GitHub marketplace scanning
 	improver := NewImprovementLoop(nil, registrar) // scanner can be wired later
-	if cfg.ProfilerDBPath != "" {
-		improver.SetProfilerDB(cfg.ProfilerDBPath)
-	}
 
 	// 7. Pipeline — orchestrates the full cycle
 	pipeline := NewPipeline(detector, designer, coder, tester, registrar)

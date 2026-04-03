@@ -2,12 +2,12 @@ package ags
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/events"
 	"github.com/wunderpus/wunderpus/internal/provider"
-	"github.com/wunderpus/wunderpus/internal/ra"
 	"github.com/wunderpus/wunderpus/internal/uaa"
 )
 
@@ -25,20 +25,19 @@ type AGSManager struct {
 
 // NewAGSManager initializes all AGS components and wires them together.
 func NewAGSManager(
-	dbPath string,
+	db *sql.DB,
 	p provider.Provider,
 	trust *uaa.TrustBudget,
-	res *ra.ResourceRegistry,
 	bus *events.Bus,
 	taskExec TaskExecutorFn,
 	successJudge SuccessJudgeFn,
 ) (*AGSManager, error) {
-	store, err := NewGoalStore(dbPath)
+	store, err := NewGoalStore(db)
 	if err != nil {
 		return nil, err
 	}
 
-	scorer := NewPriorityScorer(trust, res)
+	scorer := NewPriorityScorer(trust)
 	synthesizer := NewGoalSynthesizer(p, store, scorer, bus)
 	executor := NewGoalExecutor(store, scorer, p, bus, taskExec, successJudge)
 	meta := NewMetacognitionLoop(store, scorer)

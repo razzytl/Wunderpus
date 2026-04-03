@@ -76,6 +76,9 @@ func (t *SpawnTool) Sensitive() bool {
 	return false
 }
 
+// ApprovalLevel returns the policy-based approval level for this tool.
+func (t *SpawnTool) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+
 // Version returns the tool version
 func (t *SpawnTool) Version() string {
 	return "1.0.0"
@@ -210,6 +213,9 @@ func (t *MessageTool) Execute(ctx context.Context, args map[string]any) (*tool.R
 func (t *MessageTool) Sensitive() bool {
 	return false
 }
+
+// ApprovalLevel returns the policy-based approval level for this tool.
+func (t *MessageTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
 
 // Version returns the tool version
 func (t *MessageTool) Version() string {

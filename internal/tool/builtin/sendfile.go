@@ -142,6 +142,9 @@ func (t *SendFileTool) Sensitive() bool {
 	return true
 }
 
+// ApprovalLevel returns the policy-based approval level for this tool.
+func (t *SendFileTool) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+
 // Version returns the tool version
 func (t *SendFileTool) Version() string {
 	return "1.0.0"

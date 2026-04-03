@@ -386,15 +386,6 @@ func TestDOMAgentCannotHandle(t *testing.T) {
 	}
 }
 
-// --- Desktop Agent Tests ---
-
-func TestDesktopAgentPlatform(t *testing.T) {
-	agent := NewDesktopAgent()
-	if agent.Platform() == "" {
-		t.Error("platform should not be empty")
-	}
-}
-
 // --- Utility Tests ---
 
 func TestBuildActionPrompt(t *testing.T) {

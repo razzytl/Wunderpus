@@ -31,9 +31,10 @@ func (f *FileEdit) Name() string { return "file_edit" }
 func (f *FileEdit) Description() string {
 	return "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file."
 }
-func (f *FileEdit) Sensitive() bool        { return true }
-func (f *FileEdit) Version() string        { return "1.0.0" }
-func (f *FileEdit) Dependencies() []string { return nil }
+func (f *FileEdit) Sensitive() bool                   { return true }
+func (f *FileEdit) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+func (f *FileEdit) Version() string                   { return "1.0.0" }
+func (f *FileEdit) Dependencies() []string            { return nil }
 func (f *FileEdit) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "path", Type: "string", Description: "Path to the file to edit", Required: true},
@@ -115,11 +116,12 @@ func NewFileAppendSandboxed(sandbox *security.WorkspaceSandbox) *FileAppend {
 	}
 }
 
-func (f *FileAppend) Name() string           { return "file_append" }
-func (f *FileAppend) Description() string    { return "Append content to the end of a file" }
-func (f *FileAppend) Sensitive() bool        { return true }
-func (f *FileAppend) Version() string        { return "1.0.0" }
-func (f *FileAppend) Dependencies() []string { return nil }
+func (f *FileAppend) Name() string                      { return "file_append" }
+func (f *FileAppend) Description() string               { return "Append content to the end of a file" }
+func (f *FileAppend) Sensitive() bool                   { return true }
+func (f *FileAppend) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+func (f *FileAppend) Version() string                   { return "1.0.0" }
+func (f *FileAppend) Dependencies() []string            { return nil }
 func (f *FileAppend) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "path", Type: "string", Description: "Path to the file to append to", Required: true},

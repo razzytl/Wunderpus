@@ -15,27 +15,27 @@ import (
 
 // --- Test Helpers ---
 
-// createTestMemoryDB creates a temporary SQLite database with the messages table
-// and populates it with the given entries.
-func createTestMemoryDB(t *testing.T, entries []memoryEntry) string {
+// createTestCoreDB creates a temporary SQLite database with the messages table
+// and populates it with the given entries. Returns the *sql.DB connection.
+func createTestCoreDB(t *testing.T, entries []memoryEntry) *sql.DB {
 	t.Helper()
-	dbPath := filepath.Join(t.TempDir(), "test_memory.db")
+	dbPath := filepath.Join(t.TempDir(), "test_core.db")
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
 
-	// Create schema matching memory.Store
+	// Create schema matching memory.Store (namespaced)
 	schema := `
-	CREATE TABLE IF NOT EXISTS sessions (
+	CREATE TABLE IF NOT EXISTS mem_sessions (
 		id TEXT PRIMARY KEY,
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL,
 		title TEXT NOT NULL DEFAULT 'Test'
 	);
-	CREATE TABLE IF NOT EXISTS messages (
+	CREATE TABLE IF NOT EXISTS mem_messages (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id TEXT NOT NULL,
 		role TEXT NOT NULL,
@@ -43,26 +43,31 @@ func createTestMemoryDB(t *testing.T, entries []memoryEntry) string {
 		tool_call_id TEXT DEFAULT '',
 		tool_calls TEXT DEFAULT '',
 		timestamp TEXT NOT NULL,
-		encrypted INTEGER DEFAULT 0
-	);`
+		encrypted INTEGER DEFAULT 0,
+		FOREIGN KEY (session_id) REFERENCES mem_sessions(id) ON DELETE CASCADE
+	);
+	`
+
 	if _, err := db.Exec(schema); err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
 
-	// Insert session
-	now := time.Now().Format(time.RFC3339)
-	_, _ = db.Exec(`INSERT INTO sessions (id, created_at, updated_at, title) VALUES (?, ?, ?, ?)`,
-		"test-session", now, now, "Test")
-
-	// Insert messages
-	for _, e := range entries {
-		ts := time.Now().Format(time.RFC3339)
-		_, _ = db.Exec(`INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted)
-			VALUES (?, ?, ?, ?, ?, ?, 0)`,
-			"test-session", e.Role, e.Content, e.ToolCallID, e.ToolCalls, ts)
+	// Insert test entries
+	if _, err := db.Exec(`INSERT INTO mem_sessions (id, created_at, updated_at) VALUES ('test', datetime('now'), datetime('now'))`); err != nil {
+		t.Fatalf("insert session: %v", err)
 	}
 
-	return dbPath
+	for _, e := range entries {
+		_, err := db.Exec(`
+			INSERT INTO mem_messages (session_id, role, content, tool_call_id, tool_calls, timestamp)
+			VALUES ('test', ?, ?, ?, '', datetime('now'))`,
+			e.Role, e.Content, e.ToolCalls)
+		if err != nil {
+			t.Fatalf("insert entry: %v", err)
+		}
+	}
+
+	return db
 }
 
 // mockLLM implements LLMCaller for testing.
@@ -131,7 +136,7 @@ func (r *mockRunner) Run(_ context.Context, name string, _ map[string]any) (stri
 // --- Detector Tests ---
 
 func TestDetectorScan_EmptyDB(t *testing.T) {
-	dbPath := createTestMemoryDB(t, nil)
+	dbPath := createTestCoreDB(t, nil)
 	detector := NewDetector(dbPath)
 
 	gaps, err := detector.Scan()
@@ -149,7 +154,7 @@ func TestDetectorScan_HardGap(t *testing.T) {
 		{Role: "assistant", Content: "No tool available for converting Excel to CSV."},
 		{Role: "tool", Content: "Result: I cannot find a tool for processing images."},
 	}
-	dbPath := createTestMemoryDB(t, entries)
+	dbPath := createTestCoreDB(t, entries)
 	detector := NewDetector(dbPath)
 	detector.SetScanLimit(5) // small limit so frequency-based priority is meaningful
 
@@ -185,7 +190,7 @@ func TestDetectorScan_EfficiencyGap(t *testing.T) {
 		{Role: "tool", Content: "exec curl https://api.example.com/data"},
 		{Role: "assistant", Content: "Using shell wget to download the file."},
 	}
-	dbPath := createTestMemoryDB(t, entries)
+	dbPath := createTestCoreDB(t, entries)
 	detector := NewDetector(dbPath)
 	detector.SetScanLimit(5) // small limit so frequency-based priority is meaningful
 
@@ -210,7 +215,7 @@ func TestDetectorStats(t *testing.T) {
 		{Role: "user", Content: "Hello"},
 		{Role: "assistant", Content: "Hi there!"},
 	}
-	dbPath := createTestMemoryDB(t, entries)
+	dbPath := createTestCoreDB(t, entries)
 	detector := NewDetector(dbPath)
 
 	_, _ = detector.Scan()
@@ -230,7 +235,7 @@ func TestDetectorScanLimit(t *testing.T) {
 	for i := range entries {
 		entries[i] = memoryEntry{Role: "user", Content: fmt.Sprintf("Message %d", i)}
 	}
-	dbPath := createTestMemoryDB(t, entries)
+	dbPath := createTestCoreDB(t, entries)
 
 	detector := NewDetector(dbPath)
 	detector.SetScanLimit(5)
@@ -500,8 +505,12 @@ func TestTesterMinPassRate(t *testing.T) {
 
 func TestRegistrarRegister(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	dbPath := filepath.Join(t.TempDir(), "toolsynth.db")
-	registrar := NewRegistrar(outputDir, dbPath)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
+	registrar := NewRegistrar(outputDir, db)
 
 	spec := ToolSpec{
 		Name:        "my_tool",
@@ -514,7 +523,7 @@ func TestRegistrarRegister(t *testing.T) {
 	source := "package generated\n\nfunc MyTool(x string) (string, error) { return x, nil }"
 	testResult := ToolTestResult{AllPassed: true, PassRate: 1.0}
 
-	err := registrar.Register(spec, source, testResult)
+	err = registrar.Register(spec, source, testResult)
 	if err != nil {
 		t.Fatalf("register failed: %v", err)
 	}
@@ -544,7 +553,7 @@ func TestRegistrarRegister(t *testing.T) {
 
 func TestRegistrarList(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 
 	_ = registrar.Register(ToolSpec{Name: "tool_a", Origin: "synthesized"}, "code", ToolTestResult{AllPassed: true})
 	_ = registrar.Register(ToolSpec{Name: "tool_b", Origin: "synthesized"}, "code", ToolTestResult{AllPassed: true})
@@ -557,7 +566,7 @@ func TestRegistrarList(t *testing.T) {
 
 func TestRegistrarRemove(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 
 	_ = registrar.Register(ToolSpec{Name: "temp_tool", Origin: "synthesized"}, "code", ToolTestResult{AllPassed: true})
 
@@ -574,7 +583,7 @@ func TestRegistrarRemove(t *testing.T) {
 
 func TestRegistrarRemoveNonExistent(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 
 	err := registrar.Remove("nonexistent")
 	if err == nil {
@@ -586,7 +595,7 @@ func TestRegistrarRemoveNonExistent(t *testing.T) {
 
 func TestImprovementLoopUsageTracking(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 	improver := NewImprovementLoop(nil, registrar)
 
 	// Record calls
@@ -606,7 +615,7 @@ func TestImprovementLoopUsageTracking(t *testing.T) {
 
 func TestImprovementLoopEligibility(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 
 	// Register a tool as synthesized
 	_ = registrar.Register(ToolSpec{Name: "synth_tool", Origin: "synthesized"}, "code", ToolTestResult{AllPassed: true})
@@ -633,7 +642,7 @@ func TestImprovementLoopEligibility(t *testing.T) {
 
 func TestImprovementLoopStartStop(t *testing.T) {
 	outputDir := filepath.Join(t.TempDir(), "generated")
-	registrar := NewRegistrar(outputDir, "")
+	registrar := NewRegistrar(outputDir, nil)
 	improver := NewImprovementLoop(nil, registrar)
 	improver.SetScanInterval(100 * time.Millisecond)
 

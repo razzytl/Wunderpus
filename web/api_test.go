@@ -1,6 +1,7 @@
 package web
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/config"
+	_ "modernc.org/sqlite"
 )
 
 func TestAPIConfig(t *testing.T) {
@@ -19,7 +21,9 @@ func TestAPIConfig(t *testing.T) {
 			Enabled: true,
 		},
 	}
-	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil)
+	db, _ := sql.Open("sqlite", ":memory:")
+	defer db.Close()
+	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil, db)
 
 	// dummy FS
 	mockFS := fstest.MapFS{
@@ -58,7 +62,9 @@ func TestAPIConfig(t *testing.T) {
 func TestAPIHistoryNoStore(t *testing.T) {
 	// Testing handleHistory without a memory store attached
 	cfg := &config.Config{}
-	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil)
+	db, _ := sql.Open("sqlite", ":memory:")
+	defer db.Close()
+	manager := agent.NewManager(cfg, nil, nil, nil, nil, nil, nil, nil, db)
 	mockFS := fstest.MapFS{
 		"dist/index.html": &fstest.MapFile{Data: []byte("mock html")},
 	}

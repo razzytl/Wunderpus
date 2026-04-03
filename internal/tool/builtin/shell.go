@@ -141,9 +141,10 @@ func (s *ShellExec) Name() string { return "shell_exec" }
 func (s *ShellExec) Description() string {
 	return "Execute a whitelisted shell command. Only safe, read-only commands are allowed. Requires user approval."
 }
-func (s *ShellExec) Sensitive() bool        { return true }
-func (s *ShellExec) Version() string        { return "1.1.0" }
-func (s *ShellExec) Dependencies() []string { return nil }
+func (s *ShellExec) Sensitive() bool                   { return true }
+func (s *ShellExec) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+func (s *ShellExec) Version() string                   { return "1.1.0" }
+func (s *ShellExec) Dependencies() []string            { return nil }
 func (s *ShellExec) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "command", Type: "string", Description: "The shell command to execute", Required: true},

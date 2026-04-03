@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/logging"
-	_ "modernc.org/sqlite"
 )
 
 // Tracker handles asynchronous cost tracking and budgeting.
@@ -25,19 +24,10 @@ type ModelPrice struct {
 	OutputPrice float64
 }
 
-// NewTracker creates a new cost tracker.
-func NewTracker(dbPath string, budget float64) (*Tracker, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("cost: opening db: %w", err)
-	}
-
-	// Optimize SQLite
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
-
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS cost_log (
+// NewTracker creates a new cost tracker using the shared core DB connection.
+func NewTracker(db *sql.DB, budget float64) (*Tracker, error) {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS cost_cost_log (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			timestamp    TEXT NOT NULL,
 			session_id   TEXT NOT NULL,
@@ -46,10 +36,9 @@ func NewTracker(dbPath string, budget float64) (*Tracker, error) {
 			output_tokens INTEGER NOT NULL,
 			cost         REAL NOT NULL
 		);
-		CREATE INDEX IF NOT EXISTS idx_cost_session ON cost_log(session_id);
+		CREATE INDEX IF NOT EXISTS idx_cost_session ON cost_cost_log(session_id);
 	`)
 	if err != nil {
-		db.Close()
 		return nil, fmt.Errorf("cost: creating table: %w", err)
 	}
 
@@ -85,7 +74,7 @@ func (t *Tracker) Track(sessionID, model string, input, output int) error {
 	logging.ProviderCost.WithLabelValues(model, sessionID).Add(cost)
 
 	_, err := t.db.Exec(
-		`INSERT INTO cost_log (timestamp, session_id, model, input_tokens, output_tokens, cost)
+		`INSERT INTO cost_cost_log (timestamp, session_id, model, input_tokens, output_tokens, cost)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		time.Now().Format(time.RFC3339),
 		sessionID,
@@ -111,7 +100,7 @@ func (t *Tracker) GetSessionCost(sessionID string) float64 {
 	return t.usage[sessionID]
 }
 
-// Close closes the database connection.
+// Close is a no-op — the shared DB connection is managed by db.Manager.
 func (t *Tracker) Close() error {
-	return t.db.Close()
+	return nil
 }

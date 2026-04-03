@@ -1,7 +1,10 @@
 package worldmodel
 
 import (
+	"database/sql"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 // --- Store Tests ---
@@ -460,11 +463,15 @@ func TestStore1000Entities3HopPath(t *testing.T) {
 
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	store, err := NewStore(":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	store, err := NewStore(db)
 	if err != nil {
 		t.Fatalf("failed to create test store: %v", err)
 	}
-	t.Cleanup(func() { store.Close() })
 	return store
 }
 

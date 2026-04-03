@@ -64,7 +64,7 @@ func (s *Store) executeParsedQuery(q *parsedQuery) (*QueryResult, error) {
 	var entityQuery strings.Builder
 	var args []any
 
-	entityQuery.WriteString(`SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic FROM entities WHERE 1=1`)
+	entityQuery.WriteString(`SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic FROM wm_entities WHERE 1=1`)
 
 	if q.StartType != "" {
 		entityQuery.WriteString(` AND type = ?`)
@@ -90,7 +90,7 @@ func (s *Store) executeParsedQuery(q *parsedQuery) (*QueryResult, error) {
 
 		for _, entity := range result.Entities {
 			relQuery := `SELECT id, from_entity, to_entity, rel_type, properties, confidence, created_at
-				FROM relations WHERE from_entity = ?`
+				FROM wm_relations WHERE from_entity = ?`
 			relArgs := []any{entity.ID}
 
 			if q.RelType != "" {

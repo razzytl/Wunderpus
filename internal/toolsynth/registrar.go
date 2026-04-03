@@ -43,7 +43,7 @@ type RegistryRef interface {
 // It writes source files to the generated tools directory and tracks metadata.
 type Registrar struct {
 	outputDir   string
-	dbPath      string // SQLite path for storing tool registry metadata
+	db          *sql.DB // shared core DB connection for storing tool registry metadata
 	mu          sync.RWMutex
 	tools       map[string]SynthesizedToolEntry
 	auditWriter AuditWriter
@@ -53,11 +53,11 @@ type Registrar struct {
 
 // NewRegistrar creates a registrar that manages synthesized tools.
 // outputDir is where .go source files are written (internal/tool/generated/).
-// dbPath is the SQLite database for storing tool registry metadata.
-func NewRegistrar(outputDir, dbPath string) *Registrar {
+// db is the shared database connection for storing tool registry metadata.
+func NewRegistrar(outputDir string, db *sql.DB) *Registrar {
 	r := &Registrar{
 		outputDir: outputDir,
-		dbPath:    dbPath,
+		db:        db,
 		tools:     make(map[string]SynthesizedToolEntry),
 	}
 	_ = r.loadExisting()
@@ -239,19 +239,13 @@ func (r *Registrar) loadExisting() error {
 
 // persistEntry saves tool metadata to SQLite.
 func (r *Registrar) persistEntry(entry SynthesizedToolEntry) error {
-	if r.dbPath == "" {
+	if r.db == nil {
 		return nil
 	}
 
-	db, err := sql.Open("sqlite", r.dbPath)
-	if err != nil {
-		return fmt.Errorf("registrar: open db: %w", err)
-	}
-	defer db.Close()
-
 	// Create table if not exists
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS synthesized_tools (
+	_, err := r.db.Exec(`
+		CREATE TABLE IF NOT EXISTS synth_tools_registry (
 			name TEXT PRIMARY KEY,
 			description TEXT,
 			source_path TEXT,
@@ -265,8 +259,8 @@ func (r *Registrar) persistEntry(entry SynthesizedToolEntry) error {
 
 	specJSON, _ := json.Marshal(entry.Spec)
 
-	_, err = db.Exec(`
-		INSERT OR REPLACE INTO synthesized_tools (name, description, source_path, origin, spec_json, registered_at)
+	_, err = r.db.Exec(`
+		INSERT OR REPLACE INTO synth_tools_registry (name, description, source_path, origin, spec_json, registered_at)
 		VALUES (?, ?, ?, ?, ?, ?)`,
 		entry.Name, entry.Description, entry.SourcePath, entry.Origin, string(specJSON), entry.Registered.Format(time.RFC3339))
 
@@ -275,13 +269,8 @@ func (r *Registrar) persistEntry(entry SynthesizedToolEntry) error {
 
 // removeEntry deletes tool metadata from SQLite.
 func (r *Registrar) removeEntry(name string) {
-	if r.dbPath == "" {
+	if r.db == nil {
 		return
 	}
-	db, err := sql.Open("sqlite", r.dbPath)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	_, _ = db.Exec(`DELETE FROM synthesized_tools WHERE name = ?`, name)
+	_, _ = r.db.Exec(`DELETE FROM synth_tools_registry WHERE name = ?`, name)
 }

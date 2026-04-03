@@ -27,16 +27,14 @@ func NewSkillInstaller(workspace string) *SkillInstaller {
 type InstallSource string
 
 const (
-	InstallSourceGitHub  InstallSource = "github"
-	InstallSourceLocal   InstallSource = "local"
-	InstallSourceClawHub InstallSource = "clawhub"
+	InstallSourceGitHub InstallSource = "github"
+	InstallSourceLocal  InstallSource = "local"
 )
 
 // InstallOptions contains options for skill installation.
 type InstallOptions struct {
-	Source  InstallSource
-	Version string // For ClawHub - specific version to install
-	Force   bool   // Overwrite existing skill
+	Source InstallSource
+	Force  bool // Overwrite existing skill
 }
 
 // InstallFromGitHub fetches a SKILL.md from a repository and installs it into the workspace.
@@ -209,36 +207,6 @@ func copyDir(src, dst string) error {
 				return err
 			}
 		}
-	}
-
-	return nil
-}
-
-// InstallFromClawHub installs a skill from ClawHub registry.
-func (si *SkillInstaller) InstallFromClawHub(ctx context.Context, slug string, version string, registry *ClawHubRegistry) error {
-	if registry == nil {
-		return fmt.Errorf("ClawHub registry not configured")
-	}
-
-	skillDir := filepath.Join(si.workspace, "skills", slug)
-
-	// Check if skill already exists
-	if _, err := os.Stat(skillDir); err == nil {
-		return fmt.Errorf("skill '%s' already exists (use --force to overwrite)", slug)
-	}
-
-	result, err := registry.DownloadAndInstall(ctx, slug, version, skillDir)
-	if err != nil {
-		return fmt.Errorf("failed to install from ClawHub: %w", err)
-	}
-
-	// Check moderation results
-	if result.IsMalwareBlocked {
-		return fmt.Errorf("skill '%s' was blocked by ClawHub moderation (malware detected)", slug)
-	}
-	if result.IsSuspicious {
-		// Still allowed but could warn user
-		fmt.Printf("Warning: skill '%s' is flagged as suspicious by ClawHub\n", slug)
 	}
 
 	return nil

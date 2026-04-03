@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/wunderpus/wunderpus/internal/audit"
 	"github.com/wunderpus/wunderpus/internal/events"
 )
@@ -25,21 +23,13 @@ type TrustBudget struct {
 	db           *sql.DB
 	events       *events.Bus
 	audit        *audit.AuditLog
-	jwtSecretEnv string
 	stopCh       chan struct{}
 }
 
-// NewTrustBudget creates a trust budget backed by SQLite.
+// NewTrustBudget creates a trust budget using the shared core DB connection.
 // If no existing state is found, the budget is initialized to max.
-func NewTrustBudget(dbPath string, maxVal int, regenPerHour int, bus *events.Bus, auditLog *audit.AuditLog, jwtSecretEnv string) (*TrustBudget, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("trust: opening db: %w", err)
-	}
-
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-
-	_, err = db.Exec(`
+func NewTrustBudget(db *sql.DB, maxVal int, regenPerHour int, bus *events.Bus, auditLog *audit.AuditLog) (*TrustBudget, error) {
+	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS trust_state (
 			id      INTEGER PRIMARY KEY CHECK (id = 1),
 			current INTEGER NOT NULL
@@ -54,7 +44,6 @@ func NewTrustBudget(dbPath string, maxVal int, regenPerHour int, bus *events.Bus
 		);
 	`)
 	if err != nil {
-		db.Close()
 		return nil, fmt.Errorf("trust: creating schema: %w", err)
 	}
 
@@ -65,7 +54,6 @@ func NewTrustBudget(dbPath string, maxVal int, regenPerHour int, bus *events.Bus
 		current = maxVal
 		_, _ = db.Exec(`INSERT INTO trust_state (id, current) VALUES (1, ?)`, maxVal)
 	} else if err != nil {
-		db.Close()
 		return nil, fmt.Errorf("trust: loading state: %w", err)
 	}
 
@@ -76,7 +64,6 @@ func NewTrustBudget(dbPath string, maxVal int, regenPerHour int, bus *events.Bus
 		db:           db,
 		events:       bus,
 		audit:        auditLog,
-		jwtSecretEnv: jwtSecretEnv,
 		stopCh:       make(chan struct{}),
 	}
 
@@ -299,46 +286,17 @@ func (tb *TrustBudget) enterLockdown() {
 	}
 }
 
-// Reset restores the trust budget to max after validating a JWT token.
-// The JWT must be signed with the secret from the configured env var.
-// Tokens expire after 1 hour and cannot be self-issued by the agent.
-func (tb *TrustBudget) Reset(tokenString string) error {
-	secret := os.Getenv(tb.jwtSecretEnv)
-	if secret == "" {
-		return fmt.Errorf("trust: JWT secret not set in env var %s", tb.jwtSecretEnv)
-	}
-
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(secret), nil
-	}, jwt.WithExpirationRequired())
-	if err != nil {
-		return fmt.Errorf("trust: invalid JWT: %w", err)
-	}
-
-	if !token.Valid {
-		return fmt.Errorf("trust: JWT token is not valid")
-	}
-
-	// Verify issuer is not the agent itself
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return fmt.Errorf("trust: failed to parse JWT claims")
-	}
-	if iss, ok := claims["iss"].(string); ok && iss == "wunderpus-agent" {
-		return fmt.Errorf("trust: agent cannot self-issue reset tokens")
-	}
-
+// Reset restores the trust budget to max.
+// JWT validation has been removed — trust resets are now handled via policy-based approval gates.
+func (tb *TrustBudget) Reset() error {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
 	tb.current = tb.max
 	tb.persist()
-	tb.recordHistory("", 0, "human reset via JWT")
+	tb.recordHistory("", 0, "human reset")
 
-	slog.Info("trust: budget RESET to max via JWT", "max", tb.max)
+	slog.Info("trust: budget RESET to max", "max", tb.max)
 
 	if tb.audit != nil {
 		_ = tb.audit.Write(audit.AuditEntry{
@@ -414,10 +372,7 @@ func (tb *TrustBudget) recordHistory(actionID string, delta int, reason string) 
 	)
 }
 
-// Close shuts down the trust budget and its database connection.
+// Close is a no-op — the shared DB connection is managed by db.Manager.
 func (tb *TrustBudget) Close() error {
-	if tb.db != nil {
-		return tb.db.Close()
-	}
 	return nil
 }

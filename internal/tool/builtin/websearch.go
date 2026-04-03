@@ -297,9 +297,10 @@ func (s *WebSearch) Name() string { return "web_search" }
 func (s *WebSearch) Description() string {
 	return "Search the web for current information. Returns titles, URLs, and snippets from search results."
 }
-func (s *WebSearch) Sensitive() bool        { return false }
-func (s *WebSearch) Version() string        { return "1.0.0" }
-func (s *WebSearch) Dependencies() []string { return nil }
+func (s *WebSearch) Sensitive() bool                   { return false }
+func (s *WebSearch) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (s *WebSearch) Version() string                   { return "1.0.0" }
+func (s *WebSearch) Dependencies() []string            { return nil }
 func (s *WebSearch) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "query", Type: "string", Description: "Search query", Required: true},
@@ -354,9 +355,10 @@ func (f *WebFetch) Name() string { return "web_fetch" }
 func (f *WebFetch) Description() string {
 	return "Fetch a URL and extract readable content (HTML to text)."
 }
-func (f *WebFetch) Sensitive() bool        { return false }
-func (f *WebFetch) Version() string        { return "1.0.0" }
-func (f *WebFetch) Dependencies() []string { return nil }
+func (f *WebFetch) Sensitive() bool                   { return false }
+func (f *WebFetch) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (f *WebFetch) Version() string                   { return "1.0.0" }
+func (f *WebFetch) Dependencies() []string            { return nil }
 func (f *WebFetch) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "url", Type: "string", Description: "URL to fetch", Required: true},

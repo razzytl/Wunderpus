@@ -14,8 +14,8 @@ import (
 // Designer produces a ToolSpec from a ToolGap using LLM calls.
 // It generates a JSON specification that the Coder can use to produce Go source.
 type Designer struct {
-	llm    LLMCaller
-	dbPath string // optional: SQLite path for storing ToolSpecs
+	llm LLMCaller
+	db  *sql.DB // optional: shared core DB connection for storing ToolSpecs
 }
 
 // NewDesigner creates a designer with the given LLM caller.
@@ -23,9 +23,9 @@ func NewDesigner(llm LLMCaller) *Designer {
 	return &Designer{llm: llm}
 }
 
-// SetDBPath configures the SQLite database for persisting ToolSpecs.
-func (d *Designer) SetDBPath(dbPath string) {
-	d.dbPath = dbPath
+// SetDB configures the shared database connection for persisting ToolSpecs.
+func (d *Designer) SetDB(db *sql.DB) {
+	d.db = db
 }
 
 // Design takes a ToolGap and produces a complete ToolSpec via LLM.
@@ -77,18 +77,12 @@ func (d *Designer) Design(gap ToolGap) (*ToolSpec, error) {
 
 // storeSpec persists a ToolSpec to SQLite.
 func (d *Designer) storeSpec(spec *ToolSpec) error {
-	if d.dbPath == "" {
+	if d.db == nil {
 		return nil
 	}
 
-	db, err := sql.Open("sqlite", d.dbPath)
-	if err != nil {
-		return fmt.Errorf("designer: open db: %w", err)
-	}
-	defer db.Close()
-
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS tool_specs (
+	_, err := d.db.Exec(`
+		CREATE TABLE IF NOT EXISTS synth_tool_specs (
 			name TEXT PRIMARY KEY,
 			spec_json TEXT,
 			created_at TEXT
@@ -98,8 +92,8 @@ func (d *Designer) storeSpec(spec *ToolSpec) error {
 	}
 
 	specJSON, _ := json.Marshal(spec)
-	_, err = db.Exec(`
-		INSERT OR REPLACE INTO tool_specs (name, spec_json, created_at)
+	_, err = d.db.Exec(`
+		INSERT OR REPLACE INTO synth_tool_specs (name, spec_json, created_at)
 		VALUES (?, ?, ?)`,
 		spec.Name, string(specJSON), spec.CreatedAt.Format(time.RFC3339))
 

@@ -1,15 +1,20 @@
 package cost
 
 import (
-	"os"
+	"database/sql"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 func TestNewTracker(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_cost.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -29,10 +34,13 @@ func TestNewTracker(t *testing.T) {
 }
 
 func TestTrack(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_track.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -51,10 +59,13 @@ func TestTrack(t *testing.T) {
 }
 
 func TestTrackUnknownModel(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_unknown.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -73,10 +84,13 @@ func TestTrackUnknownModel(t *testing.T) {
 }
 
 func TestTrackMultipleSessions(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_multi.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -101,10 +115,13 @@ func TestTrackMultipleSessions(t *testing.T) {
 }
 
 func TestIsOverBudget(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_budget.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 1.0) // Very low budget
+	tracker, err := NewTracker(db, 1.0) // Very low budget
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -124,10 +141,13 @@ func TestIsOverBudget(t *testing.T) {
 }
 
 func TestIsOverBudgetZeroBudget(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_zero_budget.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 0) // Zero budget = unlimited
+	tracker, err := NewTracker(db, 0) // Zero budget = unlimited
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -141,10 +161,13 @@ func TestIsOverBudgetZeroBudget(t *testing.T) {
 }
 
 func TestGetSessionCostNonExistent(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_nonexistent.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -157,10 +180,13 @@ func TestGetSessionCostNonExistent(t *testing.T) {
 }
 
 func TestKnownModelPrices(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_prices.db"
-	defer os.Remove(tmpFile)
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	defer db.Close()
 
-	tracker, err := NewTracker(tmpFile, 100.0)
+	tracker, err := NewTracker(db, 100.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
@@ -193,14 +219,17 @@ func TestKnownModelPrices(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	tmpFile := t.TempDir() + "/test_close.db"
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
 
-	tracker, err := NewTracker(tmpFile, 10.0)
+	tracker, err := NewTracker(db, 10.0)
 	if err != nil {
 		t.Fatalf("NewTracker failed: %v", err)
 	}
 
-	// Close should not error
+	// Close should not error (no-op with shared DB)
 	err = tracker.Close()
 	if err != nil {
 		t.Errorf("Close failed: %v", err)

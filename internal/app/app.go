@@ -12,12 +12,12 @@ import (
 	"github.com/wunderpus/wunderpus/internal/agent"
 	"github.com/wunderpus/wunderpus/internal/channel"
 	"github.com/wunderpus/wunderpus/internal/channel/discord"
-	"github.com/wunderpus/wunderpus/internal/channel/feishu"
 	"github.com/wunderpus/wunderpus/internal/channel/slack"
 	"github.com/wunderpus/wunderpus/internal/channel/telegram"
 	"github.com/wunderpus/wunderpus/internal/channel/websocket"
 	"github.com/wunderpus/wunderpus/internal/channel/whatsapp"
 	"github.com/wunderpus/wunderpus/internal/config"
+	"github.com/wunderpus/wunderpus/internal/db"
 	"github.com/wunderpus/wunderpus/internal/health"
 	"github.com/wunderpus/wunderpus/internal/heartbeat"
 	"github.com/wunderpus/wunderpus/internal/logging"
@@ -37,6 +37,7 @@ import (
 // App encapsulates the Wunderpus application state and dependencies.
 type App struct {
 	Config              *config.Config
+	DBManager           *db.Manager
 	Manager             *agent.Manager
 	SubAgentMgr         *subagent.Manager
 	MemoryStore         *memory.Store
@@ -69,37 +70,45 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	}
 	logging.Init(logLevel, cfg.Logging.Format, cfg.Logging.Output)
 
+	// 3. Open shared database connections
+	dbManager, err := db.Open(cfg.Home)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open databases: %w", err)
+	}
+
 	// Prepare encryption key if enabled
 	var encKey []byte
 	if cfg.Security.Encryption.Enabled && cfg.Security.Encryption.Key != "" {
 		encKey, err = base64.StdEncoding.DecodeString(cfg.Security.Encryption.Key)
 		if err != nil {
+			dbManager.Close()
 			return nil, fmt.Errorf("invalid encryption key: %w", err)
 		}
 	}
 
-	// 3. Init security
+	// 4. Init security
 	sanitizer := security.NewSanitizer(cfg.Security.SanitizationEnabled)
-	audit, err := security.NewAuditLogger(cfg.Security.AuditDBPath, encKey)
+	audit, err := security.NewAuditLogger(dbManager.AuditDB, encKey)
 	if err != nil {
+		dbManager.Close()
 		return nil, fmt.Errorf("failed to init audit logger: %w", err)
 	}
 
 	// Initial rotation check
 	_ = audit.Rotate(10000)
 
-	// 4. Init providers
+	// 5. Init providers
 	router, err := provider.NewRouter(cfg)
 	if err != nil {
-		audit.Close()
+		dbManager.Close()
 		return nil, fmt.Errorf("failed to init providers: %w", err)
 	}
 
-	// 5. Init tools
+	// 6. Init tools
 	registry := tool.NewRegistry()
 	sandbox, err := security.NewWorkspaceSandbox(cfg.Agents.Defaults.Workspace, cfg.Agents.Defaults.RestrictToWorkspace)
 	if err != nil {
-		audit.Close()
+		dbManager.Close()
 		return nil, fmt.Errorf("failed to init workspace sandbox: %w", err)
 	}
 
@@ -127,15 +136,15 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		executor = tool.NewExecutor(registry, audit, approvalFn, timeout)
 	}
 
-	// 6. Init memory store with vector search capabilities
+	// 7. Init memory store with vector search capabilities
 	var enhancedMemStore *memory.EnhancedStore
 	embedder := router.GetEmbedder()
 	if embedder != nil {
 		// Use enhanced store with embeddings for RAG
 		var enhancedStore *memory.EnhancedStore
-		enhancedStore, err = memory.NewEnhancedStore(cfg.Agent.MemoryDBPath, embedder)
+		enhancedStore, err = memory.NewEnhancedStore(dbManager.CoreDB, embedder)
 		if err != nil {
-			audit.Close()
+			dbManager.Close()
 			return nil, fmt.Errorf("failed to init enhanced memory store: %w", err)
 		}
 		enhancedMemStore = enhancedStore
@@ -143,34 +152,32 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	}
 
 	// Also create basic store for manager (needed for message history)
-	memStore, err := memory.NewStore(cfg.Agent.MemoryDBPath)
+	memStore, err := memory.NewStore(dbManager.CoreDB)
 	if err != nil {
-		audit.Close()
+		dbManager.Close()
 		return nil, fmt.Errorf("failed to init memory store: %w", err)
 	}
 
-	// 7. Init skills loader
+	// 8. Init skills loader
 	homeDir, _ := os.UserHomeDir()
 	globalSkills := filepath.Join(homeDir, ".wunderpus", "skills")
 	builtinSkills := "./skills"
 	skillsLoader := skills.NewSkillsLoader(cfg.Agents.Defaults.Workspace, globalSkills, builtinSkills)
 
-	// 8. Init tool synthesis engine (Section 1 — if enabled)
+	// 9. Init tool synthesis engine (Section 1 — if enabled)
 	var toolSynth *toolsynth.SynthSystem
 	if cfg.Genesis.ToolSynthEnabled {
 		synthCfg := toolsynth.SynthConfig{
-			Enabled:        true,
-			DBPath:         cfg.Genesis.ToolSynthDBPath,
-			MinPassRate:    cfg.Genesis.ToolSynthMinPassRate,
-			ScanLimit:      500,
-			OutputDir:      filepath.Join("internal", "tool", "generated"),
-			RepoRoot:       ".",
-			ProfilerDBPath: cfg.Genesis.ProfilerDBPath,
+			Enabled:     true,
+			MinPassRate: cfg.Genesis.ToolSynthMinPassRate,
+			ScanLimit:   500,
+			OutputDir:   filepath.Join("internal", "tool", "generated"),
+			RepoRoot:    ".",
 		}
 		llmAdapter := &RouterLLMAdapter{router: router}
 		toolSynth, err = toolsynth.InitToolSynth(
 			synthCfg,
-			cfg.Agent.MemoryDBPath,
+			dbManager.CoreDB,
 			llmAdapter,
 			nil, // genesis audit log — wired separately if available
 			nil, // event bus — wired separately if available
@@ -181,40 +188,35 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		}
 	}
 
-	// 8b. Init world model / knowledge graph (Section 2 — if enabled)
+	// 9b. Init world model / knowledge graph (Section 2 — if enabled)
 	var worldModel *worldmodel.WorldModelSystem
 	if cfg.Genesis.WorldModelEnabled {
-		wmCfg := worldmodel.Config{
-			Enabled:       true,
-			DBPath:        cfg.Genesis.WorldModelDBPath,
-			ScanIntervalH: cfg.Genesis.WorldModelScanIntervalH,
-		}
 		wmLLM := &WorldModelLLMAdapter{router: router}
-		worldModel, err = worldmodel.InitWorldModel(wmCfg, wmLLM, nil)
+		worldModel, err = worldmodel.InitWorldModel(wmLLM, nil, dbManager.CoreDB)
 		if err != nil {
 			slog.Warn("world model init failed (non-fatal)", "error", err)
 			worldModel = nil
 		}
 	}
 
-	// 8c. Init perception / computer use (Section 3 — if enabled)
+	// 9c. Init perception / computer use (Section 3 — if enabled)
 	var perceptionSystem *PerceptionSystem
 	if cfg.Genesis.PerceptionEnabled {
 		perceptionSystem = initPerception(cfg, router, browserTool)
 	}
 
-	// 9. Init agent manager
-	manager := agent.NewManager(cfg, router, sanitizer, audit, memStore, registry, executor, skillsLoader)
+	// 10. Init agent manager
+	manager := agent.NewManager(cfg, router, sanitizer, audit, memStore, registry, executor, skillsLoader, dbManager.CoreDB)
 
 	// Set enhanced store for RAG if available
 	if enhancedMemStore != nil {
 		manager.SetEnhancedStore(enhancedMemStore)
 	}
 
-	// 9. Init sub-agent manager
+	// 11. Init sub-agent manager
 	subAgentMgr := subagent.NewManager(manager, router)
 
-	// 9b. Init Human-in-the-Loop manager
+	// 11b. Init Human-in-the-Loop manager
 	hitl := builtin.NewHumanInTheLoop()
 
 	// Register spawn, message, and ask_human tools
@@ -224,7 +226,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		registry.Register(builtin.NewAskHumanTool(hitl))
 	}
 
-	// 9c. Init agent swarm (Section 4 — if enabled)
+	// 11c. Init agent swarm (Section 4 — if enabled)
 	var swarmSystem *swarm.SwarmSystem
 	if cfg.Genesis.SwarmEnabled {
 		swarmCfg := swarm.Config{Enabled: true}
@@ -250,7 +252,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		}
 	}
 
-	// 10. Init heartbeat scheduler
+	// 12. Init heartbeat scheduler
 	heartbeatCfg := &heartbeat.HeartbeatConfig{
 		Enabled:   cfg.Heartbeat.Enabled,
 		Interval:  cfg.Heartbeat.Interval,
@@ -260,10 +262,10 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	heartbeatExecutor := heartbeat.NewHeartbeatExecutor(manager, subAgentMgr)
 	heartbeatScheduler := heartbeat.NewScheduler(heartbeatCfg, heartbeatParser, heartbeatExecutor, manager, cfg.Agents.Defaults.Workspace)
 
-	// 11. Init health server
+	// 13. Init health server
 	healthSrv := health.NewServer(cfg.Server.HealthPort)
 
-	// 12. Channels
+	// 14. Channels
 	var channels []channel.Channel
 
 	if cfg.Channels.Telegram.Enabled {
@@ -281,9 +283,6 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	if cfg.Channels.WhatsApp.Enabled {
 		channels = append(channels, whatsapp.NewChannel(cfg.Channels.WhatsApp.SessionPath, manager))
 	}
-	if cfg.Channels.Feishu.Enabled {
-		channels = append(channels, feishu.NewChannel(cfg.Channels.Feishu.AppID, cfg.Channels.Feishu.AppSecret, cfg.Channels.Feishu.VerificationToken, manager))
-	}
 
 	// Create channel aggregator for file sending
 	channelAggregator := channel.NewChannelAggregator(channels)
@@ -295,6 +294,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 
 	return &App{
 		Config:              cfg,
+		DBManager:           dbManager,
 		Manager:             manager,
 		SubAgentMgr:         subAgentMgr,
 		MemoryStore:         memStore,
@@ -330,11 +330,8 @@ func (a *App) Close() {
 	for _, ch := range a.Channels {
 		_ = ch.Stop()
 	}
-	if a.MemoryStore != nil {
-		_ = a.MemoryStore.Close()
-	}
-	if a.AuditLogger != nil {
-		_ = a.AuditLogger.Close()
+	if a.DBManager != nil {
+		_ = a.DBManager.Close()
 	}
 }
 
@@ -391,7 +388,6 @@ type PerceptionSystem struct {
 	Vision       *perception.Vision
 	BrowserAgent *perception.BrowserAgent
 	DOMAgent     *perception.DOMAgent
-	DesktopAgent *perception.DesktopAgent
 }
 
 // initPerception initializes the perception system if Playwright is available.
@@ -418,18 +414,10 @@ func initPerception(cfg *config.Config, router *provider.Router, browserTool *bu
 	// Create DOM agent
 	domAgent := perception.NewDOMAgent(bridge, visionLLM)
 
-	// Create desktop agent
-	desktopAgent := perception.NewDesktopAgent()
-
-	slog.Info("perception: initialized",
-		"maxActions", cfg.Genesis.PerceptionMaxActions,
-		"platform", desktopAgent.Platform())
-
 	return &PerceptionSystem{
 		Vision:       vision,
 		BrowserAgent: browserAgent,
 		DOMAgent:     domAgent,
-		DesktopAgent: desktopAgent,
 	}
 }
 

@@ -25,9 +25,10 @@ func (c *Calculator) Name() string { return "calculator" }
 func (c *Calculator) Description() string {
 	return "Evaluate a mathematical expression. Supports +, -, *, /, parentheses, and common math functions (sqrt, pow, abs, sin, cos, tan, log, log2, log10, ceil, floor, round)."
 }
-func (c *Calculator) Sensitive() bool        { return false }
-func (c *Calculator) Version() string        { return "1.0.0" }
-func (c *Calculator) Dependencies() []string { return nil }
+func (c *Calculator) Sensitive() bool                   { return false }
+func (c *Calculator) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
+func (c *Calculator) Version() string                   { return "1.0.0" }
+func (c *Calculator) Dependencies() []string            { return nil }
 func (c *Calculator) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "expression", Type: "string", Description: "The math expression to evaluate, e.g. '2 * (3 + 4)' or 'sqrt(144)'", Required: true},

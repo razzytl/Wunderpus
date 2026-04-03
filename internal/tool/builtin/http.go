@@ -30,9 +30,10 @@ func (h *HTTPRequest) Name() string { return "http_request" }
 func (h *HTTPRequest) Description() string {
 	return "Make an HTTP request to a URL. POST/PUT/DELETE require user approval. Internal network addresses and metadata endpoints are strictly blocked to prevent SSRF."
 }
-func (h *HTTPRequest) Sensitive() bool        { return true }
-func (h *HTTPRequest) Version() string        { return "1.1.0" }
-func (h *HTTPRequest) Dependencies() []string { return nil }
+func (h *HTTPRequest) Sensitive() bool                   { return true }
+func (h *HTTPRequest) ApprovalLevel() tool.ApprovalLevel { return tool.RequiresApproval }
+func (h *HTTPRequest) Version() string                   { return "1.1.0" }
+func (h *HTTPRequest) Dependencies() []string            { return nil }
 func (h *HTTPRequest) Parameters() []tool.ParameterDef {
 	return []tool.ParameterDef{
 		{Name: "url", Type: "string", Description: "The URL to request", Required: true},

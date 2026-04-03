@@ -26,18 +26,11 @@ type EventPublisher interface {
 	PublishRelationCreated(from, to, relType string)
 }
 
-// NewStore creates a new knowledge graph store at the given SQLite path.
-func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, fmt.Errorf("worldmodel: open db: %w", err)
-	}
-
-	_, _ = db.Exec("PRAGMA journal_mode=WAL;")
-	_, _ = db.Exec("PRAGMA synchronous=NORMAL;")
-
+// NewStore creates a new knowledge graph store using the shared core DB connection.
+// Tables are namespaced with wm_ to prevent collisions.
+func NewStore(db *sql.DB) (*Store, error) {
 	schema := `
-	CREATE TABLE IF NOT EXISTS entities (
+	CREATE TABLE IF NOT EXISTS wm_entities (
 		id TEXT PRIMARY KEY,
 		type TEXT NOT NULL,
 		name TEXT NOT NULL,
@@ -49,7 +42,7 @@ func NewStore(dbPath string) (*Store, error) {
 		is_dynamic INTEGER DEFAULT 0
 	);
 
-	CREATE TABLE IF NOT EXISTS relations (
+	CREATE TABLE IF NOT EXISTS wm_relations (
 		id TEXT PRIMARY KEY,
 		from_entity TEXT NOT NULL,
 		to_entity TEXT NOT NULL,
@@ -57,20 +50,19 @@ func NewStore(dbPath string) (*Store, error) {
 		properties TEXT DEFAULT '{}',
 		confidence REAL DEFAULT 1.0,
 		created_at TEXT NOT NULL,
-		FOREIGN KEY (from_entity) REFERENCES entities(id),
-		FOREIGN KEY (to_entity) REFERENCES entities(id)
+		FOREIGN KEY (from_entity) REFERENCES wm_entities(id),
+		FOREIGN KEY (to_entity) REFERENCES wm_entities(id)
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
-	CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
-	CREATE INDEX IF NOT EXISTS idx_entities_confidence ON entities(confidence);
-	CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_entity);
-	CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_entity);
-	CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(rel_type);
+	CREATE INDEX IF NOT EXISTS idx_wm_entities_type ON wm_entities(type);
+	CREATE INDEX IF NOT EXISTS idx_wm_entities_name ON wm_entities(name);
+	CREATE INDEX IF NOT EXISTS idx_wm_entities_confidence ON wm_entities(confidence);
+	CREATE INDEX IF NOT EXISTS idx_wm_relations_from ON wm_relations(from_entity);
+	CREATE INDEX IF NOT EXISTS idx_wm_relations_to ON wm_relations(to_entity);
+	CREATE INDEX IF NOT EXISTS idx_wm_relations_type ON wm_relations(rel_type);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
-		db.Close()
 		return nil, fmt.Errorf("worldmodel: create schema: %w", err)
 	}
 
@@ -100,7 +92,7 @@ func (s *Store) UpsertEntity(input EntityInput, confidence float64, source strin
 
 		propsJSON, _ := json.Marshal(merged)
 		_, err = s.db.Exec(`
-			UPDATE entities SET properties = ?, updated_at = ?, confidence = ?, source = ?
+			UPDATE wm_entities SET properties = ?, updated_at = ?, confidence = ?, source = ?
 			WHERE id = ?`,
 			string(propsJSON), now.Format(time.RFC3339), newConfidence, source, existing.ID)
 		if err != nil {
@@ -119,7 +111,7 @@ func (s *Store) UpsertEntity(input EntityInput, confidence float64, source strin
 	propsJSON, _ := json.Marshal(input.Properties)
 
 	_, err = s.db.Exec(`
-		INSERT INTO entities (id, type, name, properties, created_at, updated_at, confidence, source)
+		INSERT INTO wm_entities (id, type, name, properties, created_at, updated_at, confidence, source)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, string(input.Type), input.Name, string(propsJSON),
 		now.Format(time.RFC3339), now.Format(time.RFC3339), confidence, source)
@@ -167,7 +159,7 @@ func (s *Store) UpsertRelation(input RelationInput, confidence float64) (*Relati
 	if existing != nil {
 		// Update confidence
 		newConf := (existing.Confidence + confidence) / 2
-		_, err = s.db.Exec(`UPDATE relations SET confidence = ? WHERE id = ?`, newConf, existing.ID)
+		_, err = s.db.Exec(`UPDATE wm_relations SET confidence = ? WHERE id = ?`, newConf, existing.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +172,7 @@ func (s *Store) UpsertRelation(input RelationInput, confidence float64) (*Relati
 	propsJSON, _ := json.Marshal(input.Properties)
 
 	_, err = s.db.Exec(`
-		INSERT INTO relations (id, from_entity, to_entity, rel_type, properties, confidence, created_at)
+		INSERT INTO wm_relations (id, from_entity, to_entity, rel_type, properties, confidence, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		id, fromEntity.ID, toEntity.ID, input.RelType, string(propsJSON),
 		confidence, now.Format(time.RFC3339))
@@ -213,7 +205,7 @@ func (s *Store) GetEntity(id string) (*Entity, error) {
 
 	err := s.db.QueryRow(`
 		SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE id = ?`, id).
+		FROM wm_entities WHERE id = ?`, id).
 		Scan(&e.ID, &e.Type, &e.Name, &propsJSON, &createdAt, &updatedAt, &e.Confidence, &e.Source, &isDynamic)
 	if err != nil {
 		return nil, err
@@ -235,7 +227,7 @@ func (s *Store) GetEntityByName(name string) (*Entity, error) {
 
 	err := s.db.QueryRow(`
 		SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE name = ? ORDER BY confidence DESC LIMIT 1`, name).
+		FROM wm_entities WHERE name = ? ORDER BY confidence DESC LIMIT 1`, name).
 		Scan(&e.ID, &e.Type, &e.Name, &propsJSON, &createdAt, &updatedAt, &e.Confidence, &e.Source, &isDynamic)
 	if err != nil {
 		return nil, err
@@ -285,7 +277,7 @@ func (s *Store) FindPath(fromName, toName string, maxHops int) (*QueryResult, er
 		SELECT r.to_entity,
 		       path_search.path || ',' || r.to_entity,
 		       path_search.depth + 1
-		FROM relations r
+		FROM wm_relations r
 		JOIN path_search ON r.from_entity = path_search.id
 		WHERE path_search.depth < ?
 		  AND path_search.path NOT LIKE '%' || r.to_entity || '%'
@@ -348,7 +340,7 @@ func (s *Store) ApplyConfidenceDecay() (int, error) {
 	cutoff := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
 
 	res, err := s.db.Exec(`
-		UPDATE entities
+		UPDATE wm_entities
 		SET confidence = MAX(0.0, confidence - 0.1 * (julianday('now') - julianday(updated_at) - 30)),
 		    updated_at = ?
 		WHERE updated_at < ? AND confidence > 0`,
@@ -367,7 +359,7 @@ func (s *Store) ApplyConfidenceDecay() (int, error) {
 // ListEntities returns entities filtered by type, with optional limit.
 func (s *Store) ListEntities(entityType EntityType, limit int) ([]Entity, error) {
 	query := `SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE type = ? ORDER BY confidence DESC`
+		FROM wm_entities WHERE type = ? ORDER BY confidence DESC`
 	args := []any{string(entityType)}
 
 	if limit > 0 {
@@ -391,7 +383,7 @@ func (s *Store) SearchEntities(nameQuery string, limit int) ([]Entity, error) {
 	}
 	rows, err := s.db.Query(`
 		SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE name LIKE ? ORDER BY confidence DESC LIMIT ?`,
+		FROM wm_entities WHERE name LIKE ? ORDER BY confidence DESC LIMIT ?`,
 		"%"+nameQuery+"%", limit)
 	if err != nil {
 		return nil, err
@@ -405,7 +397,7 @@ func (s *Store) SearchEntities(nameQuery string, limit int) ([]Entity, error) {
 func (s *Store) GetRelations(entityID string) ([]Relation, error) {
 	rows, err := s.db.Query(`
 		SELECT id, from_entity, to_entity, rel_type, properties, confidence, created_at
-		FROM relations WHERE from_entity = ? OR to_entity = ?`,
+		FROM wm_relations WHERE from_entity = ? OR to_entity = ?`,
 		entityID, entityID)
 	if err != nil {
 		return nil, err
@@ -417,19 +409,16 @@ func (s *Store) GetRelations(entityID string) ([]Relation, error) {
 
 // Count returns the total number of entities and relations.
 func (s *Store) Count() (entities, relations int, err error) {
-	err = s.db.QueryRow("SELECT COUNT(*) FROM entities").Scan(&entities)
+	err = s.db.QueryRow("SELECT COUNT(*) FROM wm_entities").Scan(&entities)
 	if err != nil {
 		return entities, relations, err
 	}
-	err = s.db.QueryRow("SELECT COUNT(*) FROM relations").Scan(&relations)
+	err = s.db.QueryRow("SELECT COUNT(*) FROM wm_relations").Scan(&relations)
 	return entities, relations, err
 }
 
-// Close closes the database connection.
+// Close is a no-op — the shared DB connection is managed by db.Manager.
 func (s *Store) Close() error {
-	if s.db != nil {
-		return s.db.Close()
-	}
 	return nil
 }
 
@@ -443,7 +432,7 @@ func (s *Store) findEntityByNameType(name string, entityType EntityType) (*Entit
 
 	err := s.db.QueryRow(`
 		SELECT id, type, name, properties, created_at, updated_at, confidence, source, is_dynamic
-		FROM entities WHERE name = ? AND type = ?`, name, string(entityType)).
+		FROM wm_entities WHERE name = ? AND type = ?`, name, string(entityType)).
 		Scan(&e.ID, &e.Type, &e.Name, &propsJSON, &createdAt, &updatedAt, &e.Confidence, &e.Source, &isDynamic)
 	if err != nil {
 		return nil, err
@@ -465,13 +454,13 @@ func (s *Store) findRelation(fromID, toID, relType string) (*Relation, error) {
 	if relType != "" {
 		err = s.db.QueryRow(`
 			SELECT id, from_entity, to_entity, rel_type, properties, confidence, created_at
-			FROM relations WHERE from_entity = ? AND to_entity = ? AND rel_type = ?`,
+			FROM wm_relations WHERE from_entity = ? AND to_entity = ? AND rel_type = ?`,
 			fromID, toID, relType).
 			Scan(&r.ID, &r.FromEntity, &r.ToEntity, &r.RelType, &propsJSON, &r.Confidence, &createdAt)
 	} else {
 		err = s.db.QueryRow(`
 			SELECT id, from_entity, to_entity, rel_type, properties, confidence, created_at
-			FROM relations WHERE from_entity = ? AND to_entity = ?`,
+			FROM wm_relations WHERE from_entity = ? AND to_entity = ?`,
 			fromID, toID).
 			Scan(&r.ID, &r.FromEntity, &r.ToEntity, &r.RelType, &propsJSON, &r.Confidence, &createdAt)
 	}
@@ -485,7 +474,7 @@ func (s *Store) findRelation(fromID, toID, relType string) (*Relation, error) {
 }
 
 func (s *Store) scanEntities(rows *sql.Rows) ([]Entity, error) {
-	var entities []Entity
+	var wm_entities []Entity
 	for rows.Next() {
 		var e Entity
 		var propsJSON string
@@ -498,9 +487,9 @@ func (s *Store) scanEntities(rows *sql.Rows) ([]Entity, error) {
 		e.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 		e.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 		e.IsDynamic = isDynamic == 1
-		entities = append(entities, e)
+		wm_entities = append(wm_entities, e)
 	}
-	return entities, rows.Err()
+	return wm_entities, rows.Err()
 }
 
 func (s *Store) scanRelations(rows *sql.Rows) ([]Relation, error) {

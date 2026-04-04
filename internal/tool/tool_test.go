@@ -15,17 +15,26 @@ import (
 
 // mockTool is a simple tool for testing the executor.
 type mockTool struct {
-	sensitive bool
-	errResult error
+	sensitive     bool
+	errResult     error
+	approvalLevel tool.ApprovalLevel
 }
 
-func (m *mockTool) Name() string                      { return "mock_tool" }
-func (m *mockTool) Description() string               { return "A mock tool" }
-func (m *mockTool) Parameters() []tool.ParameterDef   { return nil }
-func (m *mockTool) Sensitive() bool                   { return m.sensitive }
-func (m *mockTool) ApprovalLevel() tool.ApprovalLevel { return tool.AutoExecute }
-func (m *mockTool) Version() string                   { return "1.0.0" }
-func (m *mockTool) Dependencies() []string            { return nil }
+func (m *mockTool) Name() string                    { return "mock_tool" }
+func (m *mockTool) Description() string             { return "A mock tool" }
+func (m *mockTool) Parameters() []tool.ParameterDef { return nil }
+func (m *mockTool) Sensitive() bool                 { return m.sensitive }
+func (m *mockTool) ApprovalLevel() tool.ApprovalLevel {
+	if m.approvalLevel != 0 {
+		return m.approvalLevel
+	}
+	if m.sensitive {
+		return tool.RequiresApproval
+	}
+	return tool.AutoExecute
+}
+func (m *mockTool) Version() string        { return "1.0.0" }
+func (m *mockTool) Dependencies() []string { return nil }
 func (m *mockTool) Execute(ctx context.Context, args map[string]any) (*tool.Result, error) {
 	if m.errResult != nil {
 		return nil, m.errResult

@@ -125,11 +125,6 @@ tools:
     enabled: true
     global_skills_path: "~/.wunderpus/skills"
     builtin_skills_path: "./skills"
-    registries:
-      clawhub:
-        enabled: false
-        base_url: "https://clawhub.ai"
-        auth_token: ""
 
   search:
     brave_api_key: ""

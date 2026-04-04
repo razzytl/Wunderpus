@@ -68,7 +68,7 @@ Every major subsystem uses Go interfaces:
 | `provider.Embedder` | Vector embeddings | OpenAI, Gemini, Ollama |
 | `channel.Channel` | Messaging platform | Telegram, Discord, Slack, WhatsApp, etc. |
 | `tool.Tool` | Agent actions | file_read, shell_exec, http_request, etc. |
-| `skills.SkillRegistry` | Skill distribution | Memory, ClawHub |
+| `skills.SkillRegistry` | Skill distribution | Memory (local) |
 
 ### Strategy Pattern (Provider Factory)
 

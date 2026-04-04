@@ -72,20 +72,6 @@ wunderpus skills install user/repo
 wunderpus skills install ./path/to/skill
 ```
 
-### Skill Registry
-
-Configure remote skill registries:
-
-```yaml
-tools:
-  skills:
-    registries:
-      clawhub:
-        enabled: false
-        base_url: "https://clawhub.ai"
-        auth_token: ""
-```
-
 ## Creating Custom Skills
 
 ### Step 1: Create Directory

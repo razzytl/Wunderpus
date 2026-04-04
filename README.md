@@ -31,15 +31,14 @@ Wunderpus is a **production-grade, vendor-agnostic autonomous AI agent framework
 | Capability | Description |
 |---|---|
 | **Multi-Provider LLM** | 15+ providers via protocol-based routing (OpenAI, Anthropic, Gemini, Ollama, Groq, DeepSeek, and more) with automatic fallback and parallel probing |
-| **Multi-Channel** | Connect to Telegram, Discord, Slack, WhatsApp, Feishu, LINE, QQ, WeCom, DingTalk, OneBot, and WebSocket — simultaneously |
+| **Multi-Channel** | Connect to Telegram, Discord, Slack, WhatsApp, LINE, and WebSocket — simultaneously |
 | **Tool System** | 15+ built-in tools (file I/O, shell, HTTP, browser, calculator) with sandboxing, approval gates, and MCP support |
-| **Skills** | Markdown-based extensibility system with local, global, and remote (ClawHub) registries |
+| **Skills** | Markdown-based extensibility system with local and global registries |
 | **Memory & RAG** | SQLite-persisted sessions with AES-256-GCM encryption, vector search, and SOP (Standard Operating Procedure) retrieval |
 | **World Model** | Persistent knowledge graph with entity/relation tracking, confidence scoring, and Cypher-like queries |
 | **Perception** | Computer use via Playwright — navigate websites, fill forms, interact with any GUI |
-| **Swarm** | Multi-agent orchestration with 7 specialist profiles (researcher, coder, writer, trader, operator, creator, security) |
-| **Self-Improvement** | Tool synthesis engine that detects capability gaps and generates new tools autonomously |
-| **Genesis Autonomy** | Four-pillar autonomous system: RSI (Recursive Self-Improvement), AGS (Autonomous Goal Synthesis), UAA (Unbounded Autonomous Action), RA (Resource Acquisition) |
+| **Self-Improvement** | Tool synthesis engine that detects capability gaps and generates new tools |
+| **Autonomy** | AGS (Autonomous Goal Synthesis) with explicit API/CLI/Cron invocation — no autonomous loops |
 
 ---
 

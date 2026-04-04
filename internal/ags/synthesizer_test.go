@@ -18,7 +18,7 @@ func TestGoalSynthesizer_Deduplicate(t *testing.T) {
 	existing.Status = GoalStatusActive
 	store.Save(existing)
 
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	p := &mockProvider{
 		completeFn: func(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {
@@ -71,7 +71,7 @@ func TestGoalSynthesizer_Deduplicate(t *testing.T) {
 func TestGoalSynthesizer_MaxPerCycle(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	p := &mockProvider{
 		completeFn: func(ctx context.Context, req *provider.CompletionRequest) (*provider.CompletionResponse, error) {

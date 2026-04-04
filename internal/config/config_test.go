@@ -254,14 +254,11 @@ func TestGenesisConfig_Defaults(t *testing.T) {
 	cfg := &Config{}
 	applyDefaults(cfg)
 
-	// Sanity: trust budget defaults still correct
-	if cfg.Genesis.TrustBudgetMax != 1000 {
-		t.Errorf("TrustBudgetMax default = %v, want 1000", cfg.Genesis.TrustBudgetMax)
-	}
-	if cfg.Genesis.TrustRegenPerHour != 10 {
-		t.Errorf("TrustRegenPerHour default = %v, want 10", cfg.Genesis.TrustRegenPerHour)
-	}
+	// Sanity: genesis defaults still correct
 	if cfg.Genesis.MaxDailySpendUSD != 10.0 {
 		t.Errorf("MaxDailySpendUSD default = %v, want 10.0", cfg.Genesis.MaxDailySpendUSD)
+	}
+	if cfg.Genesis.ToolSynthMinPassRate != 0.8 {
+		t.Errorf("ToolSynthMinPassRate default = %v, want 0.8", cfg.Genesis.ToolSynthMinPassRate)
 	}
 }

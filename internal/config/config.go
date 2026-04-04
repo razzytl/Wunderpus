@@ -41,10 +41,7 @@ type GenesisConfig struct {
 	WorldModelScanIntervalH int      `yaml:"worldmodel_scan_interval_h"` // Hours between web scans for dynamic entities (default: 24)
 	PerceptionEnabled       bool     `yaml:"perception_enabled"`         // Enable Computer Use / GUI Control (Section 3)
 	PerceptionMaxActions    int      `yaml:"perception_max_actions"`     // Max browser actions per goal (default: 50)
-	SwarmEnabled            bool     `yaml:"swarm_enabled"`              // Enable Agent Swarm Architecture (Section 4)
 	MaxDailySpendUSD        float64  `yaml:"max_daily_spend_usd"`        // Hard cap on cloud spend (default: 10.0)
-	TrustBudgetMax          int      `yaml:"trust_budget_max"`           // Maximum trust points (default: 1000)
-	TrustRegenPerHour       int      `yaml:"trust_regen_per_hour"`       // Trust regeneration rate (default: 10)
 	ProfilerPPROFPort       int      `yaml:"profiler_pprof_port"`        // pprof endpoint port (default: 6060, 0 = disabled)
 	ExternalHostAllowlist   []string `yaml:"external_host_allowlist"`    // Known-safe external hosts for Tier 4
 }
@@ -611,10 +608,7 @@ func applyDefaults(cfg *Config) {
 	cfg.Genesis.WorldModelScanIntervalH = 24
 	cfg.Genesis.PerceptionEnabled = false
 	cfg.Genesis.PerceptionMaxActions = 50
-	cfg.Genesis.SwarmEnabled = false
 	cfg.Genesis.MaxDailySpendUSD = 10.0
-	cfg.Genesis.TrustBudgetMax = 1000
-	cfg.Genesis.TrustRegenPerHour = 10
 	cfg.Genesis.ProfilerPPROFPort = 0 // disabled by default
 	cfg.Genesis.ExternalHostAllowlist = []string{}
 
@@ -706,9 +700,6 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_PERCEPTION"); v != "" {
 		cfg.Genesis.PerceptionEnabled = strings.ToLower(v) == "true" || v == "1"
-	}
-	if v := os.Getenv("WUNDERPUS_GENESIS_SWARM"); v != "" {
-		cfg.Genesis.SwarmEnabled = strings.ToLower(v) == "true" || v == "1"
 	}
 	if v := os.Getenv("WUNDERPUS_GENESIS_MAX_DAILY_SPEND"); v != "" {
 		if spend, err := strconv.ParseFloat(v, 64); err == nil {

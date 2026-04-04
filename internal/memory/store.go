@@ -44,6 +44,9 @@ func NewStore(db *sql.DB) (*Store, error) {
 		tool_call_id TEXT DEFAULT '',
 		tool_calls TEXT DEFAULT '',
 		timestamp TEXT NOT NULL,
+		encrypted INTEGER DEFAULT 0,
+		parent_message_id INTEGER DEFAULT NULL,
+		branch_id TEXT DEFAULT 'main',
 		FOREIGN KEY (session_id) REFERENCES mem_sessions(id) ON DELETE CASCADE
 	);
 	
@@ -85,7 +88,8 @@ func (s *Store) EnsureSession(sessionID string) error {
 
 // SaveMessage appends a message to the specified session.
 // encryptionKey is optional, if provided content will be encrypted.
-func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKey []byte) error {
+// parentMsgID and branchID are optional for conversation branching.
+func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKey []byte, parentMsgID *int, branchID string) error {
 	if err := s.EnsureSession(sessionID); err != nil {
 		return err
 	}
@@ -108,10 +112,14 @@ func (s *Store) SaveMessage(sessionID string, msg provider.Message, encryptionKe
 		toolCallsStr = string(b)
 	}
 
+	if branchID == "" {
+		branchID = "main"
+	}
+
 	_, err := s.db.Exec(`
-		INSERT INTO mem_messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		sessionID, msg.Role, content, msg.ToolCallID, toolCallsStr, now, isEncrypted,
+		INSERT INTO mem_messages (session_id, role, content, tool_call_id, tool_calls, timestamp, encrypted, parent_message_id, branch_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		sessionID, msg.Role, content, msg.ToolCallID, toolCallsStr, now, isEncrypted, parentMsgID, branchID,
 	)
 
 	if err == nil {
@@ -155,11 +163,16 @@ func (s *Store) GetSessions() ([]Session, error) {
 // LoadSession retrieves all messages for a given session.
 // encryptionKey is required to decrypt encrypted messages.
 func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.Message, error) {
+	return s.LoadSessionBranch(sessionID, "main", encryptionKey)
+}
+
+// LoadSessionBranch retrieves all messages for a given session on a specific branch.
+func (s *Store) LoadSessionBranch(sessionID, branchID string, encryptionKey []byte) ([]provider.Message, error) {
 	rows, err := s.db.Query(`
 		SELECT role, content, tool_call_id, tool_calls, encrypted
 		FROM mem_messages 
-		WHERE session_id = ? 
-		ORDER BY timestamp ASC`, sessionID)
+		WHERE session_id = ? AND branch_id = ?
+		ORDER BY timestamp ASC`, sessionID, branchID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +213,49 @@ func (s *Store) LoadSession(sessionID string, encryptionKey []byte) ([]provider.
 	}
 
 	return messages, rows.Err()
+}
+
+// CreateBranch creates a new branch from a specific message.
+// Returns the new branch ID.
+func (s *Store) CreateBranch(sessionID string, fromMessageID int) (string, error) {
+	branchID := fmt.Sprintf("branch-%s-%d", sessionID, fromMessageID)
+	_, err := s.db.Exec(`
+		UPDATE mem_messages SET branch_id = ? WHERE id = ? AND session_id = ?`,
+		branchID, fromMessageID, sessionID)
+	return branchID, err
+}
+
+// GetBranches returns all branch IDs for a session.
+func (s *Store) GetBranches(sessionID string) ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT DISTINCT branch_id FROM mem_messages 
+		WHERE session_id = ? ORDER BY branch_id`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var branches []string
+	for rows.Next() {
+		var branchID string
+		if err := rows.Scan(&branchID); err != nil {
+			continue
+		}
+		branches = append(branches, branchID)
+	}
+	return branches, rows.Err()
+}
+
+// GetLastMessageID returns the ID of the most recent message in a session.
+func (s *Store) GetLastMessageID(sessionID string) (int, error) {
+	var id int
+	err := s.db.QueryRow(`
+		SELECT id FROM mem_messages 
+		WHERE session_id = ? ORDER BY id DESC LIMIT 1`, sessionID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
 }
 
 // GetPreference gets a user preference string.

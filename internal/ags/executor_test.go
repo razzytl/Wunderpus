@@ -10,7 +10,7 @@ import (
 func TestGoalExecutor_SelectNext(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	// Create 3 pending goals
 	for i := 0; i < 3; i++ {
@@ -49,7 +49,7 @@ func (m *mockProvider) Stream(ctx context.Context, req *provider.CompletionReque
 func TestGoalExecutor_ExecuteSuccess(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	g := NewGoal("Simple goal", "do something", 3, GoalBeUseful.Title,
 		nil, []string{"task completed"}, 0.8)
@@ -93,7 +93,7 @@ func TestGoalExecutor_ExecuteSuccess(t *testing.T) {
 func TestGoalExecutor_ExecuteAbandonAfter3Failures(t *testing.T) {
 	store, _ := NewGoalStore(tempGoalDB(t))
 	defer store.Close()
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	g := NewGoal("Failing goal", "will fail", 2, GoalBeUseful.Title,
 		nil, []string{"impossible"}, 0.5)

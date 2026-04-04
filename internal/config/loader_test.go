@@ -14,8 +14,9 @@ func TestConfig_WatchRoundTrip(t *testing.T) {
 	// Write initial config
 	initial := `version: 2
 default_provider: openai
-genesis:
-  trust_budget_max: 500
+agents:
+  defaults:
+    restrict_to_workspace: true
 `
 	os.WriteFile(cfgPath, []byte(initial), 0o644)
 
@@ -31,16 +32,16 @@ genesis:
 	}
 	defer cleanup()
 
-	if cfg.Genesis.TrustBudgetMax != 500 {
-		t.Fatalf("expected 500, got %d", cfg.Genesis.TrustBudgetMax)
+	if !cfg.Agents.Defaults.RestrictToWorkspace {
+		t.Fatalf("expected RestrictToWorkspace true, got false")
 	}
 
 	// Modify the config file
 	updated := `version: 2
 default_provider: openai
-genesis:
-  rsi_enabled: true
-  trust_budget_max: 800
+agents:
+  defaults:
+    restrict_to_workspace: false
 `
 	os.WriteFile(cfgPath, []byte(updated), 0o644)
 
@@ -57,7 +58,7 @@ genesis:
 		t.Fatal("config was not reloaded after file change")
 	}
 
-	if latestCfg.Genesis.TrustBudgetMax != 800 {
-		t.Fatalf("expected reloaded value 800, got %d", latestCfg.Genesis.TrustBudgetMax)
+	if latestCfg.Agents.Defaults.RestrictToWorkspace {
+		t.Fatalf("expected reloaded RestrictToWorkspace false, got true")
 	}
 }

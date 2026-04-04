@@ -4,8 +4,6 @@ import (
 	"math"
 	"sync"
 	"time"
-
-	"github.com/wunderpus/wunderpus/internal/uaa"
 )
 
 // ScorerWeights holds the configurable weights for the priority scoring formula.
@@ -60,14 +58,12 @@ func (w ScorerWeights) Clamp(target ScorerWeights, maxDelta float64) ScorerWeigh
 type PriorityScorer struct {
 	mu      sync.RWMutex
 	weights ScorerWeights
-	trust   *uaa.TrustBudget
 }
 
-// NewPriorityScorer creates a scorer with default weights and dependencies.
-func NewPriorityScorer(trust *uaa.TrustBudget) *PriorityScorer {
+// NewPriorityScorer creates a scorer with default weights.
+func NewPriorityScorer() *PriorityScorer {
 	return &PriorityScorer{
 		weights: DefaultScorerWeights(),
-		trust:   trust,
 	}
 }
 
@@ -121,20 +117,7 @@ func computeUrgency(g Goal) float64 {
 }
 
 func (s *PriorityScorer) computeFeasibility(g Goal) float64 {
-	feasibility := 0.7 // base default
-
-	// Trust impact: Higher budget = higher feasibility for autonomy
-	if s.trust != nil {
-		balance := float64(s.trust.Current())
-		// Assuming max trust is around 1000 for normalization
-		trustFactor := balance / 1000.0
-		if trustFactor > 1.0 {
-			trustFactor = 1.0
-		}
-		feasibility *= (0.5 + 0.5*trustFactor)
-	}
-
-	return clamp01(feasibility)
+	return clamp01(0.7) // base default
 }
 
 // computeNovelty: 1.0 / (1.0 + AttemptCount)

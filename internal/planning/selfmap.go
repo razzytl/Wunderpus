@@ -18,7 +18,7 @@ type SelfImprovementRoadmap struct {
 // ImprovementGoal represents a self-improvement goal.
 type ImprovementGoal struct {
 	ID          string    `json:"id"`
-	Type        string    `json:"type"` // "tool_synthesis", "rsi_target", "learning"
+	Type        string    `json:"type"` // "tool_synthesis", "learning"
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Priority    int       `json:"priority"` // 1-10
@@ -30,7 +30,6 @@ type ImprovementGoal struct {
 type SelfMapEngine struct {
 	toolGapDetector ToolGapDetector
 	agsFailures     FailureAnalyzer
-	rsiFitness      FitnessAnalyzer
 	revenueData     RevenueAnalyzer
 	llm             LLMCaller
 }
@@ -52,17 +51,6 @@ type FailureAnalyzer interface {
 	GetRecentFailures(ctx context.Context) ([]string, error)
 }
 
-// FitnessAnalyzer gets RSI fitness data.
-type FitnessAnalyzer interface {
-	GetFitnessData(ctx context.Context) (FitnessData, error)
-}
-
-// FitnessData represents RSI fitness metrics.
-type FitnessData struct {
-	AverageImprovement float64  `json:"avg_improvement"`
-	TopAreas           []string `json:"top_areas"`
-}
-
 // RevenueAnalyzer gets revenue data.
 type RevenueAnalyzer interface {
 	GetRevenueData(ctx context.Context) (RevenueData, error)
@@ -81,11 +69,10 @@ type SelfMapConfig struct {
 }
 
 // NewSelfMapEngine creates a new self-map engine.
-func NewSelfMapEngine(cfg SelfMapConfig, gapDetector ToolGapDetector, failures FailureAnalyzer, fitness FitnessAnalyzer, revenue RevenueAnalyzer, llm LLMCaller) *SelfMapEngine {
+func NewSelfMapEngine(cfg SelfMapConfig, gapDetector ToolGapDetector, failures FailureAnalyzer, revenue RevenueAnalyzer, llm LLMCaller) *SelfMapEngine {
 	return &SelfMapEngine{
 		toolGapDetector: gapDetector,
 		agsFailures:     failures,
-		rsiFitness:      fitness,
 		revenueData:     revenue,
 		llm:             llm,
 	}
@@ -121,13 +108,7 @@ func (e *SelfMapEngine) GenerateRoadmap(ctx context.Context) (*SelfImprovementRo
 		}
 	}
 
-	// 3. RSI fitness
-	if e.rsiFitness != nil {
-		fitness, _ := e.rsiFitness.GetFitnessData(ctx)
-		inputs = append(inputs, "RSI top areas: "+joinStrings(fitness.TopAreas))
-	}
-
-	// 4. Revenue signals
+	// 3. Revenue signals
 	if e.revenueData != nil {
 		revenue, _ := e.revenueData.GetRevenueData(ctx)
 		inputs = append(inputs, "Revenue sources: "+joinStrings(revenue.RevenueSources))
@@ -161,7 +142,7 @@ func (e *SelfMapEngine) GenerateRoadmap(ctx context.Context) (*SelfImprovementRo
 		},
 		{
 			ID:       generateID(),
-			Type:     "rsi_target",
+			Type:     "learning",
 			Title:    "Improve code generation quality",
 			Priority: 8,
 			Status:   "pending",

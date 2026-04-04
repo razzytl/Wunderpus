@@ -6,7 +6,7 @@ import (
 )
 
 func TestPriorityScorer_DeferredGoalScoresHigher(t *testing.T) {
-	scorer := NewPriorityScorer(nil)
+	scorer := NewPriorityScorer()
 
 	now := time.Now().UTC()
 

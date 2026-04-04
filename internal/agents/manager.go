@@ -20,11 +20,10 @@ const (
 
 // AgentConfig specifies how to spawn a sub-agent.
 type AgentConfig struct {
-	ID          string
-	GoalID      string
-	GoalTitle   string
-	TimeBudget  time.Duration
-	TrustBudget int
+	ID         string
+	GoalID     string
+	GoalTitle  string
+	TimeBudget time.Duration
 }
 
 // SubAgent represents a running sub-agent instance.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/logging"
+	"github.com/wunderpus/wunderpus/internal/provider"
 )
 
 // Tracker handles asynchronous cost tracking and budgeting.
@@ -103,4 +104,51 @@ func (t *Tracker) GetSessionCost(sessionID string) float64 {
 // Close is a no-op — the shared DB connection is managed by db.Manager.
 func (t *Tracker) Close() error {
 	return nil
+}
+
+// CostPrediction holds estimated min/max costs for an upcoming request.
+type CostPrediction struct {
+	MinCost         float64 `json:"min_cost"`
+	MaxCost         float64 `json:"max_cost"`
+	InputTokens     int     `json:"input_tokens"`
+	EstOutputTokens int     `json:"est_output_tokens"`
+	Model           string  `json:"model"`
+}
+
+// EstimateCost predicts the min/max cost for a set of messages and tools
+// using tiktoken-style token counting and the model's pricing matrix.
+// It estimates output tokens as 50% of input tokens (configurable via outputRatio).
+func (t *Tracker) EstimateCost(messages []provider.Message, model string, outputRatio float64) CostPrediction {
+	if outputRatio <= 0 {
+		outputRatio = 0.5 // default: output ≈ 50% of input
+	}
+
+	// Count input tokens (rough estimate: ~4 chars per token)
+	inputTokens := 0
+	for _, m := range messages {
+		// Each message has ~4 tokens of overhead (role, formatting)
+		inputTokens += len(m.Content)/4 + 4
+		// Tool calls add extra tokens
+		for _, tc := range m.ToolCalls {
+			inputTokens += len(tc.Function.Arguments)/4 + 10
+		}
+	}
+
+	estOutputTokens := int(float64(inputTokens) * outputRatio)
+
+	price, ok := t.prices[model]
+	if !ok {
+		price = ModelPrice{InputPrice: 0.1, OutputPrice: 0.1}
+	}
+
+	minCost := (float64(inputTokens) / 1000000.0) * price.InputPrice
+	maxCost := minCost + (float64(estOutputTokens)/1000000.0)*price.OutputPrice
+
+	return CostPrediction{
+		MinCost:         minCost,
+		MaxCost:         maxCost,
+		InputTokens:     inputTokens,
+		EstOutputTokens: estOutputTokens,
+		Model:           model,
+	}
 }

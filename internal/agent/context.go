@@ -10,12 +10,14 @@ import (
 
 // ContextManager manages conversation history with token-based truncation and sqlite persistence.
 type ContextManager struct {
-	messages  []provider.Message
-	maxTokens int
-	store     *memory.Store
-	sessionID string
-	tke       *tiktoken.Tiktoken
-	encKey    []byte
+	messages    []provider.Message
+	maxTokens   int
+	store       *memory.Store
+	sessionID   string
+	tke         *tiktoken.Tiktoken
+	encKey      []byte
+	branchID    string
+	parentMsgID *int
 }
 
 // NewContextManager creates a new context manager.
@@ -32,6 +34,7 @@ func NewContextManager(maxTokens int, store *memory.Store, sessionID string, enc
 		sessionID: sessionID,
 		tke:       tke,
 		encKey:    encKey,
+		branchID:  "main",
 	}
 
 	if store != nil && sessionID != "" {
@@ -44,6 +47,20 @@ func NewContextManager(maxTokens int, store *memory.Store, sessionID string, enc
 	return cm
 }
 
+// BranchID returns the current branch ID.
+func (c *ContextManager) BranchID() string {
+	return c.branchID
+}
+
+// SetBranch sets the current conversation branch for branching support.
+func (c *ContextManager) SetBranch(branchID string, parentMsgID *int) {
+	c.branchID = branchID
+	c.parentMsgID = parentMsgID
+	if branchID != "main" {
+		slog.Info("context: switched branch", "branch", branchID, "parentMsgID", parentMsgID)
+	}
+}
+
 // AddMessage appends a message to the conversation history.
 func (c *ContextManager) AddMessage(role, content string) {
 	msg := provider.Message{
@@ -52,7 +69,7 @@ func (c *ContextManager) AddMessage(role, content string) {
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey, c.parentMsgID, c.branchID); err != nil {
 			slog.Error("failed to save message", "error", err)
 		}
 	}
@@ -68,7 +85,7 @@ func (c *ContextManager) AddToolCallMessage(content string, toolCalls []provider
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey, c.parentMsgID, c.branchID); err != nil {
 			slog.Error("failed to save message", "error", err)
 		}
 	}
@@ -84,7 +101,7 @@ func (c *ContextManager) AddToolResultMessage(toolCallID string, content string)
 	}
 	c.messages = append(c.messages, msg)
 	if c.store != nil && c.sessionID != "" {
-		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey); err != nil {
+		if err := c.store.SaveMessage(c.sessionID, msg, c.encKey, c.parentMsgID, c.branchID); err != nil {
 			slog.Error("failed to save message", "error", err)
 		}
 	}
@@ -120,6 +137,12 @@ func (c *ContextManager) SummarizeOldest(summary string) {
 // Clear removes all in-memory messages but doesn't delete from SQLite.
 func (c *ContextManager) Clear() {
 	c.messages = nil
+}
+
+// SetMessages replaces all in-memory messages (used when switching branches).
+func (c *ContextManager) SetMessages(msgs []provider.Message) {
+	c.messages = msgs
+	c.truncate()
 }
 
 // Count returns the number of messages.

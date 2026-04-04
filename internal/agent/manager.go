@@ -124,6 +124,32 @@ func (m *Manager) ProcessMessage(ctx context.Context, sessionID, input string) (
 	return ag.HandleMessage(ctx, input)
 }
 
+// ProcessMessageWithBranch routes a message for a specific session and branch.
+// If the branch differs from the agent's current branch, it switches context.
+func (m *Manager) ProcessMessageWithBranch(ctx context.Context, sessionID, input, branchID string) (string, error) {
+	if m.tracker != nil && m.tracker.IsOverBudget(sessionID) {
+		return "⚠️  This session has exceeded its budget. Please contact the administrator.", nil
+	}
+
+	ag := m.GetAgent(sessionID)
+	if branchID != "" && branchID != "main" {
+		ag.SetBranch(branchID)
+	}
+	return ag.HandleMessage(ctx, input)
+}
+
+// SwitchBranch switches an agent's active branch and reloads context from that branch.
+func (m *Manager) SwitchBranch(sessionID, branchID string) error {
+	m.mu.Lock()
+	ag, ok := m.agents[sessionID]
+	m.mu.Unlock()
+	if !ok {
+		return nil // no agent yet, will be set on next message
+	}
+	ag.SetBranch(branchID)
+	return nil
+}
+
 // GetSkillsLoader returns the skills loader.
 func (m *Manager) GetSkillsLoader() *skills.SkillsLoader {
 	return m.loader

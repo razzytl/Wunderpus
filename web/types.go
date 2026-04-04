@@ -6,7 +6,9 @@ import "time"
 // the React frontend and Go backend.
 const (
 	// Client → Server
-	MsgTypeUserMessage = "user_message"
+	MsgTypeUserMessage  = "user_message"
+	MsgTypeBranchSwitch = "branch_switch"
+	MsgTypeListBranches = "list_branches"
 
 	// Server → Client
 	MsgTypeChatToken           = "chat_token"
@@ -31,20 +33,29 @@ type WSMessage struct {
 type UserMessagePayload struct {
 	Content   string `json:"content"`
 	SessionID string `json:"session_id,omitempty"`
+	BranchID  string `json:"branch_id,omitempty"`
+}
+
+// BranchSwitchPayload is sent by the frontend to switch the active branch.
+type BranchSwitchPayload struct {
+	SessionID string `json:"session_id"`
+	BranchID  string `json:"branch_id"`
 }
 
 // --- Server → Client Payloads ---
 
 // ChatTokenPayload represents a streaming text chunk from the LLM.
 type ChatTokenPayload struct {
-	Token string `json:"token"`
-	Done  bool   `json:"done"`
+	Token    string `json:"token"`
+	Done     bool   `json:"done"`
+	BranchID string `json:"branch_id,omitempty"`
 }
 
 // ChatCompletePayload is sent when the full response is assembled.
 type ChatCompletePayload struct {
 	Content    string `json:"content"`
 	TokenCount int    `json:"token_count,omitempty"`
+	BranchID   string `json:"branch_id,omitempty"`
 }
 
 // ToolExecutionStartPayload is sent when the agent invokes a tool/skill.

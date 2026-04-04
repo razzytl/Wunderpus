@@ -57,6 +57,8 @@ func NewServer(distFS fs.FS, fsRoot string, port int, manager *agent.Manager) (*
 	// API endpoints
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/history", s.handleHistory)
+	mux.HandleFunc("/api/branches", s.handleBranches)
+	mux.HandleFunc("/api/branches/messages", s.handleBranchMessages)
 
 	// Static file serving with SPA fallback
 	fileServer := http.FileServer(http.FS(sub))
@@ -200,6 +202,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		switch envelope.Type {
 		case MsgTypeUserMessage:
 			s.handleUserMessage(conn, sessionID, envelope)
+		case MsgTypeBranchSwitch:
+			s.handleBranchSwitch(conn, sessionID, envelope)
+		case MsgTypeListBranches:
+			s.handleListBranches(conn, sessionID, envelope)
 		default:
 			slog.Warn("unknown message type", "type", envelope.Type)
 		}
@@ -232,6 +238,9 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, sessionID string, envel
 		sid = payload.SessionID
 	}
 
+	// Use branch from payload if provided
+	branchID := payload.BranchID
+
 	// Notify frontend that processing started
 	s.sendMessage(conn, WSMessage{
 		Type:      MsgTypeSystemLog,
@@ -248,21 +257,21 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, sessionID string, envel
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 		defer cancel()
 
-		response, processErr := s.manager.ProcessMessage(ctx, sid, payload.Content)
+		response, processErr := s.manager.ProcessMessageWithBranch(ctx, sid, payload.Content, branchID)
 		if processErr != nil {
 			s.sendError(conn, sid, processErr.Error())
 			return
 		}
 
 		// Send the complete response
-		// (For now, we send the full response. Phase 4+ can add streaming.)
 		s.sendMessage(conn, WSMessage{
 			Type:      MsgTypeChatToken,
 			Timestamp: time.Now(),
 			SessionID: sid,
 			Payload: ChatTokenPayload{
-				Token: response,
-				Done:  true,
+				Token:    response,
+				Done:     true,
+				BranchID: branchID,
 			},
 		})
 
@@ -271,10 +280,63 @@ func (s *Server) handleUserMessage(conn *websocket.Conn, sessionID string, envel
 			Timestamp: time.Now(),
 			SessionID: sid,
 			Payload: ChatCompletePayload{
-				Content: response,
+				Content:  response,
+				BranchID: branchID,
 			},
 		})
 	}()
+}
+
+// handleBranchSwitch switches the active conversation branch for a session.
+func (s *Server) handleBranchSwitch(conn *websocket.Conn, sessionID string, envelope WSMessage) {
+	payloadBytes, err := json.Marshal(envelope.Payload)
+	if err != nil {
+		s.sendError(conn, sessionID, "failed to parse branch switch payload")
+		return
+	}
+
+	var payload BranchSwitchPayload
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		s.sendError(conn, sessionID, "invalid branch switch payload")
+		return
+	}
+
+	if err := s.manager.SwitchBranch(payload.SessionID, payload.BranchID); err != nil {
+		s.sendError(conn, sessionID, err.Error())
+		return
+	}
+
+	s.sendMessage(conn, WSMessage{
+		Type:      MsgTypeSystemLog,
+		Timestamp: time.Now(),
+		SessionID: payload.SessionID,
+		Payload: SystemLogPayload{
+			Level:   "info",
+			Message: "Switched to branch: " + payload.BranchID,
+		},
+	})
+}
+
+// handleListBranches returns all branches for a session.
+func (s *Server) handleListBranches(conn *websocket.Conn, sessionID string, envelope WSMessage) {
+	store := s.manager.Store()
+	if store == nil {
+		s.sendError(conn, sessionID, "store not available")
+		return
+	}
+
+	branches, err := store.GetBranches(sessionID)
+	if err != nil {
+		s.sendError(conn, sessionID, err.Error())
+		return
+	}
+
+	s.sendMessage(conn, WSMessage{
+		Type:      "branch_list",
+		Timestamp: time.Now(),
+		SessionID: sessionID,
+		Payload:   branches,
+	})
 }
 
 // sendMessage sends a typed JSON message over the WebSocket.

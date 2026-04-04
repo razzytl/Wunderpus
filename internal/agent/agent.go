@@ -505,6 +505,18 @@ func (a *Agent) ClearContext() {
 	a.ctx.Clear()
 }
 
+// SetBranch switches the active conversation branch and reloads context.
+func (a *Agent) SetBranch(branchID string) {
+	a.ctx.SetBranch(branchID, nil)
+	// Reload in-memory messages from the new branch
+	if a.ctx.store != nil && a.ctx.sessionID != "" {
+		msgs, err := a.ctx.store.LoadSessionBranch(a.ctx.sessionID, branchID, a.encryptionKey)
+		if err == nil && len(msgs) > 0 {
+			a.ctx.SetMessages(msgs)
+		}
+	}
+}
+
 // MessageCount returns the number of messages in context.
 func (a *Agent) MessageCount() int {
 	return a.ctx.Count()

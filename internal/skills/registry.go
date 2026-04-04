@@ -43,7 +43,7 @@ type InstallResult struct {
 // SkillRegistry is the interface that all skill registries must implement.
 // Each registry represents a different source of skills.
 type SkillRegistry interface {
-	// Name returns the unique name of this registry (e.g., "clawhub").
+	// Name returns the unique name of this registry (e.g., "local_memory").
 	Name() string
 	// Search searches the registry for skills matching the query.
 	Search(ctx context.Context, query string, limit int) ([]SearchResult, error)

@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/wunderpus/wunderpus/internal/security"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // ApprovalFunc is called before executing sensitive tools.
@@ -66,11 +69,18 @@ func (e *Executor) SetProfiler(fn ProfilerFn) {
 // Execute runs a tool call with sandbox, approval, and audit.
 // Approval is now policy-based via the tool's ApprovalLevel.
 func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
+	ctx, span := otel.Tracer("tool").Start(ctx, "tool.execute")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("tool.name", call.Name),
+	)
+
 	start := time.Now()
 
 	// 1. Look up tool
 	t, ok := e.registry.Get(call.Name)
 	if !ok {
+		span.SetStatus(codes.Error, "unknown tool")
 		return &Result{Error: fmt.Sprintf("unknown tool: %s", call.Name)}
 	}
 
@@ -78,6 +88,8 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 	level := t.ApprovalLevel()
 	switch level {
 	case Blocked:
+		span.SetStatus(codes.Error, "blocked by policy")
+		span.SetAttributes(attribute.String("error.message", "blocked by policy"))
 		e.audit.Log(security.AuditEvent{
 			Timestamp:   time.Now(),
 			Action:      "tool_blocked",
@@ -90,9 +102,12 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 		if e.approvalFn != nil {
 			approved, err := e.approvalFn(call.Name, call.Args)
 			if err != nil {
+				span.SetStatus(codes.Error, "approval error")
+				span.SetAttributes(attribute.String("error.message", err.Error()))
 				return &Result{Error: fmt.Sprintf("approval error: %v", err)}
 			}
 			if !approved {
+				span.SetStatus(codes.Error, "denied by user")
 				e.audit.Log(security.AuditEvent{
 					Timestamp:   time.Now(),
 					Action:      "tool_denied",
@@ -132,11 +147,18 @@ func (e *Executor) Execute(ctx context.Context, call ToolCall) *Result {
 	elapsed := time.Since(start)
 
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.String("error.message", err.Error()))
 		result = &Result{Error: err.Error()}
 	}
 	if result == nil {
 		result = &Result{Error: "tool returned nil result"}
 	}
+
+	span.SetAttributes(
+		attribute.Float64("duration_ms", float64(elapsed.Milliseconds())),
+		attribute.Bool("has_error", result.Error != ""),
+	)
 
 	// 5. Record analytics
 	e.analytics.record(call.Name, elapsed, result.Error != "")

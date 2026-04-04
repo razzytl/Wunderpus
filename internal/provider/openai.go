@@ -10,6 +10,9 @@ import (
 	"strings"
 
 	"github.com/wunderpus/wunderpus/internal/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // OpenAI implements the Provider interface for OpenAI-compatible APIs.
@@ -58,6 +61,14 @@ func NewOpenAICompatible(apiKey, model string, maxTokens int, baseURL, name stri
 func (o *OpenAI) Name() string { return o.providerName }
 
 func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
+	ctx, span := otel.Tracer("provider").Start(ctx, "provider.complete")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("provider.name", o.providerName),
+		attribute.String("model", o.model),
+		attribute.Int("message_count", len(req.Messages)),
+	)
+
 	model := req.Model
 	if model == "" {
 		model = o.model
@@ -106,12 +117,21 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		span.SetStatus(codes.Error, "decode response failed")
+		span.RecordError(err)
 		return nil, fmt.Errorf("openai: decode response: %w", err)
 	}
 
 	if len(result.Choices) == 0 {
+		span.SetStatus(codes.Error, "empty response")
 		return nil, fmt.Errorf("openai: empty response")
 	}
+
+	span.SetAttributes(
+		attribute.Int("prompt_tokens", result.Usage.PromptTokens),
+		attribute.Int("completion_tokens", result.Usage.CompletionTokens),
+		attribute.String("finish_reason", result.Choices[0].FinishReason),
+	)
 
 	return &CompletionResponse{
 		Content:      result.Choices[0].Message.Content,
@@ -124,6 +144,13 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 }
 
 func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan StreamChunk, error) {
+	ctx, span := otel.Tracer("provider").Start(ctx, "provider.stream")
+	span.SetAttributes(
+		attribute.String("provider.name", o.providerName),
+		attribute.String("model", o.model),
+	)
+	defer span.End()
+
 	model := req.Model
 	if model == "" {
 		model = o.model

@@ -27,7 +27,6 @@ import (
 	"github.com/wunderpus/wunderpus/internal/security"
 	"github.com/wunderpus/wunderpus/internal/skills"
 	"github.com/wunderpus/wunderpus/internal/subagent"
-	"github.com/wunderpus/wunderpus/internal/swarm"
 	"github.com/wunderpus/wunderpus/internal/tool"
 	"github.com/wunderpus/wunderpus/internal/tool/builtin"
 	"github.com/wunderpus/wunderpus/internal/toolsynth"
@@ -52,7 +51,6 @@ type App struct {
 	ToolSynth           *toolsynth.SynthSystem       // Tool Synthesis Engine (Section 1)
 	WorldModel          *worldmodel.WorldModelSystem // World Model / Knowledge Graph (Section 2)
 	Perception          *PerceptionSystem            // Computer Use / GUI Control (Section 3)
-	Swarm               *swarm.SwarmSystem           // Agent Swarm Architecture (Section 4)
 }
 
 // Bootstrap initializes the application with the given config path.
@@ -226,33 +224,7 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		registry.Register(builtin.NewAskHumanTool(hitl))
 	}
 
-	// 11c. Init agent swarm (Section 4 — if enabled)
-	var swarmSystem *swarm.SwarmSystem
-	if cfg.Genesis.SwarmEnabled {
-		swarmCfg := swarm.Config{Enabled: true}
-		defaultAgent := manager.GetAgent("default")
-		swarmSystem, err = swarm.InitSwarm(swarmCfg, func(ctx context.Context, goal swarm.Goal, config swarm.AgentConfig) (*swarm.SpecialistResult, error) {
-			var resp string
-			resp, err = defaultAgent.HandleMessage(ctx, goal.Description)
-			if err != nil {
-				return nil, err
-			}
-			return &swarm.SpecialistResult{
-				Specialist: config.Name,
-				GoalID:     goal.ID,
-				Output:     resp,
-				Success:    true,
-			}, nil
-		}, nil)
-		if err != nil {
-			slog.Warn("swarm init failed (non-fatal)", "error", err)
-			swarmSystem = nil
-		} else {
-			slog.Info("swarm: initialized successfully")
-		}
-	}
-
-	// 12. Init heartbeat scheduler
+	// 11c. Init heartbeat scheduler
 	heartbeatCfg := &heartbeat.HeartbeatConfig{
 		Enabled:   cfg.Heartbeat.Enabled,
 		Interval:  cfg.Heartbeat.Interval,
@@ -262,8 +234,11 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	heartbeatExecutor := heartbeat.NewHeartbeatExecutor(manager, subAgentMgr)
 	heartbeatScheduler := heartbeat.NewScheduler(heartbeatCfg, heartbeatParser, heartbeatExecutor, manager, cfg.Agents.Defaults.Workspace)
 
-	// 13. Init health server
-	healthSrv := health.NewServer(cfg.Server.HealthPort)
+	// 12. Init health server with aggregated component checks
+	healthAgg := health.NewAggregator()
+	health.RegisterDBCheck(healthAgg, "core_db", dbManager.CoreDB)
+	health.RegisterDBCheck(healthAgg, "audit_db", dbManager.AuditDB)
+	healthSrv := health.NewServer(cfg.Server.HealthPort, healthAgg)
 
 	// 14. Channels
 	var channels []channel.Channel
@@ -309,7 +284,6 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 		ToolSynth:           toolSynth,
 		WorldModel:          worldModel,
 		Perception:          perceptionSystem,
-		Swarm:               swarmSystem,
 	}, nil
 }
 

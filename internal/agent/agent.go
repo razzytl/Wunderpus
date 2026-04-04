@@ -16,6 +16,9 @@ import (
 	"github.com/wunderpus/wunderpus/internal/security"
 	"github.com/wunderpus/wunderpus/internal/skills"
 	"github.com/wunderpus/wunderpus/internal/tool"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // Agent is the core agent that processes user messages.
@@ -103,6 +106,13 @@ func (a *Agent) SetSOPGetter(fn func(ctx context.Context, task string, topK int)
 
 // HandleMessage processes a user message and returns the agent response.
 func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error) {
+	ctx, span := otel.Tracer("agent").Start(ctx, "agent.handle_message")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("session_id", a.sessionID),
+		attribute.Int("input_length", len(input)),
+	)
+
 	// 0. Rate Limit
 	if a.limiter != nil && !a.limiter.Allow(a.sessionID) {
 		return "⚠️  Rate limit exceeded. Please wait a moment before sending more messages.", nil
@@ -145,8 +155,12 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 
 	// 3. Loop for tool execution (up to MaxIterations iterations)
 	for i := 0; i < constants.MaxIterations; i++ {
+		loopCtx, loopSpan := otel.Tracer("agent").Start(ctx, "agent.loop_iteration")
+		loopSpan.SetAttributes(attribute.Int("iteration.count", i+1))
+
 		messages := a.buildMessages()
 		prov := a.router.Active()
+		loopSpan.SetAttributes(attribute.String("provider.name", prov.Name()))
 		req := &provider.CompletionRequest{
 			Messages:    messages,
 			Temperature: a.temp,
@@ -179,8 +193,11 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 			// ... continue to tool execution if tool calls are in cache
 		}
 
-		resp, err := a.router.CompleteWithFallback(ctx, req)
+		resp, err := a.router.CompleteWithFallback(loopCtx, req)
 		if err != nil {
+			loopSpan.SetStatus(codes.Error, err.Error())
+			loopSpan.SetAttributes(attribute.String("error.message", err.Error()))
+			loopSpan.End()
 			return "", err
 		}
 
@@ -273,10 +290,14 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 			a.ctx.AddToolResultMessage(res.id, res.output)
 		}
 
+		loopSpan.SetAttributes(attribute.Int("tool_call_count", len(resp.ToolCalls)))
+
 		// Check if summarization is needed
 		if a.ctx.NeedsSummarization() {
-			a.triggerSummarization(ctx)
+			a.triggerSummarization(loopCtx)
 		}
+
+		loopSpan.End()
 	}
 
 	return "", fmt.Errorf("agent reached maximum tool call iterations (%d)", constants.MaxIterations)

@@ -119,7 +119,7 @@ func TestSaveAndLoadMessage(t *testing.T) {
 	}
 
 	// Save message
-	err = store.SaveMessage(sessionID, msg, nil)
+	err = store.SaveMessage(sessionID, msg, nil, nil, "main")
 	if err != nil {
 		t.Fatalf("SaveMessage failed: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestSaveMultipleMessages(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		err = store.SaveMessage(sessionID, msg, nil)
+		err = store.SaveMessage(sessionID, msg, nil, nil, "main")
 		if err != nil {
 			t.Fatalf("SaveMessage failed: %v", err)
 		}

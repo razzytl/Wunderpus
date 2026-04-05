@@ -40,6 +40,15 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_mem_sops_title ON mem_sops(title);
 		`,
 	},
+	{
+		Version: 4,
+		SQL: `
+			ALTER TABLE mem_messages ADD COLUMN parent_message_id INTEGER DEFAULT NULL;
+			ALTER TABLE mem_messages ADD COLUMN branch_id TEXT DEFAULT 'main';
+			CREATE INDEX IF NOT EXISTS idx_mem_messages_branch ON mem_messages(branch_id);
+			CREATE INDEX IF NOT EXISTS idx_mem_messages_parent ON mem_messages(parent_message_id);
+		`,
+	},
 }
 
 // Migrate runs all pending migrations.

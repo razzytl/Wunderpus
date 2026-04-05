@@ -289,3 +289,30 @@ func (e *GoalExecutor) StartExecutionLoop(ctx context.Context, interval time.Dur
 	}()
 	return func() { close(stop) }
 }
+
+// RunOnce performs a single execution cycle: SelectNext → Decompose → Execute.
+// This is the explicit, non-autonomous way to run the AGS executor.
+func (e *GoalExecutor) RunOnce(ctx context.Context) error {
+	goal, err := e.SelectNext()
+	if err != nil {
+		return fmt.Errorf("ags executor: SelectNext failed: %w", err)
+	}
+	if goal == nil {
+		return nil // no pending goals
+	}
+
+	slog.Info("ags executor: selected goal (explicit run)", "title", goal.Title, "tier", goal.Tier)
+
+	// Increment attempt
+	now := time.Now().UTC()
+	goal.AttemptCount++
+	goal.LastAttempt = &now
+	_ = e.store.Update(*goal)
+
+	tasks, err := e.Decompose(ctx, *goal)
+	if err != nil {
+		return fmt.Errorf("ags executor: Decompose failed: %w", err)
+	}
+
+	return e.Execute(ctx, *goal, tasks)
+}

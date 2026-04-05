@@ -9,11 +9,20 @@ import (
 
 // Event represents a single event in the system's pub/sub bus.
 type Event struct {
-	Type      EventType   `json:"type"`
-	Payload   interface{} `json:"payload"`
-	Timestamp time.Time   `json:"timestamp"`
-	Source    string      `json:"source"`
+	Type      EventType     `json:"type"`
+	Payload   interface{}   `json:"payload"`
+	Timestamp time.Time     `json:"timestamp"`
+	Source    string        `json:"source"`
+	Priority  EventPriority `json:"priority"`
 }
+
+// EventPriority determines how an event is routed.
+type EventPriority int
+
+const (
+	PriorityNormal EventPriority = iota // Async — handler runs in goroutine
+	PriorityHigh                        // Sync — handler runs on caller's goroutine
+)
 
 // DeadLetter wraps an event that failed processing with error context.
 type DeadLetter struct {
@@ -51,9 +60,10 @@ func (b *Bus) Subscribe(t EventType, h HandlerFunc) {
 	b.subscribers[t] = append(b.subscribers[t], h)
 }
 
-// Publish sends an event to all registered handlers non-blocking.
-// Each handler runs in its own goroutine. Panicking handlers are caught
-// and the event is routed to the dead-letter queue.
+// Publish sends an event to all registered handlers.
+// PriorityHigh events are handled synchronously (blocking).
+// PriorityNormal events are handled asynchronously (non-blocking, one goroutine per handler).
+// Panicking handlers are caught and the event is routed to the dead-letter queue.
 func (b *Bus) Publish(e Event) {
 	if e.Timestamp.IsZero() {
 		e.Timestamp = time.Now().UTC()
@@ -64,22 +74,36 @@ func (b *Bus) Publish(e Event) {
 	copy(handlers, b.subscribers[e.Type])
 	b.mu.RUnlock()
 
-	for _, h := range handlers {
-		fn := h
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("event handler panic",
-						"event_type", e.Type,
-						"source", e.Source,
-						"panic", r,
-					)
-					b.sendToDLQ(e, fmt.Sprintf("%v", r))
-				}
+	if e.Priority == PriorityHigh {
+		// Synchronous: run each handler on caller's goroutine
+		for _, h := range handlers {
+			b.invokeHandler(h, e)
+		}
+	} else {
+		// Asynchronous: one goroutine per handler
+		for _, h := range handlers {
+			fn := h
+			go func() {
+				b.invokeHandler(fn, e)
 			}()
-			fn(e)
-		}()
+		}
 	}
+}
+
+// invokeHandler runs a single handler with panic recovery and DLQ routing.
+func (b *Bus) invokeHandler(h HandlerFunc, e Event) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("event handler panic",
+				"event_type", e.Type,
+				"source", e.Source,
+				"priority", e.Priority,
+				"panic", r,
+			)
+			b.sendToDLQ(e, fmt.Sprintf("%v", r))
+		}
+	}()
+	h(e)
 }
 
 // PublishSync sends an event to all registered handlers and blocks until all complete.

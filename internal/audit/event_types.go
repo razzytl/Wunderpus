@@ -58,13 +58,6 @@ const (
 	EventDesktopAction   EventType = "perception.desktop_action"
 )
 
-// Swarm events
-const (
-	EventSwarmDispatch  EventType = "swarm.dispatch"
-	EventSwarmCompleted EventType = "swarm.completed"
-	EventSwarmFailed    EventType = "swarm.failed"
-)
-
 // System events
 const (
 	EventSystemStartup  EventType = "system.startup"

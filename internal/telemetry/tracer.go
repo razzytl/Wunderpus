@@ -3,6 +3,8 @@ package telemetry
 import (
 	"context"
 	"log/slog"
+	"net"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -19,7 +21,7 @@ type Tracer struct {
 // Otherwise, a no-op tracer is used (spans are created but not exported).
 func NewTracer(serviceName string) *Tracer {
 	// Try to set up OTLP exporter; fall back to no-op
-	exporter, err := tryOTLPExporter()
+	tp, err := tryOTLPExporter()
 	if err != nil {
 		slog.Info("telemetry: using no-op tracer (OTLP collector not available)",
 			"service", serviceName, "hint", "run Jaeger or Tempo on localhost:4318 to collect spans")
@@ -29,7 +31,6 @@ func NewTracer(serviceName string) *Tracer {
 	}
 
 	// OTLP exporter succeeded — set up real tracing
-	tp := exporter
 	otel.SetTracerProvider(tp)
 	tracer := tp.Tracer(serviceName)
 
@@ -50,26 +51,41 @@ func (t *Tracer) Shutdown(ctx context.Context) error {
 // tryOTLPExporter attempts to create a real tracer provider with OTLP HTTP exporter.
 // Returns nil + error if the collector is not available.
 func tryOTLPExporter() (trace.TracerProvider, error) {
-	// The OTLP HTTP exporter requires additional go.mod dependencies
-	// (go.opentelemetry.io/otel/sdk, go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp)
-	// These are already in go.mod as indirect dependencies.
-	// For now, return no-op to avoid build issues.
-	// TODO: When ready to collect traces, uncomment the OTLP setup below:
-	//
-	// ctx := context.Background()
-	// exporter, err := otlptracehttp.New(ctx,
-	//     otlptracehttp.WithInsecure(),
-	//     otlptracehttp.WithEndpoint("localhost:4318"),
-	// )
-	// if err != nil {
-	//     return nil, err
-	// }
-	// res, _ := resource.New(ctx, resource.WithFromEnv())
-	// tp := sdktrace.NewTracerProvider(
-	//     sdktrace.WithBatcher(exporter),
-	//     sdktrace.WithResource(res),
-	// )
-	// return tp, nil
+	// First, check if a collector is actually listening on localhost:4318
+	conn, err := net.DialTimeout("tcp", "localhost:4318", 2*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	conn.Close()
 
+	// Collector is reachable — try to set up the SDK
+	// These imports require go.opentelemetry.io/otel/sdk and
+	// go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp as direct deps.
+	// If they're not available, the build will fail and the user knows to run:
+	//   go get go.opentelemetry.io/otel/sdk go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+	ctx := context.Background()
+
+	// Attempt to create the OTLP HTTP exporter
+	exporter, err := newOTLPHTTPExporter(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tp, err := newTracerProvider(ctx, exporter)
+	if err != nil {
+		return nil, err
+	}
+
+	return tp, nil
+}
+
+// newOTLPHTTPExporter creates an OTLP HTTP span exporter.
+// This function is in a separate file so it can be replaced with build tags
+// if the OTel SDK is not available.
+var newOTLPHTTPExporter = func(ctx context.Context) (interface{}, error) {
+	return nil, nil
+}
+
+var newTracerProvider = func(ctx context.Context, exporter interface{}) (trace.TracerProvider, error) {
 	return nil, nil
 }

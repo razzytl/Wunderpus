@@ -183,11 +183,12 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 
 		// Check cache
 		if cached, ok := a.router.Cache.Get(req); ok {
-			logging.L(ctx).Info("cache hit", "provider", prov.Name())
+			logging.L(loopCtx).Info("cache hit", "provider", prov.Name())
 			resp := cached
 			// Process tool calls as usual if cached
 			if len(resp.ToolCalls) == 0 {
 				a.ctx.AddMessage(provider.RoleAssistant, resp.Content)
+				loopSpan.End()
 				return resp.Content, nil
 			}
 			// ... continue to tool execution if tool calls are in cache
@@ -214,6 +215,7 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 				ThreatLevel: "none",
 			})
 			logging.MessagesProcessed.WithLabelValues("unknown", prov.Name()).Inc()
+			loopSpan.End()
 			return resp.Content, nil
 		}
 
@@ -234,7 +236,7 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 				defer wg.Done()
 				defer func() {
 					if r := recover(); r != nil {
-						logging.L(ctx).Error("PANIC in tool execution", "tool", t.Function.Name, "panic", r)
+						logging.L(loopCtx).Error("PANIC in tool execution", "tool", t.Function.Name, "panic", r)
 						mu.Lock()
 						results[i] = struct {
 							id     string
@@ -262,7 +264,7 @@ func (a *Agent) HandleMessage(ctx context.Context, input string) (string, error)
 				}
 
 				start := time.Now()
-				res := a.executor.Execute(ctx, toolCall)
+				res := a.executor.Execute(loopCtx, toolCall)
 				logging.ToolExecutionTime.WithLabelValues(t.Function.Name).Observe(time.Since(start).Seconds())
 
 				outputStr := res.Output

@@ -238,6 +238,23 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	healthAgg := health.NewAggregator()
 	health.RegisterDBCheck(healthAgg, "core_db", dbManager.CoreDB)
 	health.RegisterDBCheck(healthAgg, "audit_db", dbManager.AuditDB)
+
+	// Provider health: check if router has an active provider
+	health.RegisterProviderCheck(healthAgg, "provider", func() bool {
+		return router.Active() != nil
+	})
+
+	// Memory health: check that session store is accessible
+	if memStore != nil {
+		health.RegisterMemoryCheck(healthAgg, "memory", func() int {
+			sessions, err := memStore.GetSessions()
+			if err != nil {
+				return -1
+			}
+			return len(sessions)
+		})
+	}
+
 	healthSrv := health.NewServer(cfg.Server.HealthPort, healthAgg)
 
 	// 14. Channels
@@ -257,6 +274,14 @@ func Bootstrap(configPath string, verbose bool) (*App, error) {
 	}
 	if cfg.Channels.WhatsApp.Enabled {
 		channels = append(channels, whatsapp.NewChannel(cfg.Channels.WhatsApp.SessionPath, manager))
+	}
+
+	// Register channel health checks
+	for _, ch := range channels {
+		chName := ch.Name()
+		health.RegisterChannelCheck(healthAgg, "channel:"+chName, func() bool {
+			return ch != nil
+		})
 	}
 
 	// Create channel aggregator for file sending

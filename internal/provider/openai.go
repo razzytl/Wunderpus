@@ -144,12 +144,8 @@ func (o *OpenAI) Complete(ctx context.Context, req *CompletionRequest) (*Complet
 }
 
 func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan StreamChunk, error) {
-	ctx, span := otel.Tracer("provider").Start(ctx, "provider.stream")
-	span.SetAttributes(
-		attribute.String("provider.name", o.providerName),
-		attribute.String("model", o.model),
-	)
-	defer span.End()
+	// Don't start the span here — it would end when this function returns (immediately).
+	// Instead, start the span inside the goroutine so it covers the full streaming duration.
 
 	model := req.Model
 	if model == "" {
@@ -191,6 +187,14 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 		defer close(ch)
 		defer resp.Body.Close()
 
+		// Start span here so it covers the full streaming duration
+		streamCtx, span := otel.Tracer("provider").Start(ctx, "provider.stream")
+		defer span.End()
+		span.SetAttributes(
+			attribute.String("provider.name", o.providerName),
+			attribute.String("model", model),
+		)
+
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
 			line := scanner.Text()
@@ -200,6 +204,7 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 			data := strings.TrimPrefix(line, "data: ")
 			if data == "[DONE]" {
 				ch <- StreamChunk{Done: true}
+				_ = streamCtx // suppress unused warning
 				return
 			}
 
@@ -218,6 +223,8 @@ func (o *OpenAI) Stream(ctx context.Context, req *CompletionRequest) (<-chan Str
 			}
 		}
 		if err := scanner.Err(); err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			span.SetAttributes(attribute.String("error.message", err.Error()))
 			ch <- StreamChunk{Error: err}
 		}
 	}()

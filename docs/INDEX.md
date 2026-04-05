@@ -9,16 +9,14 @@
 | Document | Purpose |
 |---|---|
 | [Getting Started](guides/getting-started.md) | Install, configure, and run Wunderpus in 5 minutes |
-| [Quick Reference](reference/quick-reference.md) | One-page cheat sheet for common operations |
 
 ### 🏗️ Architecture
 
 | Document | Purpose |
 |---|---|
 | [System Overview](architecture/overview.md) | High-level architecture, design patterns, and data flow |
-| [Agent Core](architecture/agent-core.md) | Agent loop, context management, tool execution, orchestration |
-| [Provider System](architecture/provider-system.md) | LLM provider routing, fallback, caching, and parallel probing |
-| [Genesis Autonomy](architecture/genesis-autonomy.md) | RSI, AGS, UAA, and RA — the four pillars of autonomous operation |
+| [Agent Core](architecture/agent-core.md) | Agent loop, context management, branching, checkpoints, tool execution |
+| [Provider System](architecture/provider-system.md) | LLM provider routing, fallback, and caching |
 | [Memory & Knowledge](architecture/memory-knowledge.md) | Session storage, RAG, world model, and SOP retrieval |
 
 ### 📖 Reference
@@ -37,8 +35,8 @@
 
 | Document | Purpose |
 |---|---|
-| [Deployment Guide](operations/deployment.md) | Production deployment: Docker, systemd, Kubernetes |
-| [Monitoring & Observability](operations/monitoring.md) | Prometheus metrics, health checks, logging |
+| [Deployment Guide](operations/deployment.md) | Production deployment: Docker, systemd |
+| [Monitoring & Observability](operations/monitoring.md) | Health dashboard, OpenTelemetry, Prometheus metrics, logging |
 | [Security Guide](guides/security.md) | Security model, hardening, best practices |
 | [Troubleshooting](operations/troubleshooting.md) | Common issues and solutions |
 
@@ -49,43 +47,50 @@
 ```
 CLI Layer → Bootstrap → Agent Core → Provider Router → LLM APIs
                       ↕
-              Channels │ Tools │ Skills │ Memory
-                      ↕
-              Genesis Systems (RSI · AGS · UAA · RA)
+              Channels │ Tools │ Skills │ Memory │ World Model
 ```
 
 ## Key Concepts
 
 | Concept | Description |
 |---|---|
-| **Provider** | An LLM backend (OpenAI, Anthropic, etc.) — Wunderpus supports 20+ via protocol-based routing |
+| **Provider** | An LLM backend (OpenAI, Anthropic, etc.) — Wunderpus supports 15+ via protocol-based routing |
 | **Channel** | A communication platform (Telegram, Discord, etc.) — connect multiple simultaneously |
 | **Tool** | An action the agent can perform (read file, run command, make HTTP request) |
 | **Skill** | A markdown-based capability extension that guides agent behavior |
 | **Session** | An isolated conversation context with its own history and preferences |
-| **Genesis** | The autonomous operation system with four pillars: RSI, AGS, UAA, RA |
-| **Trust Budget** | A points-based system that limits what autonomous actions the agent can take |
+| **Branch** | A diverged conversation path from any message, enabling exploration of alternatives |
+| **Checkpoint** | A persisted snapshot of agent context for crash-resilient resume |
+| **Approval Level** | Policy-based tool classification: AutoExecute, NotifyOnly, RequiresApproval, Blocked |
 | **World Model** | A persistent knowledge graph that learns from every interaction |
+| **AGS** | Autonomous Goal Synthesis — goal creation and execution triggered via API/CLI/Cron only |
 
 ---
 
 ## Version Information
 
-This documentation corresponds to **Wunderpus v2.0** with all core systems implemented:
+This documentation corresponds to **Wunderpus v2.0** with the following systems implemented:
 
 | System | Status |
 |---|---|
 | Core Agent | ✅ Stable |
-| Provider Router (20+ providers) | ✅ Stable |
-| Channel System (11 channels) | ✅ Stable |
+| Provider Router (15+ providers) | ✅ Stable |
+| Channel System (5 channels) | ✅ Stable |
 | Tool System (15+ tools) | ✅ Stable |
 | Skills System | ✅ Stable |
 | Memory & RAG | ✅ Stable |
 | World Model | ✅ Stable |
 | Perception (Computer Use) | ✅ Stable |
-| Swarm (Multi-Agent) | ✅ Stable |
 | Tool Synthesis | ✅ Stable |
-| Genesis — RSI | ✅ Implemented |
-| Genesis — AGS | ✅ Implemented |
-| Genesis — UAA | ✅ Implemented |
-| Genesis — RA | ✅ Implemented |
+| AGS (Goals — manual trigger) | ✅ Stable |
+| Conversation Branching | ✅ Stable |
+| Multi-Modal Input Detection | ✅ Stable |
+| Structured Output Enforcement | ✅ Stable |
+| Cost Prediction | ✅ Stable |
+| Checkpoint & Resume | ✅ Stable |
+| OpenTelemetry Tracing | ✅ Stable |
+| Health Dashboard | ✅ Stable |
+| Prompt Versioning | ✅ Stable |
+| Webhook System | ✅ Stable |
+| Sub-Agent Orchestration | ✅ Stable |
+| Heartbeat Scheduler | ✅ Stable |

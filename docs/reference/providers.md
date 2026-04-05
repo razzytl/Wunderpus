@@ -14,7 +14,7 @@ model_list:
     max_tokens: 4096
 ```
 
-**Models:** gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo
+**Models:** gpt-4o, gpt-4o-mini, gpt-4-turbo
 
 ### Anthropic
 
@@ -26,7 +26,7 @@ model_list:
     max_tokens: 4096
 ```
 
-**Models:** claude-sonnet-4-20250514, claude-opus-4-20250514, claude-3-5-sonnet, claude-3-haiku
+**Models:** claude-sonnet-4, claude-opus-4, claude-3-5-sonnet
 
 ### Google Gemini
 
@@ -38,7 +38,7 @@ model_list:
     max_tokens: 4096
 ```
 
-**Models:** gemini-2.0-flash, gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash
+**Models:** gemini-2.0-flash, gemini-1.5-pro
 
 ### Ollama (Local)
 
@@ -125,7 +125,6 @@ model_list:
 | Zhipu (GLM) | `zhipu/` | `open.bigmodel.cn` | `ZHIPU_API_KEY` |
 | Moonshot | `moonshot/` | `api.moonshot.cn` | `MOONSHOT_API_KEY` |
 | Qwen | `qwen/` | `dashscope.aliyuncs.com` | `QWEN_API_KEY` |
-| Volcanic | `volcanic/` | `ark.cn-beijing.volces.com` | `VOLCANIC_API_KEY` |
 | vLLM | `vllm/` | `localhost:8000/v1` | — |
 | LiteLLM | `litellm/` | `localhost:4000/v1` | — |
 

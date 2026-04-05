@@ -8,8 +8,8 @@ Wunderpus implements a defense-in-depth security model with five layers of prote
 ┌─────────────────────────────────────────────────────────────┐
 │                    Security Layers                           │
 ├──────────────┬──────────────┬──────────────┬────────────────┤
-│  Input       │  Execution   │  Network     │  Autonomy      │
-│  Sanitization│  Sandbox     │  SSRF Block  │  Trust Budget  │
+│  Input       │  Execution   │  Network     │  Approval      │
+│  Sanitization│  Sandbox     │  SSRF Block  │  Policy Gates  │
 ├──────────────┴──────────────┴──────────────┴────────────────┤
 │                    Storage Protection                         │
 │              AES-256-GCM + Hash-Chained Audit                │
@@ -95,39 +95,22 @@ tools:
     - "admin.local"
 ```
 
-## Layer 4: Trust Budget (UAA)
+## Layer 4: Policy-Based Approval Gates
 
-The Unbounded Autonomous Action system limits what the agent can do without human approval:
+Tools are classified by their `ApprovalLevel()`:
 
-### Action Tiers
+| Level | Behavior | Examples |
+|---|---|---|
+| `AutoExecute` | Run immediately | file_read, calculator, system_info |
+| `NotifyOnly` | Run with log | file_list, file_glob |
+| `RequiresApproval` | Pause for human approval | shell_exec, http_request, file_write |
+| `Blocked` | Reject immediately | Any tool blocked by policy |
 
-| Tier | Type | Cost | Examples |
-|---|---|---|---|
-| 1 | Read-only | 0 | Web search, file read, calculator |
-| 2 | Ephemeral | 1 | Temp file writes, go build, go test |
-| 3 | Persistent | 5 | File writes, git commit, DB modifications |
-| 4 | External | 20 | HTTP POST, deploy, send communications, spend money |
-
-### Trust Budget
-
-```yaml
-genesis:
-  trust_budget_max: 1000        # Maximum trust points
-  trust_regen_per_hour: 10     # Passive regeneration
-```
-
-**Mechanics:**
-- Successful actions refund 50% of cost
-- Failed actions penalize 3x cost
-- At zero trust: only Tier 1 actions allowed (lockdown)
-- Human reset via JWT (agent cannot self-issue)
-
-### Shadow Simulation
-
-Tier 3+ actions are simulated before execution:
-- LLM judges potential outcomes
-- SHA-256 keyed cache (5-min TTL)
-- High-risk actions require human approval
+When a tool requires approval:
+1. Execution pauses
+2. Human is notified (via TUI or channel)
+3. Human approves or denies
+4. Execution continues or aborts
 
 ## Layer 5: Storage Protection
 
@@ -138,23 +121,19 @@ AES-256-GCM encryption for sensitive data:
 ```yaml
 # Generate key: openssl rand -base64 32
 security:
-  encryption_key: "${WUNDERPUS_ENCRYPTION_KEY}"
+  encryption:
+    enabled: true
+    key: "${WUNDERPUS_ENCRYPTION_KEY}"
 ```
 
 **Encrypted at rest:**
 - Session messages
 - Audit log entries
-- Resource credentials (RA system)
 - API keys (when prefixed with `enc:`)
 
 ### Audit Log
 
-SHA-256 hash-chained, tamper-evident audit log:
-
-```yaml
-security:
-  audit_db_path: "wunderpus_audit.db"
-```
+SHA-256 hash-chained, tamper-evident audit log in `wunderpus-audit.db`:
 
 Every action logged with:
 - Timestamp
@@ -169,19 +148,13 @@ Every action logged with:
 Sliding window rate limiter per session:
 
 ```yaml
-# Default: 60 requests/minute, burst of 10
+security:
+  rate_limit:
+    enabled: true
+    window_sec: 60
+    max_requests: 60
+    cleanup_interval_sec: 300
 ```
-
-## RSI Firewall
-
-The Recursive Self-Improvement system can only modify files within `internal/`:
-
-```yaml
-genesis:
-  rsi_firewall_enabled: true  # NEVER disable in production
-```
-
-The deployer validates all diffs against this restriction before applying.
 
 ## Security Checklist
 
@@ -189,12 +162,10 @@ Before deploying to production:
 
 - [ ] `sanitization_enabled: true`
 - [ ] `restrict_to_workspace: true`
-- [ ] `rsi_firewall_enabled: true`
 - [ ] Encryption key configured
 - [ ] Audit log path set
 - [ ] Shell whitelist reviewed
 - [ ] SSRF blocklist updated for your network
-- [ ] Trust budget configured appropriately
 - [ ] API keys in environment variables (not config files)
 - [ ] Config file permissions: `chmod 600 config.yaml`
 - [ ] Database files excluded from version control
@@ -226,17 +197,14 @@ chmod 644 *.db  # SQLite databases
 ```yaml
 security:
   sanitization_enabled: true
-  audit_db_path: "/var/lib/wunderpus/audit.db"
+  encryption:
+    enabled: true
+    key: "${WUNDERPUS_ENCRYPTION_KEY}"
 
 agents:
   defaults:
     restrict_to_workspace: true
     workspace: "/var/lib/wunderpus/workspace"
-
-genesis:
-  rsi_firewall_enabled: true
-  uaa_enabled: false  # Disable autonomy until thoroughly tested
-  trust_budget_max: 100
 ```
 
 ## Threat Model
@@ -246,9 +214,8 @@ genesis:
 | Prompt injection | Input sanitization (9 patterns) |
 | File system escape | Workspace sandbox |
 | SSRF attacks | Network blocklist |
-| Autonomous damage | Trust budget + shadow simulation |
+| Unauthorized tool execution | Policy-based approval gates |
 | Data theft | AES-256-GCM encryption |
 | Audit tampering | SHA-256 hash chain |
 | Resource exhaustion | Rate limiting |
-| Self-modification abuse | RSI firewall |
 | Credential exposure | Encrypted storage |

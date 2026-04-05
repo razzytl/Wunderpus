@@ -28,7 +28,7 @@ cannot find package
 ```bash
 go mod download
 go mod tidy
-make build
+go build -o build/wunderpus ./cmd/wunderpus
 ```
 
 ### CGO Errors
@@ -46,7 +46,7 @@ sudo apt install gcc
 # macOS
 xcode-select --install
 
-# Or disable CGO
+# Or disable CGO (some features may not work)
 CGO_ENABLED=0 go build ./cmd/wunderpus
 ```
 
@@ -78,140 +78,133 @@ wunderpus auth status
 ### Rate Limiting
 
 **Solution:**
-- Configure fallback providers
-- Use cheaper models for simple tasks
-- Enable response caching
-
-```yaml
-model_list:
-  - model_name: "primary"
-    model: "openai/gpt-4o"
-    fallback_models:
-      - "groq/llama-3.3-70b-versatile"
-```
+- Configure fallback models
+- Increase timeout in config
+- Use providers with higher rate limits
 
 ## Channel Issues
 
-### Channel Fails to Start
+### Telegram Bot Not Responding
 
 **Solution:**
 - Verify bot token is correct
-- Check network connectivity
-- Ensure bot has necessary permissions
+- Check bot is not blocked by Telegram
+- Ensure Message Content Intent is enabled
 
-```bash
-wunderpus gateway -v 2>&1 | grep -i telegram
-```
-
-### Messages Not Delivered
+### Discord Bot Not Receiving Messages
 
 **Solution:**
-1. Check channel status: `wunderpus status`
-2. Verify rate limits not exceeded
-3. Check bot permissions on the platform
+- Enable Message Content Intent in Discord Developer Portal
+- Enable Guild Messages intent
+- Invite bot with correct permissions
 
-## Memory Issues
-
-### High Memory Usage
+### WebSocket Connection Refused
 
 **Solution:**
-- Reduce `max_context_tokens`
-- Limit concurrent sessions
-- Check for memory leaks in tools
+- Check port is not already in use
+- Verify `channels.websocket.enabled: true` in config
+- Check firewall rules
 
-```yaml
-agent:
-  max_context_tokens: 4000  # Reduce from 8000
+## Database Issues
+
+### SQLite Lock
+
 ```
-
-### Database Lock Errors
+database is locked
+```
 
 **Solution:**
-- Ensure only one Wunderpus instance accesses the database
-- Use WAL mode (enabled by default)
-- Check file permissions
+- Ensure only one instance is running
+- Check file permissions on `.db` files
+- SQLite WAL mode is enabled by default for concurrent reads
 
-```bash
-chmod 644 *.db
+### Database File Not Found
+
 ```
+no such table: mem_sessions
+```
+
+**Solution:**
+- Tables are created automatically on first access
+- Check that the DB path is writable
+- Verify `db.Open()` is called during bootstrap
 
 ## Tool Issues
 
-### Tool Execution Timeout
-
-```
-tool execution timed out after 30s
-```
+### Tool Execution Timed Out
 
 **Solution:**
-- Increase timeout: `tools.timeout_seconds: 60`
-- Check if command is hanging
-- Verify tool dependencies are installed
+- Increase `tools.timeout_seconds` in config
+- Check if the command is hanging (e.g., waiting for input)
+- Verify the tool is in the shell whitelist
 
-### Shell Command Not Allowed
-
-```
-command 'rm' is not in the whitelist
-```
+### "tool denied by user"
 
 **Solution:**
-- Add command to whitelist:
+- This is expected for `RequiresApproval` tools
+- Approve the tool execution via TUI or channel
+- To auto-approve, change the tool's `ApprovalLevel` to `AutoExecute`
 
-```yaml
-tools:
-  shell_whitelist:
-    - git
-    - go
-    - rm  # Add the command
-```
-
-## Genesis Issues
-
-### RSI Sandbox Failures
+### "tool blocked by policy"
 
 **Solution:**
-- Ensure Go toolchain is available in sandbox
-- Check Docker is running (if using Docker isolation)
-- Verify `internal/` directory exists
+- The tool is classified as `Blocked`
+- Check the tool's `ApprovalLevel()` implementation
+- Review policy configuration
 
-### Trust Budget Lockdown
+## Memory Issues
+
+### Context Too Long
 
 **Solution:**
-- Check trust budget status
-- Reset via JWT if locked down
-- Reduce autonomous action frequency
+- Increase `agent.max_context_tokens`
+- Summarization triggers automatically at 80% capacity
+- Check tiktoken is loading correctly (falls back to heuristic if not)
 
-```bash
-# Check status
-wunderpus status
-```
+### RAG Not Returning SOPs
 
-## Debug Mode
+**Solution:**
+- Verify an embedding-capable provider is configured
+- Check `EnhancedStore` is initialized (requires embedder)
+- Verify SOPs are stored: `enhanced.StoreSOP(ctx, title, content)`
 
-Enable verbose logging for detailed diagnostics:
+## Health Check Issues
+
+### /health Returns "unhealthy"
+
+**Solution:**
+- Check the `components` field in the response to identify which component is down
+- Common causes:
+  - Database connection lost
+  - Provider not responding
+  - Channel disconnected
+
+### /ready Returns "not ready"
+
+**Solution:**
+- Same as above — check component status
+- Readiness uses the same aggregation as health
+
+## Logging
+
+### Enable Debug Logging
 
 ```bash
 wunderpus -v
-wunderpus agent -v -m "test message"
-wunderpus gateway -v
 ```
 
-### Log Levels
-
-| Level | Use Case |
-|---|---|
-| `debug` | Detailed debugging |
-| `info` | Normal operation (default) |
-| `warn` | Warning conditions |
-| `error` | Error conditions only |
+Or in config:
 
 ```yaml
 logging:
-  level: "debug"  # Maximum verbosity
+  level: "debug"
 ```
 
-## Getting Help
+### JSON Logs for Log Aggregation
 
-- **GitHub Issues:** [Report bugs](https://github.com/wunderpus/wunderpus/issues)
-- **Documentation:** [docs/INDEX.md](../INDEX.md)
-- **CLI Help:** `wunderpus --help`
+```yaml
+logging:
+  level: "info"
+  format: "json"
+  output: "/var/log/wunderpus/app.log"
+```

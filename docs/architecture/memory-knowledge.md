@@ -1,6 +1,6 @@
 # Memory & Knowledge System
 
-Wunderpus implements a three-tier memory architecture combining in-memory context, persistent storage, and vector-based retrieval.
+Wunderpus implements a multi-tier memory architecture combining in-memory context, persistent SQLite storage, vector-based retrieval, and a knowledge graph.
 
 ## Architecture
 
@@ -12,9 +12,10 @@ Wunderpus implements a three-tier memory architecture combining in-memory contex
 │  In-Memory   │  Persistent  │  Vector (RAG)                  │
 │  Context     │  Storage     │                                │
 │              │              │                                │
-│ • tiktoken   │ • SQLite     │ • Cosine similarity            │
-│ • Truncation │ • AES-256    │ • SOP embeddings               │
-│ • Summarize  │ • Sessions   │ • Hybrid fallback              │
+│ • tiktoken   │ • SQLite     │ • Embeddings via provider      │
+│ • Truncation │ • AES-256    │ • SOP retrieval                │
+│ • Summarize  │ • Sessions   │ • Hybrid fallback (SQL search) │
+│ • Branching  │ • Branches   │                                │
 └──────────────┴──────────────┴────────────────────────────────┘
 ```
 
@@ -50,29 +51,55 @@ When context reaches 80% capacity:
 
 ### SQLite Backend
 
-All sessions persisted in SQLite with WAL mode:
+All sessions persisted in SQLite with WAL mode. Tables are namespaced with `mem_` prefix in the shared `wunderpus.db`:
 
-```yaml
-agent:
-  memory_db_path: "wonderpus_memory.db"
+```sql
+CREATE TABLE mem_sessions (
+    id TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    title TEXT NOT NULL DEFAULT 'New Conversation'
+);
+
+CREATE TABLE mem_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    tool_call_id TEXT DEFAULT '',
+    tool_calls TEXT DEFAULT '',
+    timestamp TEXT NOT NULL,
+    encrypted INTEGER DEFAULT 0,
+    parent_message_id INTEGER DEFAULT NULL,
+    branch_id TEXT DEFAULT 'main',
+    FOREIGN KEY (session_id) REFERENCES mem_sessions(id) ON DELETE CASCADE
+);
 ```
-
-### Schema
-
-| Table | Purpose |
-|---|---|
-| `sessions` | Session metadata (ID, created, provider) |
-| `messages` | Individual messages (role, content, tokens) |
-| `preferences` | User preferences per session |
 
 ### Encryption
 
 Messages encrypted with AES-256-GCM before storage:
 
+```yaml
+security:
+  encryption:
+    enabled: true
+    key: "<base64-encoded-32-byte-key>"
+```
+
+### Conversation Branching
+
+Messages support `parent_message_id` and `branch_id` for branching:
+
 ```go
-// Encryption key derived from config
-encrypted := encryption.Encrypt(message, key)
-store.SaveMessage(sessionID, encrypted)
+// Create a new branch from message N
+branchID, err := store.CreateBranch(sessionID, messageID)
+
+// Load messages from a specific branch
+messages, err := store.LoadSessionBranch(sessionID, branchID, encKey)
+
+// Get all branches for a session
+branches, err := store.GetBranches(sessionID)
 ```
 
 ## Tier 3: Vector Search (RAG)
@@ -82,8 +109,10 @@ store.SaveMessage(sessionID, encrypted)
 Extends basic storage with Retrieval-Augmented Generation:
 
 ```go
-enhanced := memory.NewEnhancedStore(baseStore, vectorStore, embedder)
+enhanced := memory.NewEnhancedStore(baseStore, embedder)
 ```
+
+The embedder is auto-selected from the provider router — the first provider that supports embeddings is used.
 
 ### SOPs (Standard Operating Procedures)
 
@@ -127,7 +156,7 @@ If embedder unavailable:
 
 ## World Model (Knowledge Graph)
 
-A persistent knowledge graph that learns from every interaction.
+A persistent knowledge graph that learns from every interaction. Tables are namespaced with `wm_` prefix.
 
 ### Entity Types
 
@@ -138,12 +167,9 @@ A persistent knowledge graph that learns from every interaction.
 | Product | Software, tools, services |
 | API | API endpoints and services |
 | Technology | Frameworks, languages, libraries |
-| Market | Markets, sectors, industries |
-| Event | Notable events |
 | Concept | Abstract concepts |
 | File | Referenced files |
 | URL | Web resources |
-| Price | Pricing information |
 | Tool | Agent tools |
 
 ### Confidence Scoring
@@ -159,9 +185,7 @@ Each entity/relation has a confidence score based on source:
 
 ### Confidence Decay
 
-```
-Entities not observed for 30 days: -10% confidence/day
-```
+Entities not observed for 30 days lose 10% confidence per day.
 
 ### Queries
 
@@ -175,25 +199,11 @@ FIND PATH FROM "OpenAI" TO "Sam Altman" MAX 3 HOPS
 MATCH (n:Technology) WHERE n.confidence > 0.7
 ```
 
-## Memory Configuration
+## Persistence Model
 
-```yaml
-agent:
-  memory_db_path: "wonderpus_memory.db"
-  max_context_tokens: 8000
+Wunderpus uses exactly 2 SQLite databases:
 
-security:
-  audit_db_path: "wonderpus_audit.db"
-```
-
-## Persistence Model Summary
-
-| Database | Purpose | Encryption |
+| Database | Purpose | Namespaces |
 |---|---|---|
-| `wonderpus_memory.db` | Sessions, messages, preferences | AES-256-GCM |
-| `wonderpus_audit.db` | Tamper-evident audit log | Optional |
-| `wonderpus_worldmodel.db` | Knowledge graph | No |
-| `wonderpus_cost.db` | Cost tracking | No |
-| `wunderpus_profiler.db` | RSI metrics | No |
-| `wunderpus_trust.db` | Trust budget | No |
-| `wunderpus_resources.db` | Provisioned resources | AES-256-GCM |
+| `wunderpus.db` | Core data | `mem_` (memory), `wm_` (world model), `cost_` (cost tracking), `task_checkpoints` |
+| `wunderpus-audit.db` | Tamper-evident audit log | `audit_log` (hash-chained entries) |

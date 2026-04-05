@@ -102,14 +102,6 @@ List all scheduled tasks.
 wunderpus cron list
 ```
 
-**Output:**
-```
-Periodic Tasks Status: {interval: 30, quick_tasks: 2, long_tasks: 2}
-Interval: 30 minutes
-Quick Tasks: [Report current date and time, Summarize conversation]
-Long Tasks: [Search for tech news, Check for updates]
-```
-
 #### cron add
 
 Add a new periodic task.
@@ -134,17 +126,6 @@ List installed skills.
 
 ```bash
 wunderpus skills list
-```
-
-**Output:**
-```
-Installed Skills (6):
-- github (builtin): Interact with GitHub using gh CLI
-- tmux (builtin): Automate terminal multiplexer sessions
-- weather (builtin): Get current weather and forecasts
-- summarize (builtin): Automatic content summarization
-- social-post (builtin): Generate social media posts
-- skill-creator (builtin): Generate new skills
 ```
 
 #### skills install

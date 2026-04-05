@@ -4,22 +4,33 @@ Wunderpus provides a comprehensive tool system that enables the agent to interac
 
 ## Built-in Tools
 
-| Tool | Description | Sensitive |
+| Tool | Description | Approval Level |
 |---|---|---|
-| `file_read` | Read file contents | No |
-| `file_write` | Write content to file | Yes |
-| `file_list` | List directory contents | No |
-| `file_glob` | Find files by pattern | No |
-| `search_files` | Search file contents | No |
-| `shell_exec` | Execute shell commands | Yes |
-| `http_request` | Make HTTP requests | Yes |
-| `calculator` | Mathematical calculations | No |
-| `system_info` | System information | No |
-| `browser` | Browser automation | Yes |
-| `spawn` | Create sub-agent | Yes |
-| `message` | Send message to sub-agent | No |
-| `ask_human` | Request human input | No |
-| `send_file` | Send file to user | No |
+| `file_read` | Read file contents (sandboxed to workspace) | AutoExecute |
+| `file_write` | Write content to file (sandboxed) | RequiresApproval |
+| `file_list` | List directory contents (sandboxed) | NotifyOnly |
+| `file_glob` | Find files by pattern (sandboxed) | NotifyOnly |
+| `search_files` | Search file contents (sandboxed) | AutoExecute |
+| `shell_exec` | Execute shell commands (whitelisted + sandboxed) | RequiresApproval |
+| `http_request` | Make HTTP requests (SSRF-blocked) | RequiresApproval |
+| `calculator` | Mathematical calculations | AutoExecute |
+| `system_info` | System information | AutoExecute |
+| `browser` | Browser automation via Playwright | RequiresApproval |
+| `spawn` | Create sub-agent | RequiresApproval |
+| `message` | Send message to sub-agent | AutoExecute |
+| `ask_human` | Request human input | AutoExecute |
+| `send_file` | Send file to user via channel | AutoExecute |
+
+## Approval Levels
+
+Tools are classified by their `ApprovalLevel()`:
+
+| Level | Behavior | When to Use |
+|---|---|---|
+| `AutoExecute` | Run immediately | Read-only, safe operations |
+| `NotifyOnly` | Run with log entry | Low-risk operations worth auditing |
+| `RequiresApproval` | Pause for human approval | Destructive or external operations |
+| `Blocked` | Reject immediately | Dangerous or disabled tools |
 
 ## Tool Execution Pipeline
 
@@ -30,8 +41,11 @@ Agent requests tool
 1. Lookup tool in registry
     │
     ▼
-2. Approval check (sensitive tools)
-    │  (pause for human approval if needed)
+2. Policy-based approval check
+    │  ├── AutoExecute → run immediately
+    │  ├── RequiresApproval → pause for human
+    │  ├── Blocked → reject
+    │  └── NotifyOnly → log and run
     ▼
 3. Timeout enforcement
     │
@@ -52,13 +66,13 @@ Agent requests tool
 
 ```go
 type Tool interface {
-    Name() string                          // Unique identifier
-    Description() string                   // What the tool does
-    Parameters() []ParameterDef            // Input parameters
+    Name() string                              // Unique identifier
+    Description() string                       // What the tool does
+    Parameters() []ParameterDef                // Input parameters
     Execute(ctx context.Context, args) (*Result, error)  // Run the tool
-    Sensitive() bool                       // Requires human approval
-    Version() string                       // Semantic version
-    Dependencies() []string                // Required dependencies
+    ApprovalLevel() ApprovalLevel              // Policy-based classification
+    Version() string                           // Semantic version
+    Dependencies() []string                    // Required dependencies
 }
 ```
 
@@ -68,6 +82,8 @@ Per-tool tracking includes:
 - Call count
 - Error count
 - Total latency
+
+Access via `executor.GetStats()`.
 
 ## MCP Support
 
@@ -89,12 +105,16 @@ tools:
 tools:
   enabled: true
   timeout_seconds: 30
-
-  # Sensitive tools require approval
-  sensitive_tools:
-    - shell_exec
-    - http_request
-    - file_write
+  shell_whitelist:
+    - ls
+    - git
+    - go
+    - cat
+    - echo
+    - grep
+    - find
+  ssrf_blocklist:
+    - "internal.company.com"
 ```
 
 ## Tool Synthesis
@@ -114,5 +134,5 @@ When enabled, the agent:
 
 ```yaml
 genesis:
-  toolsynth_enabled: true
+  tool_synth_enabled: true
 ```

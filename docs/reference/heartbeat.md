@@ -52,17 +52,6 @@ These tasks are executed asynchronously using spawned subagents.
 | Quick Tasks | Immediate, synchronous | Simple queries, status checks |
 | Long Tasks | Async via sub-agent | Research, analysis, multi-step tasks |
 
-### Schedule Syntax
-
-The parser supports natural language schedules:
-
-| Syntax | Meaning |
-|---|---|
-| `hourly` | Every hour |
-| `daily` | Every day |
-| `weekdays at 9am` | Monday-Friday at 9:00 |
-| `every 5 minutes` | Every 5 minutes |
-
 ## CLI Commands
 
 ### List Tasks

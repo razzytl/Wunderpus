@@ -1,202 +1,131 @@
 # Agent Core
 
-The agent is the central processing unit of Wunderpus — it receives messages, manages context, executes tools, and generates responses.
+The Agent Core is the central processing unit of Wunderpus — it receives messages, manages context, executes tools, and orchestrates multi-agent workflows.
+
+## Components
+
+| Component | File | Purpose |
+|---|---|---|
+| `Agent` | `internal/agent/agent.go` | Core agent loop — message processing, tool execution, streaming |
+| `ContextManager` | `internal/agent/context.go` | Conversation history with tiktoken counting and SQLite persistence |
+| `Manager` | `internal/agent/manager.go` | Multi-session agent factory, budget checking, RAG integration |
+| `StructuredOutputEnforcer` | `internal/agent/structured_output.go` | JSON validation with retry logic |
+| `CheckpointStore` | `internal/agent/checkpoint.go` | Crash-resilient task checkpoints |
+| `TaskPlanner` | `internal/agent/planner.go` | Decomposes complex tasks into dependency graphs |
+| `Orchestrator` | `internal/agent/orchestrator.go` | Executes task graphs with scoped worker arms |
+| `WorkerArm` | `internal/agent/worker.go` | Individual sub-agent with tool scoping |
 
 ## Agent Loop
 
 ```
-User Message
+HandleMessage(input)
     │
-    ▼
-┌─────────────────────────────────────────┐
-│ 1. Sanitize Input                        │
-│    - Unicode normalization               │
-│    - Injection pattern detection         │
-│    - Block high-severity threats         │
-└──────────────────┬──────────────────────┘
-                   │
-┌──────────────────▼──────────────────────┐
-│ 2. Add to Context                        │
-│    - tiktoken counting (cl100k_base)    │
-│    - SQLite persistence                 │
-│    - Optional AES encryption            │
-└──────────────────┬──────────────────────┘
-                   │
-┌──────────────────▼──────────────────────┐
-│ 3. Loop (max 5 iterations)              │
-│                                         │
-│   a. Build messages                     │
-│      - System prompt                    │
-│      - Conversation context             │
-│      - RAG SOPs (if relevant)           │
-│      - Tool schemas                     │
-│                                         │
-│   b. Check response cache (5-min TTL)   │
-│                                         │
-│   c. provider.Router.CompleteWithFallback│
-│      - Try active provider              │
-│      - Fallback to model chain          │
-│      - Fallback to other providers      │
-│                                         │
-│   d. If tool calls:                     │
-│      - Execute in parallel              │
-│      - Approval gate (sensitive tools)  │
-│      - Timeout enforcement              │
-│      - Audit log                        │
-│      - Add results to context           │
-│      - Check summarization (>80%)       │
-│      - Continue loop                    │
-│                                         │
-│   e. If no tool calls:                  │
-│      - Return response                  │
-└─────────────────────────────────────────┘
+    ├── Rate limit check
+    ├── Sanitize input (prompt injection detection)
+    ├── Audit log input
+    ├── Add user message to context
+    │
+    └── Loop (max MaxIterations):
+        │
+        ├── Build messages (system prompt + context + SOPs)
+        ├── Select active provider
+        ├── Attach tool schemas
+        ├── Check response cache
+        ├── provider.CompleteWithFallback()
+        │
+        ├── If no tool calls → return response
+        │
+        └── If tool calls:
+            │
+            ├── Add tool-call request to context
+            ├── Execute tools in parallel (goroutines)
+            │   ├── Policy-based approval check
+            │   ├── Sandbox validation
+            │   ├── Tool.Execute()
+            │   └── Audit log result
+            ├── Add tool results to context
+            ├── Check summarization threshold
+            └── Continue loop
 ```
 
 ## Context Management
 
-### Token Counting
+The `ContextManager` handles:
 
-Uses tiktoken (cl100k_base encoding) for accurate token counting:
+- **Token-based truncation** using tiktoken (cl100k_base encoding)
+- **SQLite persistence** — messages saved on every addition
+- **AES-256-GCM encryption** at rest (optional)
+- **Conversation branching** — create, switch, and navigate branches
+- **Automatic summarization** when context exceeds 80% capacity
+
+### Conversation Branching
+
+Messages support `parent_message_id` and `branch_id` fields:
+
+```
+Session: abc123
+├── Branch: main
+│   ├── Message 1: "Help me write code"
+│   ├── Message 2: "Here's the code..."
+│   └── Message 3: "Can you optimize it?"
+│
+└── Branch: branch-abc123-2  (branched from message 2)
+    ├── Message 2: "Here's the code..."
+    ├── Message 4: "Try a different approach..."
+    └── Message 5: "This version is faster"
+```
+
+API:
+- `POST /api/branches` — create branch from message X
+- `GET /api/branches/messages` — retrieve branch messages
+- WebSocket: `branch_switch`, `list_branches` message types
+
+### Checkpoint & Resume
+
+After every tool execution step, a checkpoint can be saved:
 
 ```go
-// Automatic truncation when context exceeds limit
-if contextManager.NeedsSummarization() {
-    // Summarize oldest messages
-    summary := llm.Summarize(oldestMessages)
-    contextManager.ReplaceWithSummary(summary)
+type CheckpointSnapshot struct {
+    Messages  []provider.Message
+    BranchID  string
+    SessionID string
+    StepDesc  string
 }
 ```
 
-### Context Lifecycle
+On startup, `ScanRunningCheckpoints()` finds tasks with `status = 'running'` and `ResumeTask()` rehydrates the agent context.
 
-| Stage | Action |
-|---|---|
-| New message | Add to context, count tokens |
-| > 80% capacity | Trigger summarization |
-| > 100% capacity | Truncate oldest messages (keep min 2) |
-| Session end | Persist to SQLite |
+## Structured Output Enforcement
 
-## Tool Execution
+When a tool or agent expects JSON output:
 
-### Parallel Execution
-
-Tools are executed concurrently using `sync.WaitGroup`:
+1. LLM generates response
+2. `json.Valid()` validates the response
+3. If invalid → append correction prompt, retry (configurable max retries)
+4. Each retry counts against the iteration budget
 
 ```go
-var wg sync.WaitGroup
-for _, call := range toolCalls {
-    wg.Add(1)
-    go func(call ToolCall) {
-        defer wg.Done()
-        result := executor.Execute(ctx, call)
-        results = append(results, result)
-    }(call)
-}
-wg.Wait()
-```
-
-### Tool Scopes (Multi-Agent)
-
-In multi-agent orchestration, worker arms receive scoped tool registries:
-
-| Worker Type | Available Tools |
-|---|---|
-| I/O | http_request, file_read, file_write, file_list |
-| Compute | calculator, system_info |
-| General | All tools |
-
-This prevents lateral drift and reduces attack surface.
-
-### Approval Gates
-
-Sensitive tools require human approval:
-
-```yaml
-tools:
-  sensitive_tools:
-    - shell_exec
-    - http_request
-```
-
-When a sensitive tool is called:
-1. Execution pauses
-2. Human is notified (via TUI or channel)
-3. Human approves or denies
-4. Execution continues or aborts
-
-## Session Management
-
-The `agent.Manager` handles multiple concurrent sessions:
-
-```go
-// Get or create agent for session
-ag := manager.GetAgent(sessionID)
-
-// Process message
-resp, err := manager.ProcessMessage(ctx, sessionID, input)
-```
-
-### Session Isolation
-
-Each session has:
-- Independent conversation context
-- Separate token counter
-- Individual rate limit tracking
-- Isolated cost tracking
-
-## Streaming
-
-Providers that support streaming deliver tokens incrementally:
-
-```go
-// Streaming response
-err := agent.StreamMessage(ctx, input, func(token string) {
-    // Display token in real-time
-    fmt.Print(token)
+enforcer := NewStructuredOutputEnforcer(2) // max 2 retries
+resp, retries, err := enforcer.ExecuteWithValidation(ctx, completeFn, messages, OutputFormat{
+    Type:       "json",
+    JSONSchema: `{"type": "object", "properties": {...}}`,
 })
 ```
 
-## Complex Task Orchestration
+## Multi-Agent Orchestration
 
-For complex goals, the agent decomposes and delegates:
+For complex tasks, the agent loop is bypassed in favor of a task graph:
 
-```
-Input: "Build a REST API with authentication"
-    │
-    ▼
-TaskPlanner.Decompose()
-    │
-    │  LLM generates:
-    │  ├── Task 1: Design API schema (compute)
-    │  ├── Task 2: Implement endpoints (compute)
-    │  ├── Task 3: Add auth middleware (compute)
-    │  └── Task 4: Write tests (compute)
-    │
-    ▼
-Orchestrator.Execute(dependencyGraph)
-    │
-    │  Workers execute in parallel where possible:
-    │  ├── Task 1 ──┐
-    │  ├── Task 2 ──┼── (depends on Task 1)
-    │  ├── Task 3 ──┤
-    │  └── Task 4 ──┘  (depends on Tasks 2, 3)
-    │
-    ▼
-Synthesizer.Merge(results)
-    │
-    ▼
-"API built with 4 endpoints, JWT auth, and 12 tests"
-```
+1. **TaskPlanner** decomposes the input into a `TaskGraph` with `Subtask` nodes and dependencies
+2. **Orchestrator** resolves the graph topologically and executes independent subtasks concurrently
+3. **WorkerArm** instances run with scoped tool access (e.g., `io-scoped`, `compute-scoped`)
+4. Results are merged by the synthesizer into a final response
 
-## Configuration
+## Manager
 
-```yaml
-agent:
-  system_prompt: "You are Wunderpus, a helpful AI assistant..."
-  max_context_tokens: 8000
-  temperature: 0.7
+The `Manager` handles multiple agent instances (one per session):
 
-tools:
-  enabled: true
-  timeout_seconds: 30
-```
+- **Lazy initialization** — agents created on first message
+- **Budget checking** — `cost.Tracker.IsOverBudget()` before processing
+- **Rate limiting** — per-session rate limiting via `security.RateLimiter`
+- **RAG integration** — SOP retrieval via `EnhancedStore.GetRelevantSOPs()`

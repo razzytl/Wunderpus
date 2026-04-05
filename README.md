@@ -1,22 +1,15 @@
 # Wunderpus
 
 <p align="center">
-  <img src="resources/banner.jpg" alt="Wunderpus" width="400"/>
+  <strong>Universal Autonomous AI Agent Framework — Written in Go</strong>
 </p>
 
 <p align="center">
-  <strong>Universal Autonomous AI Agent Framework</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/wunderpus/wunderpus/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/wunderpus/wunderpus/ci.yml?branch=main&style=flat-square" alt="CI"/>
-  </a>
   <a href="https://golang.org/doc/devel/release.html#policy">
-    <img src="https://img.shields.io/github/go-mod/go-version/wunderpus/wunderpus?style=flat-square" alt="Go Version"/>
+    <img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square" alt="Go Version"/>
   </a>
   <a href="https://github.com/wunderpus/wunderpus/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/wunderpus/wunderpus?style=flat-square" alt="License"/>
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"/>
   </a>
 </p>
 
@@ -24,21 +17,28 @@
 
 ## What Is Wunderpus?
 
-Wunderpus is a **production-grade, vendor-agnostic autonomous AI agent framework** written in Go. It provides a complete runtime for building, deploying, and managing AI agents that can interact with users across multiple channels, execute tools, synthesize new capabilities, and — with the Genesis system — operate autonomously with safety guardrails.
+Wunderpus is a **production-grade, vendor-agnostic autonomous AI agent framework** written in Go. It provides a complete runtime for building, deploying, and managing AI agents that can interact with users across multiple channels, execute tools with policy-based approval gates, maintain persistent memory with RAG, and operate with structured autonomy.
 
 ### Core Capabilities
 
 | Capability | Description |
 |---|---|
-| **Multi-Provider LLM** | 15+ providers via protocol-based routing (OpenAI, Anthropic, Gemini, Ollama, Groq, DeepSeek, and more) with automatic fallback and parallel probing |
-| **Multi-Channel** | Connect to Telegram, Discord, Slack, WhatsApp, LINE, and WebSocket — simultaneously |
-| **Tool System** | 15+ built-in tools (file I/O, shell, HTTP, browser, calculator) with sandboxing, approval gates, and MCP support |
+| **Multi-Provider LLM** | 15+ providers via protocol-based routing (OpenAI, Anthropic, Gemini, Ollama, Groq, DeepSeek, and more) with automatic fallback |
+| **Multi-Channel** | Connect to Telegram, Discord, Slack, WhatsApp, and WebSocket — simultaneously |
+| **Tool System** | 15+ built-in tools (file I/O, shell, HTTP, browser, calculator) with workspace sandboxing and policy-based approval gates |
 | **Skills** | Markdown-based extensibility system with local and global registries |
 | **Memory & RAG** | SQLite-persisted sessions with AES-256-GCM encryption, vector search, and SOP (Standard Operating Procedure) retrieval |
 | **World Model** | Persistent knowledge graph with entity/relation tracking, confidence scoring, and Cypher-like queries |
 | **Perception** | Computer use via Playwright — navigate websites, fill forms, interact with any GUI |
 | **Self-Improvement** | Tool synthesis engine that detects capability gaps and generates new tools |
-| **Autonomy** | AGS (Autonomous Goal Synthesis) with explicit API/CLI/Cron invocation — no autonomous loops |
+| **Conversation Branching** | Create, switch, and navigate conversation branches for exploring alternative paths |
+| **Multi-Modal Input** | Detect and route text, image, audio, PDF, and DOCX inputs through a unified pipeline |
+| **Structured Output** | Enforce JSON output format with automatic validation and retry on invalid responses |
+| **Cost Prediction** | Pre-execution cost estimation using token counting and model pricing matrices |
+| **Checkpoint & Resume** | Crash-resilient task execution with persistent checkpoints and resume capability |
+| **Observability** | OpenTelemetry tracing spans across providers, tools, and agent loops |
+| **Health Dashboard** | Component-level health aggregation with `/health`, `/live`, and `/ready` endpoints |
+| **Webhooks** | Event-driven webhook delivery with Go template rendering and retry/backoff |
 
 ---
 
@@ -47,7 +47,6 @@ Wunderpus is a **production-grade, vendor-agnostic autonomous AI agent framework
 ### Prerequisites
 
 - Go 1.25+
-- Make (optional, for Makefile targets)
 
 ### Install & Run
 
@@ -55,7 +54,7 @@ Wunderpus is a **production-grade, vendor-agnostic autonomous AI agent framework
 # Clone and build
 git clone https://github.com/wunderpus/wunderpus.git
 cd wunderpus
-make build
+go build -o build/wunderpus ./cmd/wunderpus
 
 # Configure
 cp config.example.yaml config.yaml
@@ -90,23 +89,29 @@ docker run -d -p 8080:8080 -p 9090:9090 -v $(pwd)/config.yaml:/app/config.yaml w
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Application Bootstrap                         │
-│         Config → Logging → Security → Providers → Tools        │
-│         → Memory → Skills → ToolSynth → WorldModel             │
-│         → Perception → Agent → SubAgent → Swarm → Heartbeat    │
+│  Config → Logging → DB → Security → Providers → Tools          │
+│  → Memory → Skills → ToolSynth → WorldModel → Perception       │
+│  → Agent → SubAgent → Heartbeat → Health → Channels            │
 └─────────┬────────────────────┬────────────────────┬─────────────┘
           │                    │                    │
 ┌─────────▼──────┐  ┌─────────▼──────┐  ┌─────────▼──────────────┐
-│  Agent Core    │  │   Channels     │  │   Genesis Systems      │
-│  • Context Mgt │  │  • Telegram    │  │  • RSI (Self-Improve)  │
-│  • Tool Exec   │  │  • Discord     │  │  • AGS (Goal Synth)    │
-│  • Skills      │  │  • Slack       │  │  • UAA (Autonomy)      │
-│  • RAG/SOP     │  │  • WhatsApp    │  │  • RA (Resources)      │
-│  • Streaming   │  │  • WebSocket   │  │                        │
+│  Agent Core    │  │   Channels     │  │   Core Systems         │
+│  • Context Mgt │  │  • Telegram    │  │  • Tool Synthesis      │
+│  • Tool Exec   │  │  • Discord     │  │  • World Model         │
+│  • Skills      │  │  • Slack       │  │  • Perception          │
+│  • RAG/SOP     │  │  • WhatsApp    │  │  • AGS (Goals)         │
+│  • Streaming   │  │  • WebSocket   │  │  • Sub-Agents          │
+│  • Branching   │  │                │  │  • Heartbeat           │
 └────────────────┘  └────────────────┘  └────────────────────────┘
           │                    │                    │
 ┌─────────▼────────────────────▼────────────────────▼─────────────┐
 │                    Provider Router                               │
 │    OpenAI │ Anthropic │ Gemini │ Ollama │ Groq │ DeepSeek │ ... │
+└─────────────────────────────────────────────────────────────────┘
+          │
+┌─────────▼───────────────────────────────────────────────────────┐
+│                    Persistence Layer                             │
+│    wunderpus.db (core)  │  wunderpus-audit.db (audit log)       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,14 +123,15 @@ docker run -d -p 8080:8080 -p 9090:9090 -v $(pwd)/config.yaml:/app/config.yaml w
 |---|---|
 | **[Getting Started](docs/guides/getting-started.md)** | Installation, configuration, first run |
 | **[Architecture](docs/architecture/overview.md)** | System design, data flow, extension points |
-| **[Providers](docs/reference/providers.md)** | LLM provider configuration (20+ supported) |
+| **[Providers](docs/reference/providers.md)** | LLM provider configuration (15+ supported) |
 | **[Channels](docs/reference/channels.md)** | Messaging platform integrations |
+| **[Tools](docs/reference/tools.md)** | Built-in tools and tool system |
 | **[Skills](docs/reference/skills.md)** | Creating, installing, and managing skills |
 | **[CLI Reference](docs/reference/cli.md)** | Complete command-line documentation |
 | **[Configuration](docs/reference/configuration.md)** | Full config.yaml reference |
 | **[Security](docs/guides/security.md)** | Security model, hardening, best practices |
 | **[Deployment](docs/operations/deployment.md)** | Production deployment strategies |
-| **[Monitoring](docs/operations/monitoring.md)** | Metrics, logging, alerting |
+| **[Monitoring](docs/operations/monitoring.md)** | Health dashboard, OpenTelemetry, metrics |
 | **[Heartbeat](docs/reference/heartbeat.md)** | Periodic task scheduling |
 | **[Troubleshooting](docs/operations/troubleshooting.md)** | Common issues and solutions |
 
@@ -138,7 +144,7 @@ wunderpus/
 ├── cmd/wunderpus/          # CLI entry point (Cobra commands)
 ├── internal/               # All application code
 │   ├── app/                # Bootstrap & wiring (composition root)
-│   ├── agent/              # Core agent loop, context, orchestration
+│   ├── agent/              # Core agent loop, context, branching, checkpoints
 │   ├── agents/             # Sub-agent lifecycle management
 │   ├── provider/           # LLM provider adapters & router
 │   ├── channel/            # Messaging channel implementations
@@ -147,40 +153,31 @@ wunderpus/
 │   ├── skills/             # Skills loading & registry
 │   ├── memory/             # Session storage, RAG, vector search
 │   ├── worldmodel/         # Knowledge graph
-│   ├── perception/         # Computer use (Playwright)
-│   ├── swarm/              # Multi-agent orchestration
-│   ├── a2a/                # Agent-to-Agent protocol
+│   ├── perception/         # Computer use (Playwright) + multi-modal input
 │   ├── subagent/           # Sub-agent management
 │   ├── security/           # Sanitization, sandbox, encryption
 │   ├── audit/              # Tamper-evident audit log
 │   ├── config/             # Configuration loading & validation
-│   ├── health/             # Health check server
+│   ├── health/             # Health check server with aggregator
 │   ├── heartbeat/          # Periodic task scheduler
 │   ├── logging/            # Structured logging & observability
-│   ├── cost/               # Cost tracking & budgeting
-│   ├── events/             # Pub/sub event bus
+│   ├── cost/               # Cost tracking, budgeting & prediction
+│   ├── events/             # Pub/sub event bus with priority routing
+│   ├── telemetry/          # OpenTelemetry tracer initialization
+│   ├── prompts/            # Prompt versioning manager
+│   ├── webhook/            # Webhook delivery system
 │   ├── types/              # Shared type definitions
 │   ├── errors/             # Typed error system
 │   ├── constants/          # Global constants
 │   ├── tui/                # Terminal UI (Bubbletea)
-│   ├── rsi/                # Recursive Self-Improvement
-│   ├── ags/                # Autonomous Goal Synthesis
-│   ├── uaa/                # Unbounded Autonomous Action
-│   ├── ra/                 # Resource Acquisition
+│   ├── ags/                # Autonomous Goal Synthesis (manual trigger)
 │   ├── money/              # Income generation capabilities
-│   ├── engineering/        # Software engineering domain
-│   ├── creative/           # Creative capabilities
-│   ├── research/           # Agentic RAG
-│   ├── social/             # Social media & outreach
-│   ├── business/           # Business logic
-│   ├── planning/           # Planning & self-improvement
-│   ├── edge/               # Edge computing & local LLM
-│   └── bootstrap/          # Bootstrap utilities
+│   ├── planning/           # Planning & self-mapping
+│   └── db/                 # Shared database manager (2 DBs)
+├── contrib/channels/       # Optional channel plugins (Feishu, QQ, WeCom, DingTalk)
 ├── web/                    # Web server (HTTP + WebSocket)
-├── ui/                     # React frontend (Vite + TypeScript)
 ├── skills/                 # Built-in skills
 ├── docs/                   # Documentation
-├── grafana/                # Grafana dashboard configs
 ├── config.example.yaml     # Example configuration
 ├── free_tiers.yaml         # Free-tier provider definitions
 ├── HEARTBEAT.md            # Periodic task definitions
@@ -209,7 +206,6 @@ wunderpus/
 | Zhipu (GLM) | `openai` | glm-4 | No |
 | Moonshot (Kimi) | `openai` | kimi-latest | No |
 | Qwen | `openai` | qwen-turbo | No |
-| Volcanic Engine | `openai` | doubao-1-5-pro | No |
 | vLLM | `openai` | Any self-hosted | Yes |
 | LiteLLM | `openai` | Any proxied | Yes |
 
@@ -224,7 +220,7 @@ Wunderpus implements defense-in-depth across five layers:
 | **Input** | Unicode normalization + 9-pattern injection detection | Block prompt injection attacks |
 | **Execution** | Workspace sandbox + command chaining prevention | Restrict file/shell operations |
 | **Network** | SSRF blocklist (localhost, private IPs, cloud metadata) | Prevent internal network access |
-| **Autonomy** | Trust budget (4-tier action classification) | Limit autonomous actions |
+| **Approval** | Policy-based tool classification (AutoExecute, NotifyOnly, RequiresApproval, Blocked) | Control tool execution |
 | **Storage** | AES-256-GCM encryption + SHA-256 hash-chained audit log | Protect data at rest |
 
 ---

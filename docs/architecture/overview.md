@@ -7,27 +7,28 @@ Wunderpus follows a layered, dependency-injected architecture with a central boo
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         CLI Layer                               │
-│    wunderpus │ agent │ gateway │ onboard │ status │ skills │ cron│
+│    wunderpus │ agent │ gateway │ onboard │ status │ skills      │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Application Bootstrap                         │
 │         (internal/app/) — Composition Root                       │
 │                                                                  │
-│  12-step initialization:                                         │
-│  Config → Logging → Security → Providers → Tools → Memory       │
-│  → Skills → ToolSynth → WorldModel → Perception → Agent         │
-│  → SubAgent → Swarm → Heartbeat → Health → Channels             │
+│  Config → Logging → DB → Security → Providers → Tools           │
+│  → Memory → Skills → ToolSynth → WorldModel → Perception        │
+│  → Agent → SubAgent → Heartbeat → Health → Channels             │
 └──────┬───────────────────┬───────────────────┬──────────────────┘
        │                   │                   │
 ┌──────▼──────┐   ┌───────▼───────┐   ┌───────▼──────────────────┐
-│ Agent Core  │   │   Channels    │   │   Genesis Systems        │
+│ Agent Core  │   │   Channels    │   │   Core Systems           │
 │             │   │               │   │                          │
-│ • Context   │   │ • Telegram    │   │ • RSI (Self-Improve)     │
-│ • Tools     │   │ • Discord     │   │ • AGS (Goal Synthesis)   │
-│ • Skills    │   │ • Slack       │   │ • UAA (Autonomous Action)│
-│ • RAG       │   │ • WhatsApp    │   │ • RA (Resource Acq.)     │
-│ • Streaming │   │ • WebSocket   │   │                          │
+│ • Context   │   │ • Telegram    │   │ • Tool Synthesis         │
+│ • Tools     │   │ • Discord     │   │ • World Model            │
+│ • Skills    │   │ • Slack       │   │ • Perception             │
+│ • RAG       │   │ • WhatsApp    │   │ • AGS (Goals)            │
+│ • Streaming │   │ • WebSocket   │   │ • Sub-Agents             │
+│ • Branching │   │               │   │ • Heartbeat              │
+│ • Checkpoint│   │               │   │ • Webhooks               │
 └──────┬──────┘   └───────┬───────┘   └──────────────────────────┘
        │                  │
 ┌──────▼──────────────────▼──────────────────────────────────────┐
@@ -36,7 +37,6 @@ Wunderpus follows a layered, dependency-injected architecture with a central boo
 │                                                                  │
 │  • Auto-detect protocol from model prefix                       │
 │  • Fallback chain on failure                                    │
-│  • Parallel probing for fastest response                        │
 │  • 5-minute response cache                                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -45,18 +45,7 @@ Wunderpus follows a layered, dependency-injected architecture with a central boo
 
 ### Dependency Injection via Bootstrap
 
-The `app.Bootstrap()` function is the single composition root. Every component is constructed in a defined order and passed explicitly to dependents:
-
-```go
-// Simplified bootstrap flow
-config := config.Load(path)
-logger := logging.Init(config.Logging)
-security := security.Init(config.Security)
-providers := provider.NewRouter(config)
-tools := tool.NewRegistry()
-memory := memory.NewStore(config)
-agent := agent.NewAgent(providers, tools, memory, security)
-```
+The `app.Bootstrap()` function is the single composition root. Every component is constructed in a defined order and passed explicitly to dependents.
 
 ### Interface-Based Abstraction
 
@@ -66,7 +55,7 @@ Every major subsystem uses Go interfaces:
 |---|---|---|
 | `provider.Provider` | LLM completion | OpenAI, Anthropic, Gemini, Ollama |
 | `provider.Embedder` | Vector embeddings | OpenAI, Gemini, Ollama |
-| `channel.Channel` | Messaging platform | Telegram, Discord, Slack, WhatsApp, etc. |
+| `channel.Channel` | Messaging platform | Telegram, Discord, Slack, WhatsApp, WebSocket |
 | `tool.Tool` | Agent actions | file_read, shell_exec, http_request, etc. |
 | `skills.SkillRegistry` | Skill distribution | Memory (local) |
 
@@ -99,6 +88,7 @@ Analysis Spec    Source  Tests   to Disk
 
 The `events.Bus` provides typed publish/subscribe with:
 - Non-blocking handler execution (separate goroutines)
+- Priority-based routing (`PriorityHigh` sync, `PriorityNormal` async)
 - Panic recovery per handler
 - Dead-letter queue (max 1000 entries)
 
@@ -163,76 +153,13 @@ Synthesizer.Merge()
 Final Response
 ```
 
-## Component Relationships
-
-```
-                    ┌─────────────┐
-                    │   Config    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-        ┌─────▼─────┐ ┌───▼────┐ ┌────▼─────┐
-        │ Providers │ │ Tools  │ │ Channels │
-        └─────┬─────┘ └───┬────┘ └────┬─────┘
-              │           │           │
-              └───────────┼───────────┘
-                          │
-                    ┌─────▼─────┐
-                    │   Agent   │
-                    └─────┬─────┘
-                          │
-              ┌───────────┼───────────┐
-              │           │           │
-        ┌─────▼─────┐ ┌───▼────┐ ┌────▼─────┐
-        │  Memory   │ │ Skills │ │  Cost    │
-        └───────────┘ └────────┘ └──────────┘
-```
-
-## Extension Points
-
-### Add a New Provider
-
-1. Implement `provider.Provider` interface
-2. Register in `provider.NewFromModelEntry()` factory
-3. Add to `config.example.yaml`
-
-### Add a New Channel
-
-1. Create directory in `internal/channel/`
-2. Implement `channel.Channel` interface (`Start`, `Stop`, `Name`)
-3. Register in `app.Bootstrap()`
-
-### Add a New Tool
-
-1. Implement `tool.Tool` interface (`Name`, `Description`, `Parameters`, `Execute`, `Sensitive`, `Version`)
-2. Register in tool registry during bootstrap
-3. Tool is automatically available to the agent
-
-### Add a New Skill
-
-1. Create directory: `skills/my-skill/`
-2. Add `SKILL.md` with frontmatter:
-   ```yaml
-   ---
-   name: my-skill
-   description: "What this skill does"
-   ---
-   ```
-3. Document usage in the markdown body
-
 ## Persistence Model
 
-All persistence uses SQLite — no external database required:
+Wunderpus uses **exactly 2 SQLite databases** with namespaced tables:
 
-| Database | Purpose | Package |
+| Database | Purpose | Table Prefixes |
 |---|---|---|
-| `wonderpus_memory.db` | Sessions, messages, preferences | `memory/` |
-| `wonderpus_audit.db` | Tamper-evident audit log | `audit/` |
-| `wunderpus_cost.db` | Cost tracking, budgets | `cost/` |
-| `wunderpus_worldmodel.db` | Knowledge graph | `worldmodel/` |
-| `wunderpus_profiler.db` | RSI performance metrics | `rsi/` |
-| `wunderpus_trust.db` | Trust budget | `uaa/` |
-| `wunderpus_resources.db` | Provisioned resources | `ra/` |
+| `wunderpus.db` | Core data | `mem_` (memory), `wm_` (world model), `cost_` (cost tracking), `task_checkpoints` |
+| `wunderpus-audit.db` | Tamper-evident audit log | `audit_log` (hash-chained entries) |
 
 All databases support WAL mode for concurrent reads.

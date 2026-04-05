@@ -1,12 +1,12 @@
 # Provider System
 
-Wunderpus connects to 20+ LLM providers through a protocol-based routing system with automatic fallback, caching, and parallel probing.
+Wunderpus connects to 15+ LLM providers through a protocol-based routing system with automatic fallback, caching, and cooldown management.
 
 ## Supported Protocols
 
 | Protocol | Providers |
 |---|---|
-| `openai` | OpenAI, Groq, OpenRouter, DeepSeek, Cerebras, NVIDIA, LiteLLM, vLLM, Mistral, Volcanic, Qwen, Zhipu, Moonshot |
+| `openai` | OpenAI, Groq, OpenRouter, DeepSeek, Cerebras, NVIDIA, LiteLLM, vLLM, Mistral, Qwen, Zhipu, Moonshot |
 | `anthropic` | Anthropic Claude |
 | `ollama` | Local Ollama instances |
 | `gemini` | Google Gemini |
@@ -83,19 +83,7 @@ Failed providers enter cooldown:
 - Reduces API costs for repeated queries
 - Automatically invalidated on TTL expiry
 
-### Parallel Probing
-
-Fire multiple providers simultaneously, use the first response:
-
-```yaml
-agent:
-  parallel_probe: true
-  probe_timeout: 5s
-```
-
-## Provider Details
-
-### OpenAI-Compatible
+## OpenAI-Compatible Providers
 
 Works with any OpenAI-compatible API:
 
@@ -121,36 +109,8 @@ Works with any OpenAI-compatible API:
 | vLLM | `localhost:8000/v1` | `vllm/` |
 | LiteLLM | `localhost:4000/v1` | `litellm/` |
 | Qwen | `dashscope.aliyuncs.com` | `qwen/` |
-| Volcanic | `ark.cn-beijing.volces.com` | `volcanic/` |
 | Zhipu | `open.bigmodel.cn` | `zhipu/` |
 | Moonshot | `api.moonshot.cn` | `moonshot/` |
-
-### Anthropic
-
-```yaml
-- model_name: "claude"
-  model: "anthropic/claude-sonnet-4-20250514"
-  api_key: "sk-ant-..."
-  max_tokens: 4096
-```
-
-### Google Gemini
-
-```yaml
-- model_name: "gemini"
-  model: "gemini/gemini-2.0-flash"
-  api_key: "AIza..."
-  max_tokens: 4096
-```
-
-### Ollama (Local)
-
-```yaml
-- model_name: "local"
-  model: "ollama/llama3.2"
-  api_base: "http://localhost:11434"
-  max_tokens: 4096
-```
 
 ## Embeddings
 
@@ -179,5 +139,5 @@ Wunderpus tracks free-tier providers in `free_tiers.yaml`:
 1. **Always configure fallbacks** — At least one backup provider
 2. **Use environment variables** for API keys
 3. **Set appropriate max_tokens** — Match your use case
-4. **Monitor costs** — Enable `stats.enabled: true`
+4. **Monitor costs** — Enable cost tracking
 5. **Choose models wisely** — Use cheaper models for simple tasks

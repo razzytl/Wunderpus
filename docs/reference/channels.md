@@ -12,12 +12,17 @@ Complete reference for all supported messaging channels.
 | Slack | Socket Mode | Stable | App + Bot Token |
 | WhatsApp | whatsmeow | Stable | Phone pairing |
 | WebSocket | HTTP/WS | Stable | None |
-| Feishu/Lark | HTTP API | Stable | App credentials |
-| LINE | Messaging API | Stable | Channel token |
-| QQ | HTTP API | Stable | None |
-| WeCom | Webhook | Stable | Corp credentials |
-| DingTalk | Webhook | Stable | App credentials |
-| OneBot | WebSocket | Stable | OneBot server |
+
+### Optional Channels (contrib/)
+
+These channels are available in `contrib/channels/` but are not loaded by default:
+
+| Channel | Location | Notes |
+|---|---|---|
+| Feishu/Lark | `contrib/channels/feishu/` | Chinese market |
+| QQ | `contrib/channels/qq/` | Chinese market |
+| WeCom | `contrib/channels/wecom/` | Chinese market |
+| DingTalk | `contrib/channels/dingtalk/` | Chinese market |
 
 ## Configuration
 
@@ -58,12 +63,6 @@ channels:
   telegram:
     enabled: true
     bot_token: "${TELEGRAM_BOT_TOKEN}"
-```
-
-### Environment Variable
-
-```bash
-export TELEGRAM_BOT_TOKEN="your-token"
 ```
 
 ## Discord
@@ -137,13 +136,13 @@ const ws = new WebSocket('ws://localhost:9090');
 ws.onopen = () => {
   ws.send(JSON.stringify({
     type: 'user_message',
-    content: 'Hello!'
+    payload: { content: 'Hello!' }
   }));
 };
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  console.log(msg.type, msg.content);
+  console.log(msg.type, msg.payload);
 };
 ```
 
@@ -152,6 +151,8 @@ ws.onmessage = (event) => {
 | Type | Direction | Description |
 |---|---|---|
 | `user_message` | Client → Server | User input |
+| `branch_switch` | Client → Server | Switch conversation branch |
+| `list_branches` | Client → Server | List all branches for session |
 | `chat_token` | Server → Client | Streaming token |
 | `chat_complete` | Server → Client | Response finished |
 | `tool_execution_start` | Server → Client | Tool starting |
@@ -172,6 +173,5 @@ wunderpus gateway
 The ChannelAggregator provides unified file sending across channels:
 
 ```go
-// Try each channel's FileSender interface
 aggregator.SendFile(sessionID, filePath, caption)
 ```

@@ -97,6 +97,7 @@ agent:
   system_prompt: "You are Wunderpus..."  # System prompt
   max_context_tokens: 8000               # Max context window
   temperature: 0.7                       # Default temperature
+  budget: 10.0                           # Daily budget in USD
 ```
 
 ## Tools
@@ -105,10 +106,6 @@ agent:
 tools:
   enabled: true
   timeout_seconds: 30
-
-  allowed_paths:
-    - "."
-    - "/tmp"
 
   shell_whitelist:
     - ls
@@ -130,6 +127,9 @@ tools:
     brave_api_key: ""
     tavily_api_key: ""
     perplexity_key: ""
+
+  send_file:
+    enabled: false
 ```
 
 ## Security
@@ -137,7 +137,14 @@ tools:
 ```yaml
 security:
   sanitization_enabled: true
-  audit_db_path: "wunderpus_audit.db"
+  encryption:
+    enabled: false
+    key: ""  # Base64-encoded 32-byte key
+  rate_limit:
+    enabled: true
+    window_sec: 60
+    max_requests: 60
+    cleanup_interval_sec: 300
 ```
 
 ## Logging
@@ -194,36 +201,20 @@ heartbeat:
 
 ```yaml
 genesis:
-  # Infrastructure
-  toolsynth_enabled: false
+  # Core Systems
+  tool_synth_enabled: false
   worldmodel_enabled: false
   perception_enabled: false
-  swarm_enabled: false
 
-  # Core Autonomy
-  rsi_enabled: false
-  rsi_firewall_enabled: true
-  rsi_self_referential_enabled: false
-  rsi_fitness_threshold: 0.05
-
+  # AGS (Autonomous Goal Synthesis)
   ags_enabled: false
-  uaa_enabled: false
-  ra_enabled: false
-
-  # Trust Budget
-  trust_budget_max: 1000
-  trust_regen_per_hour: 10
+  ags_manual_only: true  # Only trigger via API/CLI/Cron
 
   # Spend Cap
   max_daily_spend_usd: 10.0
 
-  # JWT Reset
-  jwt_secret_env: "WUNDERPUS_JWT_SECRET"
-
-  # Database Paths
-  audit_log_db_path: ""
-  profiler_db_path: ""
-  trust_budget_db_path: ""
+  # Tool Synthesis
+  tool_synth_min_pass_rate: 0.8
 ```
 
 ## Environment Variable Overrides
@@ -252,4 +243,4 @@ Wunderpus auto-migrates between config versions:
 | v0 | Legacy provider-only format |
 | v1 | Added encryption salt |
 | v2 | Added `model_list` support |
-| v3 | Current — full Genesis configuration |
+| v3 | Current — cleaned genesis configuration (no RSI/UAA/RA) |
